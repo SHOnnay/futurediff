@@ -62,7 +62,8 @@ Implemented capabilities:
 
 ## Repository provenance
 
-This repository contains the canonical runnable Go core plus useful specifications and research imported from the supplied `futurediff-design` branch. The original experimental branch is preserved under `research/original-design-branch/` and is not silently mixed into the trusted runtime. See `docs/MERGE-REPORT.md` and `PROVENANCE.md`.
+This repository contains the canonical runnable Go core plus useful specifications and research imported from the supplied `futurediff-design` branch. The original experimental branch is preserved under `research/original-design-branch/` and is not silently mixed into the trusted runtime. See `docs/MERGE-REPORT.md`.
+
 
 ## Requirements
 
@@ -250,7 +251,7 @@ GitHub resources are closed/deleted and the Slack message is deleted. Use only d
 
 ## Documentation
 
-- `ARCHITECTURE.md`
+- `docs/tasks/TASK-011-controlled-github-branch-publication.md`
 - `docs/tasks/TASK-011-controlled-github-branch-publication.md`
 - `docs/tasks/TASK-012-slack-durable-outbox.md`
 - `docs/tasks/TASK-013-generic-mcp-bridge.md`

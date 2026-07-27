@@ -15,7 +15,7 @@ LDFLAGS="-s -w -X github.com/SHOnnay/futurediff/internal/buildinfo.Version=${VER
 for cmd in futurediff futurediffd futurediff-mcp futurediff-certify futurediff-bench futurediff-sbom futurediff-admin futurediff-demo futurediff-integrate futurediff-provenance futurediff-cert-suite futurediff-install futurediff-platform futurediff-agent-bench futurediff-verify-release futurediff-provider-cert futurediff-audit futurediff-prune futurediff-doctor futurediff-api-contract futurediff-export futurediff-restore futurediff-replay futurediff-config-lint futurediff-api-diff futurediff-effectspec futurediff-policy-explain futurediff-recovery-drill futurediff-metrics futurediff-support-bundle futurediff-approval futurediff-policy-bundle futurediff-diff futurediff-upgrade-rehearsal futurediff-compat futurediff-maintenance futurediff-evidence futurediff-timeline futurediff-threat-test futurediff-config-snapshot futurediff-approval-quorum futurediff-incident futurediff-drain futurediff-operator-receipt futurediff-retention-policy futurediff-effect-graph futurediff-slo futurediff-readiness futurediff-secret-scan futurediff-quota futurediff-api-audit futurediff-daemon-lock futurediff-rate-policy futurediff-config-sign futurediff-root-audit futurediff-ledger-maintain futurediff-integrity-checkpoint futurediff-lease-cleanup futurediff-repository-policy futurediff-expire futurediff-idempotency-gc futurediff-storage-check futurediff-openapi futurediff-backup-catalog; do
   go build -trimpath -ldflags "$LDFLAGS" -o "$OUT/$cmd" "./cmd/$cmd"
 done
-cp README.md ARCHITECTURE.md PROVENANCE.md "$OUT/"
+cp README.md "$OUT/"
 "$OUT/futurediff-sbom" --root . --output "$OUT/futurediff.spdx.json" --files=true
 PROV_ARGS=()
 for artifact in "$OUT"/futurediff*; do
