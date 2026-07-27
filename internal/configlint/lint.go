@@ -12,8 +12,15 @@ import (
 	"strings"
 
 	"github.com/SHOnnay/futurediff/internal/agentbench"
+	"github.com/SHOnnay/futurediff/internal/backupcatalog"
+	"github.com/SHOnnay/futurediff/internal/configattest"
 	"github.com/SHOnnay/futurediff/internal/credentials"
+	"github.com/SHOnnay/futurediff/internal/idempotencygc"
 	"github.com/SHOnnay/futurediff/internal/installer"
+	"github.com/SHOnnay/futurediff/internal/ratelimit"
+	"github.com/SHOnnay/futurediff/internal/repoadmission"
+	"github.com/SHOnnay/futurediff/internal/storageguard"
+	"github.com/SHOnnay/futurediff/internal/transactionexpiry"
 	"github.com/SHOnnay/futurediff/internal/verification"
 )
 
@@ -71,6 +78,34 @@ func Lint(path, kind string) Report {
 		if err := validateOpenCode(data); err != nil {
 			fail("invalid_opencode_profile", err)
 		}
+	case "rate-policy":
+		if _, err := ratelimit.Load(path); err != nil {
+			fail("invalid_rate_policy", err)
+		}
+	case "repository-policy":
+		if _, err := repoadmission.Load(path); err != nil {
+			fail("invalid_repository_policy", err)
+		}
+	case "storage-policy":
+		if _, err := storageguard.Load(path); err != nil {
+			fail("invalid_storage_policy", err)
+		}
+	case "transaction-expiry-policy":
+		if _, err := transactionexpiry.Load(path); err != nil {
+			fail("invalid_transaction_expiry_policy", err)
+		}
+	case "idempotency-retention-policy":
+		if _, err := idempotencygc.Load(path); err != nil {
+			fail("invalid_idempotency_retention_policy", err)
+		}
+	case "backup-retention-policy":
+		if _, err := backupcatalog.Load(path); err != nil {
+			fail("invalid_backup_retention_policy", err)
+		}
+	case "config-attestation":
+		if _, err := configattest.Load(path); err != nil {
+			fail("invalid_config_attestation", err)
+		}
 	case "json":
 		var value any
 		if err := strictJSON(data, &value); err != nil {
@@ -115,6 +150,26 @@ func detect(data []byte) string {
 	}
 	if _, ok := m["mcp"]; ok {
 		return "opencode"
+	}
+	if _, ok := m["read_requests_per_minute"]; ok {
+		return "rate-policy"
+	}
+	if _, ok := m["minimum_free_bytes"]; ok {
+		return "storage-policy"
+	}
+	if _, ok := m["state_after_hours"]; ok {
+		return "transaction-expiry-policy"
+	}
+	if _, ok := m["completed_after_hours"]; ok {
+		return "idempotency-retention-policy"
+	}
+	if _, ok := m["backup_root"]; ok {
+		return "backup-retention-policy"
+	}
+	if _, ok := m["file_sha256"]; ok {
+		if _, ok := m["signature"]; ok {
+			return "config-attestation"
+		}
 	}
 	return "json"
 }

@@ -1,0 +1,9 @@
+{
+  "version": "0.1",
+  "maximum_unresolved": 0,
+  "maximum_unknown_effects": 0,
+  "maximum_audit_errors": 0,
+  "maximum_audit_warnings": 10,
+  "daemon_required": false,
+  "maintenance_must_be_disabled": false
+}

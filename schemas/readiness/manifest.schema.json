@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://futurediff.dev/schemas/readiness/manifest-0.1.json",
+  "type": "object",
+  "required": ["version", "require_audit_healthy", "require_maintenance_disabled", "require_operator_receipts"],
+  "properties": {
+    "version": {"const": "0.1"},
+    "require_audit_healthy": {"type": "boolean"},
+    "slo_policy": {"type": "string"},
+    "required_api_contract_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "require_maintenance_disabled": {"type": "boolean"},
+    "operator_receipt_keyring": {"type": "string"},
+    "require_operator_receipts": {"type": "boolean"}
+  },
+  "additionalProperties": false
+}

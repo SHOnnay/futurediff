@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/SHOnnay/futurediff/internal/apicontract"
@@ -18,16 +20,26 @@ import (
 	"github.com/SHOnnay/futurediff/internal/buildinfo"
 	"github.com/SHOnnay/futurediff/internal/drain"
 	"github.com/SHOnnay/futurediff/internal/maintenance"
+	"github.com/SHOnnay/futurediff/internal/openapispec"
 	"github.com/SHOnnay/futurediff/internal/operatorapproval"
+	"github.com/SHOnnay/futurediff/internal/peerauth"
+	"github.com/SHOnnay/futurediff/internal/ratelimit"
+	"github.com/SHOnnay/futurediff/internal/requestid"
+	"github.com/SHOnnay/futurediff/internal/storageguard"
 	"github.com/SHOnnay/futurediff/internal/verification"
 )
 
 type Server struct {
-	Service     *app.Service
-	SocketPath  string
-	HTTP        *http.Server
-	Maintenance *maintenance.Manager
-	Drain       *drain.Manager
+	Service                *app.Service
+	SocketPath             string
+	HTTP                   *http.Server
+	Maintenance            *maintenance.Manager
+	Drain                  *drain.Manager
+	RequirePeerCredentials bool
+	AllowedPeerUIDs        map[uint32]struct{}
+	RateLimiter            *ratelimit.Limiter
+	StorageGuard           *storageguard.Guard
+	idempotencyMu          sync.Mutex
 }
 
 type errorBody struct {
@@ -56,9 +68,12 @@ func (s *Server) Handler() http.Handler {
 				return
 			}
 		}
-		writeJSON(w, 200, map[string]any{"status": "ok", "implementation": "go", "build": buildinfo.Current(), "time": time.Now().UTC(), "oci": s.Service.RuntimeStatus(r.Context()), "credentials": s.Service.CredentialStatus(), "approvals": s.Service.ApprovalStatus(), "maintenance": status, "drain": s.drainStatus()})
+		writeJSON(w, 200, map[string]any{"status": "ok", "implementation": "go", "build": buildinfo.Current(), "time": time.Now().UTC(), "oci": s.Service.RuntimeStatus(r.Context()), "credentials": s.Service.CredentialStatus(), "approvals": s.Service.ApprovalStatus(), "quotas": s.Service.QuotaStatus(), "secret_scan": s.Service.SecretScanStatus(), "peer_auth": map[string]any{"required": s.RequirePeerCredentials, "allowed_uid_count": len(s.AllowedPeerUIDs)}, "rate_limit": s.rateStatus(), "storage": s.storageStatus(), "maintenance": status, "drain": s.drainStatus()})
 	})
 	mux.HandleFunc("GET /v1/contract", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, apicontract.Current()) })
+	mux.HandleFunc("GET /v1/openapi", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 200, openapispec.Generate(apicontract.Current()))
+	})
 	mux.HandleFunc("POST /v1/transactions", s.create)
 	mux.HandleFunc("GET /v1/transactions/{id}", s.get)
 	mux.HandleFunc("POST /v1/transactions/{id}/execute", s.execute)
@@ -75,7 +90,90 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/transactions/{id}/recover", s.recover)
 	mux.HandleFunc("POST /v1/transactions/{id}/abort", s.abort)
 	mux.HandleFunc("GET /v1/transactions/{id}/events", s.events)
-	return logging(s.drainGuard(s.maintenanceGuard(mux)))
+	return s.requestIDGuard(logging(s.peerGuard(s.rateGuard(s.drainGuard(s.maintenanceGuard(s.storageGuard(s.idempotencyGuard(mux))))))))
+}
+
+func (s *Server) storageStatus() any {
+	if s.StorageGuard == nil {
+		return map[string]any{"enabled": false}
+	}
+	status, err := s.StorageGuard.Status(time.Now())
+	if err != nil {
+		return map[string]any{"enabled": true, "healthy": false, "error": err.Error()}
+	}
+	return map[string]any{"enabled": true, "status": status}
+}
+
+func (s *Server) storageGuard(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions || s.StorageGuard == nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+		status, err := s.StorageGuard.Status(time.Now())
+		if err != nil {
+			writeErr(w, http.StatusInsufficientStorage, "storage_check_failed", err)
+			return
+		}
+		if !status.Healthy {
+			writeJSON(w, http.StatusInsufficientStorage, map[string]any{"error": "storage_pressure", "message": "mutations are blocked by the storage-pressure policy", "storage": status})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (s *Server) rateStatus() any {
+	if s.RateLimiter == nil {
+		return map[string]any{"enabled": false}
+	}
+	status := s.RateLimiter.Status()
+	return map[string]any{"enabled": true, "policy": status}
+}
+
+func (s *Server) rateGuard(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.RateLimiter == nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+		mutation := r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions
+		principal := peerauth.Principal(r.Context())
+		release, retry, err := s.RateLimiter.Begin(principal, mutation, time.Now())
+		if err != nil {
+			seconds := int(retry.Round(time.Second) / time.Second)
+			if seconds < 1 {
+				seconds = 1
+			}
+			w.Header().Set("Retry-After", fmt.Sprint(seconds))
+			if s.Service != nil && s.Service.Ledger != nil {
+				_ = s.Service.Ledger.RecordAPIAccess(principal, r.Method, r.URL.Path, http.StatusTooManyRequests, "", "", requestid.From(r.Context()))
+			}
+			writeJSON(w, http.StatusTooManyRequests, map[string]any{"error": "rate_limited", "message": err.Error(), "retry_after_seconds": seconds})
+			return
+		}
+		defer release()
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (s *Server) peerGuard(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !s.RequirePeerCredentials {
+			next.ServeHTTP(w, r)
+			return
+		}
+		identity, ok := peerauth.FromContext(r.Context())
+		if !ok {
+			writeJSON(w, http.StatusForbidden, map[string]any{"error": "peer_credentials_unavailable", "message": "kernel-authenticated Unix peer credentials are required"})
+			return
+		}
+		if _, allowed := s.AllowedPeerUIDs[identity.UID]; !allowed {
+			writeJSON(w, http.StatusForbidden, map[string]any{"error": "peer_not_authorized", "message": "Unix peer UID is not authorized"})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) drainStatus() drain.Status {
@@ -133,7 +231,21 @@ func (s *Server) Serve() error {
 		_ = ln.Close()
 		return err
 	}
-	s.HTTP = &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 5 * time.Second}
+	s.HTTP = &http.Server{
+		Handler:           s.Handler(),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    32 << 10,
+		ConnContext: func(ctx context.Context, conn net.Conn) context.Context {
+			identity, err := peerauth.FromConn(conn)
+			if err != nil {
+				return ctx
+			}
+			return peerauth.WithIdentity(ctx, identity)
+		},
+	}
 	defer os.Remove(s.SocketPath)
 	err = s.HTTP.Serve(ln)
 	if errors.Is(err, http.ErrServerClosed) {
@@ -164,9 +276,26 @@ func (s *Server) Close() error {
 }
 func decode(r *http.Request, v any) error {
 	defer r.Body.Close()
-	d := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
+	data, err := io.ReadAll(io.LimitReader(r.Body, maxRequestBodyBytes+1))
+	if err != nil {
+		return err
+	}
+	if len(data) > maxRequestBodyBytes {
+		return errors.New("request body exceeds 1 MiB")
+	}
+	d := json.NewDecoder(bytes.NewReader(data))
 	d.DisallowUnknownFields()
-	return d.Decode(v)
+	if err := d.Decode(v); err != nil {
+		return err
+	}
+	var extra any
+	if err := d.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return errors.New("trailing JSON value rejected")
+		}
+		return err
+	}
+	return nil
 }
 func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 	var req app.CreateRequest

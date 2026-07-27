@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	kind := flag.String("kind", "auto", "auto, credentials, verification, agent-run, installer-plan, opencode, or json")
+	kind := flag.String("kind", "auto", "auto, credentials, verification, agent-run, installer-plan, opencode, rate-policy, repository-policy, config-attestation, or json")
 	version := flag.Bool("version", false, "print build information")
 	flag.Parse()
 	if *version {

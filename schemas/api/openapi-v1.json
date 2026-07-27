@@ -1,0 +1,475 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "FutureDiff Local API",
+    "version": "1.0",
+    "description": "Private Unix-socket HTTP API. Agent-safe authority is declared per operation."
+  },
+  "paths": {
+    "/v1/contract": {
+      "get": {
+        "operationId": "contract",
+        "summary": "contract",
+        "x-futurediff-agent-safe": true,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        }
+      }
+    },
+    "/v1/health": {
+      "get": {
+        "operationId": "health",
+        "summary": "health",
+        "x-futurediff-agent-safe": true,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        }
+      }
+    },
+    "/v1/openapi": {
+      "get": {
+        "operationId": "openapi",
+        "summary": "openapi",
+        "x-futurediff-agent-safe": true,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        }
+      }
+    },
+    "/v1/transactions": {
+      "post": {
+        "operationId": "transaction_create",
+        "summary": "transaction create",
+        "x-futurediff-agent-safe": true,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/v1/transactions/{id}": {
+      "get": {
+        "operationId": "transaction_get",
+        "summary": "transaction get",
+        "x-futurediff-agent-safe": true,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        }
+      }
+    },
+    "/v1/transactions/{id}/abort": {
+      "post": {
+        "operationId": "transaction_abort",
+        "summary": "transaction abort",
+        "x-futurediff-agent-safe": false,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/v1/transactions/{id}/approval-material": {
+      "get": {
+        "operationId": "approval_material",
+        "summary": "approval material",
+        "x-futurediff-agent-safe": false,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        }
+      }
+    },
+    "/v1/transactions/{id}/approve": {
+      "post": {
+        "operationId": "transaction_approve",
+        "summary": "transaction approve",
+        "x-futurediff-agent-safe": false,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/v1/transactions/{id}/commit": {
+      "post": {
+        "operationId": "transaction_commit",
+        "summary": "transaction commit",
+        "x-futurediff-agent-safe": false,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/v1/transactions/{id}/effects": {
+      "get": {
+        "operationId": "effects_list",
+        "summary": "effects list",
+        "x-futurediff-agent-safe": true,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        }
+      }
+    },
+    "/v1/transactions/{id}/effects/github/branch": {
+      "post": {
+        "operationId": "github_branch_prepare",
+        "summary": "github branch prepare",
+        "x-futurediff-agent-safe": true,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/v1/transactions/{id}/effects/github/draft-pull-request": {
+      "post": {
+        "operationId": "github_pr_prepare",
+        "summary": "github pr prepare",
+        "x-futurediff-agent-safe": true,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/v1/transactions/{id}/effects/slack/message": {
+      "post": {
+        "operationId": "slack_message_prepare",
+        "summary": "slack message prepare",
+        "x-futurediff-agent-safe": true,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/v1/transactions/{id}/effects/{effectID}/refresh": {
+      "post": {
+        "operationId": "effect_refresh",
+        "summary": "effect refresh",
+        "x-futurediff-agent-safe": true,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/v1/transactions/{id}/events": {
+      "get": {
+        "operationId": "events_list",
+        "summary": "events list",
+        "x-futurediff-agent-safe": true,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        }
+      }
+    },
+    "/v1/transactions/{id}/execute": {
+      "post": {
+        "operationId": "transaction_execute",
+        "summary": "transaction execute",
+        "x-futurediff-agent-safe": true,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/v1/transactions/{id}/recover": {
+      "post": {
+        "operationId": "transaction_recover",
+        "summary": "transaction recover",
+        "x-futurediff-agent-safe": false,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/v1/transactions/{id}/seal": {
+      "post": {
+        "operationId": "transaction_seal",
+        "summary": "transaction seal",
+        "x-futurediff-agent-safe": true,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/v1/transactions/{id}/verify": {
+      "post": {
+        "operationId": "transaction_verify",
+        "summary": "transaction verify",
+        "x-futurediff-agent-safe": true,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    }
+  },
+  "x-futurediff-contract-digest": "7ae2089c14e5e8f3fb92cd5578771e36926c01ec1ea7e8ae79d3a662bf61ed78",
+  "x-futurediff-spec-version": "0.1",
+  "x-futurediff-spec-digest": "98d32beb8919e503357fa95e90c45019950a0110b851c3b12e32d91e9cb365cc"
+}

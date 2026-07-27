@@ -1,0 +1,7 @@
+{
+  "version": "0.1",
+  "apply_enabled": false,
+  "completed_after_hours": 168,
+  "in_progress_after_hours": 24,
+  "maximum_candidates": 1000
+}

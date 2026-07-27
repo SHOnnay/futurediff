@@ -28,7 +28,22 @@ type PrepareSlackMessageRequest struct {
 	Input        slackoutbox.Input `json:"input"`
 }
 
+func (s *Service) enforceEffectQuota(transactionID string) error {
+	count, err := s.Ledger.CountEffects(transactionID)
+	if err != nil {
+		return err
+	}
+	limit := s.quotaPolicy().MaxEffectsPerTransaction
+	if count >= limit {
+		return fmt.Errorf("external effect quota exceeded: %d/%d", count, limit)
+	}
+	return nil
+}
+
 func (s *Service) PrepareSlackMessage(transactionID string, req PrepareSlackMessageRequest) (domain.ExternalEffect, error) {
+	if err := s.enforceEffectQuota(transactionID); err != nil {
+		return domain.ExternalEffect{}, err
+	}
 	if s.Credentials == nil || s.Slack == nil {
 		return domain.ExternalEffect{}, errors.New("Slack outbox is not configured")
 	}
@@ -74,6 +89,9 @@ type PrepareGitHubDraftPRRequest struct {
 }
 
 func (s *Service) PrepareGitHubBranch(ctx context.Context, transactionID string, req PrepareGitHubBranchRequest) (domain.ExternalEffect, error) {
+	if err := s.enforceEffectQuota(transactionID); err != nil {
+		return domain.ExternalEffect{}, err
+	}
 	if s.Credentials == nil || s.GitHubBranch == nil {
 		return domain.ExternalEffect{}, errors.New("GitHub branch credential path is not configured")
 	}
@@ -124,6 +142,9 @@ func (s *Service) PrepareGitHubBranch(ctx context.Context, transactionID string,
 }
 
 func (s *Service) PrepareGitHubDraftPR(ctx context.Context, transactionID string, req PrepareGitHubDraftPRRequest) (domain.ExternalEffect, error) {
+	if err := s.enforceEffectQuota(transactionID); err != nil {
+		return domain.ExternalEffect{}, err
+	}
 	if s.Credentials == nil || s.GitHub == nil {
 		return domain.ExternalEffect{}, errors.New("GitHub adapter is not configured")
 	}

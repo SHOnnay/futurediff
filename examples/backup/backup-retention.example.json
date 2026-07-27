@@ -1,0 +1,8 @@
+{
+  "version": "0.1",
+  "backup_root": "/absolute/path/to/futurediff-backups",
+  "apply_enabled": false,
+  "keep_latest": 3,
+  "minimum_age_hours": 168,
+  "maximum_delete_bytes": 10737418240
+}

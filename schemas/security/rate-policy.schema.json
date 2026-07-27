@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://futurediff.dev/schemas/security/rate-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "read_requests_per_minute", "read_burst", "mutation_requests_per_minute", "mutation_burst", "max_concurrent_mutations"],
+  "properties": {
+    "version": {"const": "0.1"},
+    "read_requests_per_minute": {"type": "integer", "minimum": 1},
+    "read_burst": {"type": "integer", "minimum": 1},
+    "mutation_requests_per_minute": {"type": "integer", "minimum": 1},
+    "mutation_burst": {"type": "integer", "minimum": 1},
+    "max_concurrent_mutations": {"type": "integer", "minimum": 1}
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "version": "0.1",
+  "require_audit_healthy": true,
+  "slo_policy": "../slo/local.example.json",
+  "require_maintenance_disabled": true,
+  "require_operator_receipts": false
+}

@@ -1,0 +1,8 @@
+{
+  "version": "0.1",
+  "read_requests_per_minute": 600,
+  "read_burst": 100,
+  "mutation_requests_per_minute": 120,
+  "mutation_burst": 30,
+  "max_concurrent_mutations": 8
+}

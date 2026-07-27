@@ -19,15 +19,23 @@ import (
 	"github.com/SHOnnay/futurediff/internal/api"
 	"github.com/SHOnnay/futurediff/internal/app"
 	"github.com/SHOnnay/futurediff/internal/buildinfo"
+	"github.com/SHOnnay/futurediff/internal/configattest"
 	"github.com/SHOnnay/futurediff/internal/credentials"
+	"github.com/SHOnnay/futurediff/internal/daemonlock"
 	"github.com/SHOnnay/futurediff/internal/drain"
 	"github.com/SHOnnay/futurediff/internal/egress"
 	"github.com/SHOnnay/futurediff/internal/evidencecrypto"
 	"github.com/SHOnnay/futurediff/internal/ledger"
 	"github.com/SHOnnay/futurediff/internal/maintenance"
 	"github.com/SHOnnay/futurediff/internal/operatorapproval"
+	"github.com/SHOnnay/futurediff/internal/quota"
+	"github.com/SHOnnay/futurediff/internal/ratelimit"
+	"github.com/SHOnnay/futurediff/internal/repoadmission"
+	"github.com/SHOnnay/futurediff/internal/rootaudit"
 	"github.com/SHOnnay/futurediff/internal/runtimeoci"
+	"github.com/SHOnnay/futurediff/internal/secretscan"
 	"github.com/SHOnnay/futurediff/internal/staging"
+	"github.com/SHOnnay/futurediff/internal/storageguard"
 	"github.com/SHOnnay/futurediff/internal/verification"
 )
 
@@ -45,10 +53,21 @@ func main() {
 	approvalQuorumPolicy := flag.String("approval-quorum-policy", "", "optional approval quorum policy JSON")
 	evidenceKey := flag.String("evidence-key", "", "0600 AES-256-GCM key file for runtime evidence encryption")
 	evidenceKeyring := flag.String("evidence-keyring", "", "0600 evidence keyring supporting rotation")
+	secretPolicyPath := flag.String("secret-scan-policy", "", "optional secret-scan policy JSON")
+	quotaPolicyPath := flag.String("quota-policy", "", "optional resource quota policy JSON")
+	ratePolicyPath := flag.String("rate-policy", "", "optional per-principal request rate policy JSON")
+	repositoryPolicyPath := flag.String("repository-policy", "", "optional repository admission policy JSON")
+	storagePolicyPath := flag.String("storage-policy", "", "optional storage-pressure policy JSON")
+	configSigningKeyring := flag.String("config-signing-keyring", "", "trusted Ed25519 keyring for configuration attestations")
+	requireSignedConfigs := flag.Bool("require-signed-configs", false, "require valid sidecar attestations for every configured security file")
+	requireSecureRoot := flag.Bool("require-secure-root", true, "fail startup when the FutureDiff data root has unsafe ownership, permissions, symlinks, or special files")
 	githubAPIBase := flag.String("github-api-base", "https://api.github.com", "GitHub API base URL for the built-in draft-PR adapter")
 	slackAPIBase := flag.String("slack-api-base", "https://slack.com/api", "Slack API base URL for the built-in message outbox")
 	pidFile := flag.String("pid-file", "", "daemon PID file")
+	lockFile := flag.String("lock-file", "", "exclusive daemon lock file")
 	shutdownTimeout := flag.Duration("shutdown-timeout", 30*time.Second, "maximum graceful drain duration")
+	allowedPeerUIDs := flag.String("allowed-peer-uids", strconv.Itoa(os.Geteuid()), "comma-separated Unix UIDs allowed to access the daemon socket")
+	disablePeerAuth := flag.Bool("disable-peer-auth", false, "disable Linux SO_PEERCRED authorization (not recommended)")
 	version := flag.Bool("version", false, "print build information")
 	flag.Parse()
 	if *version {
@@ -61,9 +80,28 @@ func main() {
 	if *pidFile == "" {
 		*pidFile = filepath.Join(*root, "futurediff.pid")
 	}
+	if *lockFile == "" {
+		*lockFile = filepath.Join(*root, "daemon.lock")
+	}
 	if err := os.MkdirAll(*root, 0o700); err != nil {
 		log.Fatal(err)
 	}
+	if *requireSecureRoot {
+		report := rootaudit.Audit(*root, os.Geteuid(), time.Now())
+		if !report.Healthy {
+			for _, check := range report.Checks {
+				if check.Status == "fail" {
+					log.Printf("data-root security failure: %s: %s", check.ID, check.Message)
+				}
+			}
+			log.Fatal("FutureDiff data-root security audit failed")
+		}
+	}
+	instanceLock, err := daemonlock.Acquire(*lockFile, *root, time.Now())
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer instanceLock.Release()
 	repo, err := ledger.OpenRepository(filepath.Join(*root, "ledger.db"))
 	if err != nil {
 		log.Fatal(err)
@@ -101,6 +139,46 @@ func main() {
 	if err != nil {
 		log.Fatalf("Slack egress transport: %v", err)
 	}
+	var configTrust *operatorapproval.Keyring
+	if *configSigningKeyring != "" {
+		ring, err := operatorapproval.LoadKeyring(*configSigningKeyring)
+		if err != nil {
+			log.Fatalf("configuration signing keyring: %v", err)
+		}
+		configTrust = &ring
+	} else if *requireSignedConfigs {
+		log.Fatal("--require-signed-configs requires --config-signing-keyring")
+	}
+	verifyConfig := func(kind, path string) {
+		if path == "" {
+			return
+		}
+		sidecar := configattest.SidecarPath(path)
+		_, statErr := os.Stat(sidecar)
+		if statErr != nil {
+			if os.IsNotExist(statErr) && !*requireSignedConfigs {
+				return
+			}
+			log.Fatalf("configuration attestation for %s: %v", kind, statErr)
+		}
+		if configTrust == nil {
+			log.Fatalf("configuration attestation for %s exists but no --config-signing-keyring is configured", kind)
+		}
+		if _, err := configattest.VerifySidecar(*configTrust, path, kind, time.Now()); err != nil {
+			log.Fatalf("configuration attestation for %s: %v", kind, err)
+		}
+	}
+	verifyConfig("credential_config", *credentialConfig)
+	verifyConfig("approval_keyring", *approvalKeyring)
+	verifyConfig("approval_quorum_policy", *approvalQuorumPolicy)
+	verifyConfig("evidence_key", *evidenceKey)
+	verifyConfig("evidence_keyring", *evidenceKeyring)
+	verifyConfig("secret_scan_policy", *secretPolicyPath)
+	verifyConfig("quota_policy", *quotaPolicyPath)
+	verifyConfig("rate_policy", *ratePolicyPath)
+	verifyConfig("repository_policy", *repositoryPolicyPath)
+	verifyConfig("storage_policy", *storagePolicyPath)
+
 	var approvalKeys *operatorapproval.Keyring
 	if *approvalKeyring != "" {
 		ring, err := operatorapproval.LoadKeyring(*approvalKeyring)
@@ -143,6 +221,57 @@ func main() {
 		evidenceCipher = cipher
 		log.Printf("runtime evidence encryption configured: key_id=%s", cipher.KeyID)
 	}
+	secretScanner := secretscan.Default()
+	if *secretPolicyPath != "" {
+		policy, err := secretscan.LoadPolicy(*secretPolicyPath)
+		if err != nil {
+			log.Fatalf("secret-scan policy: %v", err)
+		}
+		secretScanner.Policy = policy
+	}
+	quotaPolicy := quota.Default()
+	if *quotaPolicyPath != "" {
+		loaded, err := quota.Load(*quotaPolicyPath)
+		if err != nil {
+			log.Fatalf("quota policy: %v", err)
+		}
+		quotaPolicy = loaded
+	}
+	ratePolicy := ratelimit.Default()
+	if *ratePolicyPath != "" {
+		loaded, err := ratelimit.Load(*ratePolicyPath)
+		if err != nil {
+			log.Fatalf("rate policy: %v", err)
+		}
+		ratePolicy = loaded
+	}
+	var repositoryPolicy *repoadmission.Policy
+	if *repositoryPolicyPath != "" {
+		loaded, err := repoadmission.Load(*repositoryPolicyPath)
+		if err != nil {
+			log.Fatalf("repository policy: %v", err)
+		}
+		repositoryPolicy = &loaded
+	}
+	var storageGuard *storageguard.Guard
+	if *storagePolicyPath != "" {
+		loaded, err := storageguard.Load(*storagePolicyPath)
+		if err != nil {
+			log.Fatalf("storage policy: %v", err)
+		}
+		storageGuard = &storageguard.Guard{Root: *root, Policy: loaded, CacheTTL: 2 * time.Second}
+		status, err := storageGuard.Status(time.Now())
+		if err != nil {
+			log.Fatalf("storage policy preflight: %v", err)
+		}
+		if !status.Healthy {
+			log.Printf("storage policy starts unhealthy; mutations will be blocked: %v", status.Findings)
+		}
+	}
+	rateLimiter, err := ratelimit.New(ratePolicy)
+	if err != nil {
+		log.Fatalf("rate limiter: %v", err)
+	}
 	var broker *credentials.Broker
 	if *credentialConfig != "" {
 		config, err := credentials.LoadConfig(*credentialConfig)
@@ -158,7 +287,7 @@ func main() {
 	svc := &app.Service{
 		Ledger:                 repo,
 		Staging:                staging.Manager{RuntimeRoot: filepath.Join(*root, "runtime")},
-		Verifier:               verification.Engine{AllowLocalCommands: false, OCI: runner},
+		Verifier:               verification.Engine{AllowLocalCommands: false, OCI: runner, SecretScanner: secretScanner},
 		OCI:                    runner,
 		Credentials:            broker,
 		GitHub:                 &githubdraft.Adapter{BaseURL: *githubAPIBase, HTTPClient: githubHTTP},
@@ -169,12 +298,18 @@ func main() {
 		ApprovalQuorum:         approvalQuorum,
 		RequireSignedApprovals: *requireSignedApprovals || approvalQuorum != nil,
 		EvidenceCipher:         evidenceCipher,
+		Quotas:                 quotaPolicy,
+		RepositoryPolicy:       repositoryPolicy,
 	}
 	if err := writePIDFile(*pidFile, os.Getpid()); err != nil {
 		log.Fatal(err)
 	}
 	defer os.Remove(*pidFile)
-	server := &api.Server{Service: svc, SocketPath: *socket, Maintenance: &maintenance.Manager{Path: filepath.Join(*root, "maintenance.json")}, Drain: drain.New()}
+	peerUIDs, err := parsePeerUIDs(*allowedPeerUIDs)
+	if err != nil {
+		log.Fatalf("allowed peer UIDs: %v", err)
+	}
+	server := &api.Server{Service: svc, SocketPath: *socket, Maintenance: &maintenance.Manager{Path: filepath.Join(*root, "maintenance.json")}, Drain: drain.New(), RequirePeerCredentials: !*disablePeerAuth, AllowedPeerUIDs: peerUIDs, RateLimiter: rateLimiter, StorageGuard: storageGuard}
 	errCh := make(chan error, 1)
 	go func() { errCh <- server.Serve() }()
 	fmt.Printf("FutureDiff Go daemon listening on %s\n", *socket)
@@ -193,6 +328,25 @@ func main() {
 			log.Printf("daemon shutdown: %v", err)
 		}
 	}
+}
+
+func parsePeerUIDs(raw string) (map[uint32]struct{}, error) {
+	result := map[uint32]struct{}{}
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		value, err := strconv.ParseUint(part, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("invalid UID %q: %w", part, err)
+		}
+		result[uint32(value)] = struct{}{}
+	}
+	if len(result) == 0 {
+		return nil, fmt.Errorf("at least one allowed peer UID is required")
+	}
+	return result, nil
 }
 
 func writePIDFile(path string, pid int) error {

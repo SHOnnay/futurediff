@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://futurediff.dev/schemas/quota-policy-0.1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "max_open_transactions", "max_effects_per_transaction", "max_executions_per_transaction", "max_patch_bytes", "max_changed_paths", "max_verification_checks"],
+  "properties": {
+    "version": {"const": "0.1"},
+    "max_open_transactions": {"type": "integer", "minimum": 1},
+    "max_effects_per_transaction": {"type": "integer", "minimum": 1},
+    "max_executions_per_transaction": {"type": "integer", "minimum": 1},
+    "max_patch_bytes": {"type": "integer", "minimum": 1},
+    "max_changed_paths": {"type": "integer", "minimum": 1},
+    "max_verification_checks": {"type": "integer", "minimum": 1}
+  }
+}

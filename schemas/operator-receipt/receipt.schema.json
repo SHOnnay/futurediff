@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://futurediff.dev/schemas/operator-receipt/receipt-0.1.json",
+  "type": "object",
+  "required": ["version", "sequence", "action", "actor", "subject", "occurred_at", "digest", "key_id", "approver", "signature"],
+  "properties": {
+    "version": {"const": "0.1"},
+    "sequence": {"type": "integer", "minimum": 1},
+    "action": {"type": "string", "minLength": 1},
+    "actor": {"type": "string", "minLength": 1},
+    "subject": {"type": "string", "minLength": 1},
+    "reason": {"type": "string"},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "previous_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "key_id": {"type": "string", "minLength": 1},
+    "approver": {"type": "string", "minLength": 1},
+    "signature": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

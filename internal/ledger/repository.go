@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 	"time"
 
@@ -22,6 +23,10 @@ func OpenRepository(path string) (*Repository, error) {
 	db, err := Open(path)
 	if err != nil {
 		return nil, err
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("secure ledger permissions: %w", err)
 	}
 	r := &Repository{db: db}
 	if err := r.migrate(); err != nil {
@@ -67,7 +72,10 @@ func (r *Repository) migrate() error {
 	if err := r.verifyMigrationArtifacts(); err != nil {
 		return err
 	}
-	return r.backfillEventChains()
+	if err := r.backfillEventChains(); err != nil {
+		return err
+	}
+	return r.backfillAPIAccessChain()
 }
 
 func (r *Repository) verifyMigrationArtifacts() error {

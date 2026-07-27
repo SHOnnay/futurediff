@@ -1,0 +1,7 @@
+{
+  "version": "0.1",
+  "terminal_after_hours": 720,
+  "apply_enabled": false,
+  "maximum_candidates": 100,
+  "maximum_bytes": 10737418240
+}

@@ -14,6 +14,7 @@ import (
 
 	"github.com/SHOnnay/futurediff/internal/domain"
 	"github.com/SHOnnay/futurediff/internal/runtimeoci"
+	"github.com/SHOnnay/futurediff/internal/secretscan"
 )
 
 type Contract struct {
@@ -129,6 +130,7 @@ func Topological(checks []Check) ([]Check, error) {
 type Engine struct {
 	AllowLocalCommands bool
 	OCI                *runtimeoci.Runner
+	SecretScanner      *secretscan.Scanner
 }
 
 func (e Engine) Run(transactionID string, workspace domain.Workspace, patch domain.Patch, contract Contract) (domain.VerificationReport, error) {
@@ -145,8 +147,37 @@ func (e Engine) RunWithMaterial(transactionID string, workspace domain.Workspace
 	order, _ := Topological(contract.Checks)
 	resultByID := map[string]domain.VerificationCheckResult{}
 	var results []domain.VerificationCheckResult
+	secretBlocked := false
+	if e.SecretScanner != nil {
+		report, err := e.SecretScanner.ScanPatchFile(patch.PatchPath)
+		if err != nil {
+			return domain.VerificationReport{}, fmt.Errorf("secret scan: %w", err)
+		}
+		secretEvidencePath := filepath.Join(workspace.ArtifactsPath, "verification", "secret-scan.json")
+		if err := os.MkdirAll(filepath.Dir(secretEvidencePath), 0o700); err != nil {
+			return domain.VerificationReport{}, err
+		}
+		secretEvidence, err := json.MarshalIndent(report, "", "  ")
+		if err != nil {
+			return domain.VerificationReport{}, err
+		}
+		if err := os.WriteFile(secretEvidencePath, append(secretEvidence, '\n'), 0o600); err != nil {
+			return domain.VerificationReport{}, err
+		}
+		status := "pass"
+		message := "no blocking secret patterns detected"
+		if report.Blocking {
+			status = "fail"
+			message = fmt.Sprintf("%d secret finding(s) detected; review %s", len(report.Findings), secretEvidencePath)
+			secretBlocked = true
+		}
+		specDigest, _ := domain.Digest(map[string]any{"check_id": "futurediff.secret_scan", "policy_version": report.PolicyVersion})
+		result := domain.VerificationCheckResult{CheckID: "futurediff.secret_scan", Required: true, Status: status, CheckSpecDigest: specDigest, CacheKey: "", EvidenceDigest: report.Digest, Message: message}
+		results = append(results, result)
+		resultByID[result.CheckID] = result
+	}
 	for _, ch := range order {
-		blocked := false
+		blocked := secretBlocked
 		for _, d := range ch.DependsOn {
 			if resultByID[d].Status != "pass" {
 				blocked = true

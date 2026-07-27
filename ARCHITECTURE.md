@@ -665,3 +665,123 @@ The incident reporter composes the durable diff, timeline, replay result, effect
 
 ### Bounded daemon lifecycle
 SIGTERM begins a drain. New mutations receive `503 daemon_draining`; active mutations are allowed to complete up to the configured timeout. The server then performs graceful shutdown and removes its socket and PID file.
+
+---
+
+# Architecture update v6.5 — Tasks 061–065
+
+## Operator receipt plane
+
+High-value local operator actions can be recorded as append-only Ed25519-signed receipts. Each receipt is bound to the previous receipt digest, producing a per-installation chain. The receipt store is separate from the transaction ledger and does not contain private keys or provider secrets.
+
+## Policy-driven retention plane
+
+Retention now accepts a versioned policy that constrains terminal age, candidate count, and bytes before the existing confirmation-gated deletion mechanism can run. Policy evaluation and deletion remain separate actions.
+
+## Dependency-graph plane
+
+The composed future can be projected as a portable graph containing repository, verification, approval, and external-effect dependencies. This graph is suitable for future UI consumption but remains independently useful as JSON, Mermaid, or DOT.
+
+## SLO assurance plane
+
+Local service-level objectives are evaluated from aggregate metrics, semantic audit results, daemon reachability, and maintenance status. SLO evaluation has no mutation authority.
+
+## Readiness-gate plane
+
+A manifest-driven release gate combines ledger audit, SLO results, local API identity, maintenance state, and optional operator receipt verification. External-system certifications remain distinct and cannot be implied by a local pass.
+
+---
+
+# Architecture update v7.0 — Tasks 066–070
+
+## Local-principal authentication plane
+
+On Linux, the HTTP-over-Unix-socket server derives PID, UID, and GID from `SO_PEERCRED` and authorizes the UID before routing any request. Socket mode `0600` remains defense in depth. FutureDiff does not accept identity from an HTTP header.
+
+## Durable request-safety plane
+
+Mutation requests may carry an idempotency key. The durable record is namespaced by authenticated principal and binds method, path, and exact request digest. A completed response can be replayed after daemon restart; mismatched reuse and concurrent in-progress reuse fail closed. Strict 1 MiB body/response limits and single-value JSON decoding reduce parser and memory abuse.
+
+## Secret-preflight plane
+
+Every verification run can begin with a deterministic patch scan that examines only added lines. High-confidence credential patterns become a required failed verification result and prevent command checks from executing. Evidence contains rule identifiers, line numbers, fingerprints, and redacted previews—not raw credentials.
+
+## Resource-governance plane
+
+A versioned quota policy limits open transactions, prepared effects, runtime executions, patch bytes, changed paths, and verification-check cardinality. Limits are enforced before the next durable or expensive resource is allocated.
+
+## Local mutation-audit plane
+
+Each local mutation attempt is recorded with kernel-authenticated principal, method, route, status, and SHA-256 identities for request material and idempotency key. Request bodies, response bodies, and raw keys are intentionally excluded.
+
+---
+
+# Architecture update v7.5 — Tasks 071–075
+
+## Single-writer daemon plane
+
+Each data root has a kernel-held exclusive daemon lock. PID files remain useful for signalling but no longer carry the mutual-exclusion guarantee. Lock metadata is inspectable without treating stale bytes as ownership.
+
+## Tamper-evident API evidence plane
+
+Payload-free API access events now form one global SHA-256 chain ordered by SQLite sequence. The verifier detects gaps, previous-digest mismatches, and canonical event-digest changes. The local head is not presented as an external transparency anchor.
+
+## Principal abuse-control plane
+
+Authenticated principals receive independent read and mutation token buckets plus a maximum active-mutation count. Rejections occur before expensive handlers and are themselves represented in the API audit ledger.
+
+## Signed deployment-configuration plane
+
+Credential metadata, approval policy, evidence keys, verification preflight policy, quotas, and rate limits may require detached Ed25519 sidecars. File bytes are verified before configuration parsing. The signing keyring is a separately protected bootstrap trust root.
+
+## Filesystem trust plane
+
+The daemon treats the private data root as part of its trusted computing base. Ownership, permissions, symlink safety, and top-level file types are checked before locking or opening the ledger.
+
+---
+
+# Architecture update v8.0 — Tasks 076–080
+
+## Controlled storage-maintenance plane
+
+SQLite maintenance is now an explicit offline operation protected by the daemon's kernel lock. Apply mode creates a consistent backup, requires a healthy semantic audit, checkpoints the WAL, runs optimization/analysis/compaction, and requires another healthy audit before success is reported.
+
+## Signed integrity-checkpoint plane
+
+A consistent ledger backup can be bound to aggregate transaction event-chain heads, the mutation API audit head, and an optional operator-receipt head. The resulting material digest is signed with an operator Ed25519 key. This provides portable local evidence but is not described as trusted timestamping or external transparency.
+
+## Lease-hygiene plane
+
+Expired coordinator leases are inspectable and removable only while the daemon is offline. Deletion is confirmation-gated and constrained by the persisted expiry timestamp, preserving all live fencing tokens.
+
+## Request-correlation plane
+
+Every local HTTP request carries a bounded correlation identity. The daemon returns it and mutation audit records bind it into the existing global API hash chain. Correlation identity is deliberately separate from peer authentication, authorization and durable idempotency.
+
+## Repository-admission plane
+
+Authenticated local principals are no longer sufficient to stage any reachable Git path when a repository policy is configured. Admission binds canonical repository roots, Git object formats, detached-head behavior and dirty-worktree policy before a transaction workspace is allocated.
+
+---
+
+# Architecture update v8.5 — Tasks 081–085
+
+## Abandoned-transaction lifecycle plane
+
+A versioned expiry policy may identify only explicitly safe pre-commit states (`active`, `sealed`, `failed_verification`, `ready`, and `stale`). Evaluation is deterministic and dry-run-first. Apply requires the daemon's exclusive lock, an exact confirmation phrase, state/revision revalidation, normal abort cleanup, and a durable expiry action record. In-flight commit, compensation, reconciliation, and manual-intervention states cannot be selected.
+
+## Idempotency-retention plane
+
+Durable API idempotency responses are retained independently from payload-free mutation audit evidence. A separate policy distinguishes completed-response retention from abandoned `in_progress` reservations. Deletion is offline, confirmation-gated, bounded by candidate count, and records only aggregate cleanup evidence. Plans expose SHA-256 identities rather than raw principals or idempotency keys.
+
+## Storage-pressure plane
+
+An optional daemon storage policy evaluates filesystem free bytes/percentage plus ledger and managed-runtime growth. Reads remain available under pressure, but mutations fail before durable reservation or handler execution with HTTP `507`. The policy is observable through health and can be protected by the existing signed-configuration bootstrap.
+
+## Machine-readable API-description plane
+
+The authoritative local API contract now generates a deterministic OpenAPI 3.1 document. Every operation carries the canonical operation ID and a FutureDiff-specific agent-safety declaration. The document is available over the private daemon socket and through an offline command; validation rejects missing, unexpected, renamed, or authority-reclassified operations.
+
+## Verified backup-catalog plane
+
+Ledger backup records can be reconciled against actual files without trusting paths or metadata blindly. Catalog evaluation enforces a canonical backup root, non-symlink regular files, exact size/SHA-256 identity, and SQLite integrity on a disposable verification copy. Retention is bounded, dry-run-first, offline, and confirmation-gated; modified or missing backups block apply.

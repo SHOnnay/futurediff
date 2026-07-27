@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://futurediff.dev/schemas/slo/policy-0.1.json",
+  "type": "object",
+  "required": ["version", "maximum_unresolved", "maximum_unknown_effects", "maximum_audit_errors", "maximum_audit_warnings", "daemon_required", "maintenance_must_be_disabled"],
+  "properties": {
+    "version": {"const": "0.1"},
+    "maximum_unresolved": {"type": "integer", "minimum": 0},
+    "maximum_unknown_effects": {"type": "integer", "minimum": 0},
+    "maximum_audit_errors": {"type": "integer", "minimum": 0},
+    "maximum_audit_warnings": {"type": "integer", "minimum": 0},
+    "daemon_required": {"type": "boolean"},
+    "maintenance_must_be_disabled": {"type": "boolean"}
+  },
+  "additionalProperties": false
+}

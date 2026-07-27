@@ -1,0 +1,7 @@
+{
+  "version": "0.1",
+  "minimum_free_bytes": 268435456,
+  "minimum_free_percent": 1,
+  "maximum_ledger_bytes": 1073741824,
+  "maximum_runtime_bytes": 10737418240
+}

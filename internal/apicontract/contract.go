@@ -26,6 +26,7 @@ func Current() Contract {
 	endpoints := []Endpoint{
 		{"GET", "/v1/health", "health", true},
 		{"GET", "/v1/contract", "contract", true},
+		{"GET", "/v1/openapi", "openapi", true},
 		{"POST", "/v1/transactions", "transaction_create", true},
 		{"GET", "/v1/transactions/{id}", "transaction_get", true},
 		{"POST", "/v1/transactions/{id}/execute", "transaction_execute", true},

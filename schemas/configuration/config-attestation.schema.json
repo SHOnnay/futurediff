@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://futurediff.dev/schemas/configuration/config-attestation.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "kind", "file_sha256", "file_size", "approver", "key_id", "signed_at", "expires_at", "nonce", "signature"],
+  "properties": {
+    "version": {"const": "0.1"},
+    "kind": {"type": "string", "minLength": 1},
+    "file_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "file_size": {"type": "integer", "minimum": 0},
+    "approver": {"type": "string", "minLength": 1},
+    "key_id": {"type": "string", "minLength": 1},
+    "signed_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "nonce": {"type": "string", "minLength": 8},
+    "signature": {"type": "string", "minLength": 32}
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://futurediff.dev/schemas/retention/policy-0.1.json",
+  "type": "object",
+  "required": ["version", "terminal_after_hours", "apply_enabled"],
+  "properties": {
+    "version": {"const": "0.1"},
+    "terminal_after_hours": {"type": "integer", "minimum": 0},
+    "apply_enabled": {"type": "boolean"},
+    "maximum_candidates": {"type": "integer", "minimum": 0},
+    "maximum_bytes": {"type": "integer", "minimum": 0}
+  },
+  "additionalProperties": false
+}

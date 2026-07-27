@@ -1,0 +1,8 @@
+{
+  "version": "0.1",
+  "policy_id": "local-repositories",
+  "allowed_roots": ["/tmp/futurediff-repositories"],
+  "allowed_object_formats": ["sha1", "sha256"],
+  "allow_detached_head": false,
+  "allow_stage_from_head": false
+}

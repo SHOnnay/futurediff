@@ -1,0 +1,12 @@
+{
+  "version": "0.1",
+  "apply_enabled": false,
+  "maximum_candidates": 100,
+  "state_after_hours": {
+    "active": 168,
+    "sealed": 168,
+    "failed_verification": 72,
+    "ready": 168,
+    "stale": 72
+  }
+}

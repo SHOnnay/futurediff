@@ -18,6 +18,8 @@ import (
 	"github.com/SHOnnay/futurediff/internal/evidencecrypto"
 	"github.com/SHOnnay/futurediff/internal/ledger"
 	"github.com/SHOnnay/futurediff/internal/operatorapproval"
+	"github.com/SHOnnay/futurediff/internal/quota"
+	"github.com/SHOnnay/futurediff/internal/repoadmission"
 	"github.com/SHOnnay/futurediff/internal/runtimeoci"
 	"github.com/SHOnnay/futurediff/internal/staging"
 	"github.com/SHOnnay/futurediff/internal/verification"
@@ -37,6 +39,8 @@ type Service struct {
 	ApprovalQuorum         *operatorapproval.QuorumPolicy
 	RequireSignedApprovals bool
 	EvidenceCipher         evidencecrypto.FileCipher
+	Quotas                 quota.Policy
+	RepositoryPolicy       *repoadmission.Policy
 }
 
 type CreateRequest struct {
@@ -60,6 +64,14 @@ func (s *Service) Create(req CreateRequest) (TransactionView, error) {
 	if req.Repository == "" {
 		return TransactionView{}, errors.New("repository is required")
 	}
+	policyLimits := s.quotaPolicy()
+	openTransactions, err := s.Ledger.CountOpenTransactions()
+	if err != nil {
+		return TransactionView{}, err
+	}
+	if openTransactions >= policyLimits.MaxOpenTransactions {
+		return TransactionView{}, fmt.Errorf("open transaction quota exceeded: %d/%d", openTransactions, policyLimits.MaxOpenTransactions)
+	}
 	if req.Mode == "" {
 		req.Mode = "cooperative"
 	}
@@ -81,6 +93,12 @@ func (s *Service) Create(req CreateRequest) (TransactionView, error) {
 	inspect, err := s.Staging.Inspect(req.Repository, policy)
 	if err != nil {
 		return TransactionView{}, err
+	}
+	if s.RepositoryPolicy != nil {
+		decision := s.RepositoryPolicy.Evaluate(inspect, policy)
+		if !decision.Allowed {
+			return TransactionView{}, fmt.Errorf("repository admission rejected: %s", strings.Join(decision.Reasons, "; "))
+		}
 	}
 	id := domain.NewID("tx")
 	workspace, err := s.Staging.Create(id, inspect, policy)
@@ -105,6 +123,26 @@ type ExecuteView struct {
 	Execution domain.RuntimeExecution `json:"execution"`
 	Stdout    string                  `json:"stdout,omitempty"`
 	Stderr    string                  `json:"stderr,omitempty"`
+}
+
+func (s *Service) quotaPolicy() quota.Policy {
+	policy := s.Quotas
+	if policy.Version == "" {
+		policy = quota.Default()
+	}
+	return policy
+}
+
+func (s *Service) QuotaStatus() map[string]any {
+	policy := s.quotaPolicy()
+	return map[string]any{"configured": s.Quotas.Version != "", "policy": policy}
+}
+
+func (s *Service) SecretScanStatus() map[string]any {
+	if s.Verifier.SecretScanner == nil {
+		return map[string]any{"configured": false}
+	}
+	return map[string]any{"configured": true, "policy_version": s.Verifier.SecretScanner.Policy.Version, "enabled": s.Verifier.SecretScanner.Policy.Enabled, "block_severities": s.Verifier.SecretScanner.Policy.BlockSeverities}
 }
 
 func (s *Service) CredentialStatus() map[string]any {
@@ -159,6 +197,13 @@ func (s *Service) Execute(ctx context.Context, id string, req ExecuteRequest) (E
 	workspace, err := s.Ledger.Workspace(id)
 	if err != nil {
 		return ExecuteView{}, err
+	}
+	executions, err := s.Ledger.CountRuntimeExecutions(id)
+	if err != nil {
+		return ExecuteView{}, err
+	}
+	if executions >= s.quotaPolicy().MaxExecutionsPerTransaction {
+		return ExecuteView{}, fmt.Errorf("runtime execution quota exceeded: %d/%d", executions, s.quotaPolicy().MaxExecutionsPerTransaction)
 	}
 	executionID := domain.NewID("exec")
 	result, runErr := s.OCI.Execute(ctx, runtimeoci.Request{
@@ -280,12 +325,20 @@ func (s *Service) Seal(id string) (TransactionView, error) {
 	if err != nil {
 		return TransactionView{}, err
 	}
+	limits := s.quotaPolicy()
+	if patch.PatchSizeBytes > limits.MaxPatchBytes || int64(len(patch.ChangedPaths)) > limits.MaxChangedPaths {
+		_ = os.Remove(patch.PatchPath)
+		return TransactionView{}, fmt.Errorf("staged patch exceeds quota: bytes=%d/%d changed_paths=%d/%d", patch.PatchSizeBytes, limits.MaxPatchBytes, len(patch.ChangedPaths), limits.MaxChangedPaths)
+	}
 	if _, err := s.Ledger.RecordPatch(id, patch); err != nil {
 		return TransactionView{}, err
 	}
 	return s.Get(id)
 }
 func (s *Service) Verify(id string, contract verification.Contract) (TransactionView, error) {
+	if int64(len(contract.Checks)) > s.quotaPolicy().MaxVerificationChecks {
+		return TransactionView{}, fmt.Errorf("verification check quota exceeded: %d/%d", len(contract.Checks), s.quotaPolicy().MaxVerificationChecks)
+	}
 	tx, err := s.Ledger.Get(id)
 	if err != nil {
 		return TransactionView{}, err
@@ -526,6 +579,16 @@ func (s *Service) Recover(id string) (TransactionView, error) {
 }
 
 func (s *Service) Abort(id string) (TransactionView, error) {
+	return s.AbortWithReason(id, "user", "abort requested")
+}
+
+func (s *Service) AbortWithReason(id, actor, reason string) (TransactionView, error) {
+	if actor == "" {
+		actor = "user"
+	}
+	if reason == "" {
+		reason = "abort requested"
+	}
 	tx, err := s.Ledger.Get(id)
 	if err != nil {
 		return TransactionView{}, err
@@ -543,7 +606,7 @@ func (s *Service) Abort(id string) (TransactionView, error) {
 			return TransactionView{}, fmt.Errorf("cannot abort while external effect %s is %s", effect.EffectID, effect.Status)
 		}
 	}
-	if _, err := s.Ledger.Transition(id, tx.Status, domain.StateAborting, "user", "abort requested", false, true); err != nil {
+	if _, err := s.Ledger.Transition(id, tx.Status, domain.StateAborting, actor, reason, false, true); err != nil {
 		return TransactionView{}, err
 	}
 	if err := s.Ledger.AbortPreparedEffects(id, "transaction aborted before provider release"); err != nil {

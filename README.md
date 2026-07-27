@@ -4,7 +4,7 @@ FutureDiff is a transactional effect layer for autonomous AI agents.
 
 > Existing agents decide what to do. FutureDiff controls whether and how those decisions become persistent reality.
 
-## Current milestone: Task 055
+## Current milestone: Task 085
 
 The canonical implementation is Go and supports the staged transaction chain below, plus a unified real-environment certification command:
 
@@ -54,7 +54,11 @@ Implemented capabilities:
 - AES-256-GCM runtime evidence encryption;
 - approval-key rotation and revocation;
 - transaction timeline export;
-- executable local threat-model regression testing.
+- executable local threat-model regression testing;
+- controlled offline SQLite maintenance and signed integrity checkpoints;
+- expired coordinator lease cleanup;
+- request correlation protected by the API audit chain;
+- canonical-root repository admission policy.
 
 ## Repository provenance
 
@@ -504,3 +508,96 @@ futurediff-drain \
   --pid-file $HOME/.futurediff/futurediff.pid \
   --confirm DRAIN_FUTUREDIFF_DAEMON
 ```
+
+## Operator receipts, dependency graphs, SLOs, and readiness
+
+```bash
+futurediff-operator-receipt --mode record \
+  --private operator-private.json \
+  --action release.approve --actor operator@example.com \
+  --subject futurediff-v0.65.0 --reason "local release gate passed"
+
+futurediff-effect-graph --root "$HOME/.futurediff" \
+  --transaction <transaction-id> --format mermaid
+
+futurediff-slo --root "$HOME/.futurediff" \
+  --policy examples/slo/local.example.json
+
+futurediff-readiness --root "$HOME/.futurediff" \
+  --manifest examples/readiness/local.example.json
+```
+
+## Local API hardening (v0.70.0)
+
+The Linux daemon now authenticates Unix-socket clients with kernel `SO_PEERCRED` data in addition to the `0600` socket mode. Mutation requests can use durable idempotency keys:
+
+```bash
+curl --unix-socket "$HOME/.futurediff/futurediff.sock" \
+  -H 'Idempotency-Key: create-request-0001' \
+  -H 'Content-Type: application/json' \
+  -d '{"repository":"/absolute/repository","mode":"cooperative","policy_version":"p"}' \
+  http://localhost/v1/transactions
+```
+
+Security and operations commands:
+
+```bash
+futurediff-secret-scan --patch change.patch
+futurediff-quota --root "$HOME/.futurediff"
+futurediff-api-audit --root "$HOME/.futurediff" --limit 100
+```
+
+The verification engine automatically runs the high-confidence secret scan before configured checks. Resource quotas bound open transactions, effects, executions, patch size, changed paths, and verification-check count.
+
+## Daemon and configuration hardening (v0.75.0)
+
+Inspect the exclusive daemon lock:
+
+```bash
+futurediff-daemon-lock --root "$HOME/.futurediff"
+```
+
+Validate a request-rate policy:
+
+```bash
+futurediff-rate-policy --policy examples/security/rate-policy.example.json
+```
+
+Sign and verify a security configuration:
+
+```bash
+futurediff-config-sign sign \
+  --private operator-private.json \
+  --file "$HOME/.futurediff/quota-policy.json" \
+  --kind quota_policy
+
+futurediff-config-sign verify \
+  --keyring operator-keyring.json \
+  --file "$HOME/.futurediff/quota-policy.json" \
+  --kind quota_policy
+```
+
+Require signed configurations at daemon startup:
+
+```bash
+futurediffd \
+  --config-signing-keyring operator-keyring.json \
+  --require-signed-configs \
+  --quota-policy "$HOME/.futurediff/quota-policy.json" \
+  --rate-policy "$HOME/.futurediff/rate-policy.json"
+```
+
+Verify the API access hash chain and the local filesystem boundary:
+
+```bash
+futurediff-api-audit --root "$HOME/.futurediff" --verify
+futurediff-root-audit --root "$HOME/.futurediff"
+```
+
+## Current milestone: Task 085 additions
+
+- safe abandoned-transaction expiry;
+- explicit durable-idempotency retention;
+- storage-pressure mutation circuit breaker;
+- deterministic OpenAPI 3.1 endpoint and verifier;
+- verified backup catalog and bounded retention.

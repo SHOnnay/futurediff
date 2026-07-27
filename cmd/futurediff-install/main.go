@@ -26,6 +26,13 @@ func main() {
 	approvalQuorum := flag.String("approval-quorum-policy", "", "optional absolute approval quorum policy")
 	evidenceKey := flag.String("evidence-key", "", "optional absolute AES-GCM evidence key")
 	evidenceKeyring := flag.String("evidence-keyring", "", "optional absolute evidence keyring")
+	secretPolicy := flag.String("secret-scan-policy", "", "optional absolute secret-scan policy")
+	quotaPolicy := flag.String("quota-policy", "", "optional absolute quota policy")
+	ratePolicy := flag.String("rate-policy", "", "optional absolute rate policy")
+	configSigningKeyring := flag.String("config-signing-keyring", "", "optional trusted keyring for signed configuration attestations")
+	requireSignedConfigs := flag.Bool("require-signed-configs", false, "require signed attestations for configured security files")
+	allowedPeerUIDs := flag.String("allowed-peer-uids", "", "optional comma-separated Unix peer UIDs")
+	disablePeerAuth := flag.Bool("disable-peer-auth", false, "disable kernel peer authentication")
 	dry := flag.Bool("dry-run", false, "print plan without writing")
 	version := flag.Bool("version", false, "print build information")
 	flag.Parse()
@@ -33,7 +40,7 @@ func main() {
 		fmt.Printf("%+v\n", buildinfo.Current())
 		return
 	}
-	opts := installer.Options{SourceDir: *source, Prefix: *prefix, DataRoot: *root, Socket: *socket, Service: installer.ServiceKind(*service), Runtime: *runtimeKind, RuntimeImage: *image, CredentialConfig: *creds, ApprovalKeyring: *approvalKeyring, ApprovalQuorumPolicy: *approvalQuorum, RequireSignedApprovals: *requireSigned, EvidenceKey: *evidenceKey, EvidenceKeyring: *evidenceKeyring, DryRun: *dry}
+	opts := installer.Options{SourceDir: *source, Prefix: *prefix, DataRoot: *root, Socket: *socket, Service: installer.ServiceKind(*service), Runtime: *runtimeKind, RuntimeImage: *image, CredentialConfig: *creds, ApprovalKeyring: *approvalKeyring, ApprovalQuorumPolicy: *approvalQuorum, RequireSignedApprovals: *requireSigned, EvidenceKey: *evidenceKey, EvidenceKeyring: *evidenceKeyring, SecretScanPolicy: *secretPolicy, QuotaPolicy: *quotaPolicy, RatePolicy: *ratePolicy, ConfigSigningKeyring: *configSigningKeyring, RequireSignedConfigs: *requireSignedConfigs, AllowedPeerUIDs: *allowedPeerUIDs, DisablePeerAuth: *disablePeerAuth, DryRun: *dry}
 	plan, err := installer.BuildPlan(opts)
 	if err != nil {
 		fatal(err)

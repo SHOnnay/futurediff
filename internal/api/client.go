@@ -24,6 +24,17 @@ func NewClient(socket string) *Client {
 	return &Client{SocketPath: socket, HTTP: &http.Client{Transport: tr, Timeout: 30 * time.Second}}
 }
 func (c *Client) Do(method, path string, body any) (json.RawMessage, error) {
+	return c.do(method, path, body, "")
+}
+
+func (c *Client) DoIdempotent(method, path string, body any, idempotencyKey string) (json.RawMessage, error) {
+	if idempotencyKey == "" {
+		return nil, fmt.Errorf("idempotency key is required")
+	}
+	return c.do(method, path, body, idempotencyKey)
+}
+
+func (c *Client) do(method, path string, body any, idempotencyKey string) (json.RawMessage, error) {
 	var reader io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
@@ -38,6 +49,9 @@ func (c *Client) Do(method, path string, body any) (json.RawMessage, error) {
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	if idempotencyKey != "" {
+		req.Header.Set("Idempotency-Key", idempotencyKey)
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
