@@ -50,4 +50,4 @@ jobs:
         shell: pwsh
         run: |
           $text = Get-Content internal/platformsupport/platform.go -Raw
-          if ($text -notmatch 'GOOS:"windows".*Level:Unsupported') { throw 'Windows support decision missing' }
+          if ($text -notmatch 'GOOS:\s*"windows"[\s\S]*Level:\s*Unsupported') { throw 'Windows support decision missing' }
