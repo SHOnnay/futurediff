@@ -1,8 +1,8 @@
-# FutureDiff System Architecture v1.3
+# FutureDiff System Architecture v6.0
 
-**Status:** Canonical Go architecture after Tasks 011–013  
+**Status:** Canonical Go architecture after Tasks 056–060
 **Date:** 2026-07-27  
-**Scope:** Transactional repository changes, durable provider effects, GitHub publication, Slack outbox, and generic MCP integration  
+**Scope:** Transactional effects, multi-operator approvals, rotating encrypted evidence, incident reconstruction, and bounded daemon lifecycle
 **UI:** Intentionally deferred; future visual direction remains black, matte black, graphite, and gray
 
 ## 1. Mission
@@ -624,26 +624,44 @@ Operational metrics contain aggregate counts and bounded status labels only. Tra
 
 A verified support bundle combines build metadata, operator diagnostics, semantic ledger audit, aggregate metrics, and the API contract. The ledger, transaction artifacts, and credential configuration contents remain outside the bundle.
 
+
 ---
 
-# Architecture update v5.0 — Tasks 046–050
+# Architecture update v5.5 — Tasks 051–055
 
-## Cryptographic approval plane
+## Maintenance coordination plane
 
-Operators can create short-lived Ed25519 approval envelopes bound to the exact transaction ID and approval-material digest. A daemon may require signed approvals using a trusted public-key keyring. Private key material remains outside the daemon; the ledger stores a signature reference and expiry only.
+A digest-protected local maintenance state can freeze every daemon mutation while preserving read-only health and inspection. Automatic expiry limits accidental lockout. The boundary is local to the daemon and is not described as a distributed lock.
 
-## Portable policy plane
+## Evidence confidentiality plane
 
-Verification contracts can be distributed as deterministic `.fdpolicy` archives. The archive manifest binds policy identity, policy version, normalized labels, and the exact verification-contract digest.
+Runtime stdout, stderr, and structured execution evidence may be written directly as AES-256-GCM artifacts. Transaction, execution, and artifact identity are authenticated as associated data. SQLite, Git patches, filenames, and historical artifacts remain outside this encryption boundary.
 
-## Human review projection
+## Operator key-lifecycle plane
 
-The transaction diff provides a compact non-secret explanation of the staged repository result, deterministic verification outcome, and ordered external effects. JSON and Markdown share the same summary digest.
+Ed25519 approval keys now support overlap rotation, controlled cutover, revocation, and a final-key lockout guard. The daemon loads its trust set at startup, so keyring changes require restart/reload before taking effect.
 
-## Upgrade assurance plane
+## Human timeline plane
 
-Ledger migrations can be rehearsed against an offline SQLite clone before changing the live installation. The rehearsal requires source immutability, stable durable counts, and a healthy post-migration semantic audit.
+Durable event sequences can be transformed into JSON, Markdown, or Mermaid timelines without including event payload bodies, patches, provider messages, or secrets. A timeline digest binds the rendered chronology to its durable inputs.
 
-## Contributor compatibility plane
+## Threat-regression plane
 
-A manifest-driven compatibility harness combines API contract diffing, verification-contract parsing, EffectSpec descriptor validation, policy-bundle verification, and integration-profile linting into one local release gate.
+A local threat-model command executes named controls for agent authority, provider egress, maintenance integrity, evidence authentication, signed approvals, terminal-state immutability, and approval-key revocation. It is a regression harness, not an external security certification.
+
+## Tasks 056–060 architecture additions
+
+### Configuration attestation
+FutureDiff can bind deployment configuration identity without copying file contents. A snapshot records absolute path, required/optional state, permissions, byte size, and SHA-256 digest.
+
+### Approval quorum
+A daemon may require a quorum policy in addition to a trusted Ed25519 keyring. The policy counts distinct approver identities, can restrict the allowed set, and can require named approvers. Approval bundles are bound to one transaction ID and one approval digest.
+
+### Evidence keyring
+Runtime evidence encryption now supports one active AES-256-GCM write key and enabled historical decrypt keys. Rotation changes new writes immediately without rewriting historical artifacts.
+
+### Incident reconstruction
+The incident reporter composes the durable diff, timeline, replay result, effect state, receipts, and ledger audit into one read-only digest-bound report.
+
+### Bounded daemon lifecycle
+SIGTERM begins a drain. New mutations receive `503 daemon_draining`; active mutations are allowed to complete up to the configured timeout. The server then performs graceful shutdown and removes its socket and PID file.

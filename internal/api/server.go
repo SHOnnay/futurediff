@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,14 +16,18 @@ import (
 	"github.com/SHOnnay/futurediff/internal/apicontract"
 	"github.com/SHOnnay/futurediff/internal/app"
 	"github.com/SHOnnay/futurediff/internal/buildinfo"
+	"github.com/SHOnnay/futurediff/internal/drain"
+	"github.com/SHOnnay/futurediff/internal/maintenance"
 	"github.com/SHOnnay/futurediff/internal/operatorapproval"
 	"github.com/SHOnnay/futurediff/internal/verification"
 )
 
 type Server struct {
-	Service    *app.Service
-	SocketPath string
-	HTTP       *http.Server
+	Service     *app.Service
+	SocketPath  string
+	HTTP        *http.Server
+	Maintenance *maintenance.Manager
+	Drain       *drain.Manager
 }
 
 type errorBody struct {
@@ -42,7 +47,16 @@ func writeErr(w http.ResponseWriter, status int, code string, err error) {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/health", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, 200, map[string]any{"status": "ok", "implementation": "go", "build": buildinfo.Current(), "time": time.Now().UTC(), "oci": s.Service.RuntimeStatus(r.Context()), "credentials": s.Service.CredentialStatus(), "approvals": s.Service.ApprovalStatus()})
+		status := maintenance.State{Version: maintenance.Version, Enabled: false}
+		if s.Maintenance != nil {
+			if current, err := s.Maintenance.Status(time.Now()); err == nil {
+				status = current
+			} else {
+				writeErr(w, 503, "maintenance_state_failed", err)
+				return
+			}
+		}
+		writeJSON(w, 200, map[string]any{"status": "ok", "implementation": "go", "build": buildinfo.Current(), "time": time.Now().UTC(), "oci": s.Service.RuntimeStatus(r.Context()), "credentials": s.Service.CredentialStatus(), "approvals": s.Service.ApprovalStatus(), "maintenance": status, "drain": s.drainStatus()})
 	})
 	mux.HandleFunc("GET /v1/contract", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, apicontract.Current()) })
 	mux.HandleFunc("POST /v1/transactions", s.create)
@@ -61,7 +75,47 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/transactions/{id}/recover", s.recover)
 	mux.HandleFunc("POST /v1/transactions/{id}/abort", s.abort)
 	mux.HandleFunc("GET /v1/transactions/{id}/events", s.events)
-	return logging(mux)
+	return logging(s.drainGuard(s.maintenanceGuard(mux)))
+}
+
+func (s *Server) drainStatus() drain.Status {
+	if s.Drain == nil {
+		return drain.Status{}
+	}
+	return s.Drain.Status()
+}
+func (s *Server) drainGuard(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions || s.Drain == nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+		release, err := s.Drain.BeginMutation()
+		if err != nil {
+			writeJSON(w, 503, map[string]any{"error": "daemon_draining", "message": err.Error(), "drain": s.Drain.Status()})
+			return
+		}
+		defer release()
+		next.ServeHTTP(w, r)
+	})
+}
+func (s *Server) maintenanceGuard(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions || s.Maintenance == nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+		allowed, state, err := s.Maintenance.MutationsAllowed(time.Now())
+		if err != nil {
+			writeErr(w, 503, "maintenance_state_failed", err)
+			return
+		}
+		if !allowed {
+			writeJSON(w, 503, map[string]any{"error": "maintenance_mode", "message": "mutations are disabled while FutureDiff is in maintenance mode", "maintenance": state})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 func (s *Server) Serve() error {
 	if s.SocketPath == "" {
@@ -80,11 +134,27 @@ func (s *Server) Serve() error {
 		return err
 	}
 	s.HTTP = &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 5 * time.Second}
+	defer os.Remove(s.SocketPath)
 	err = s.HTTP.Serve(ln)
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}
 	return err
+}
+func (s *Server) DrainAndClose(ctx context.Context, reason string) error {
+	if s.Drain != nil {
+		s.Drain.Start(reason, time.Now())
+		if err := s.Drain.Wait(ctx); err != nil {
+			if s.HTTP != nil {
+				_ = s.HTTP.Close()
+			}
+			return fmt.Errorf("drain timed out: %w", err)
+		}
+	}
+	if s.HTTP == nil {
+		return nil
+	}
+	return s.HTTP.Shutdown(ctx)
 }
 func (s *Server) Close() error {
 	if s.HTTP == nil {
@@ -227,6 +297,7 @@ func (s *Server) approve(w http.ResponseWriter, r *http.Request) {
 		Digest   string                     `json:"transaction_digest,omitempty"`
 		Approver string                     `json:"approver,omitempty"`
 		Envelope *operatorapproval.Envelope `json:"approval_envelope,omitempty"`
+		Bundle   *operatorapproval.Bundle   `json:"approval_bundle,omitempty"`
 	}
 	if err := decode(r, &req); err != nil {
 		writeErr(w, 400, "invalid_request", err)
@@ -234,7 +305,11 @@ func (s *Server) approve(w http.ResponseWriter, r *http.Request) {
 	}
 	var v app.TransactionView
 	var err error
-	if req.Envelope != nil {
+	if req.Envelope != nil && req.Bundle != nil {
+		err = errors.New("approval envelope and bundle are mutually exclusive")
+	} else if req.Bundle != nil {
+		v, err = s.Service.ApproveSignedQuorum(r.PathValue("id"), *req.Bundle)
+	} else if req.Envelope != nil {
 		v, err = s.Service.ApproveSigned(r.PathValue("id"), *req.Envelope)
 	} else {
 		v, err = s.Service.Approve(r.PathValue("id"), req.Digest, req.Approver)

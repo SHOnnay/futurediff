@@ -269,3 +269,78 @@ func writeAtomic(path string, data []byte, mode os.FileMode) error {
 	}
 	return nil
 }
+
+// Rotate generates a new key for an approver and updates a trusted keyring.
+// Existing keys remain enabled by default to support overlap during rollout.
+func Rotate(ring Keyring, approver string, disableOld bool, now time.Time) (Keyring, PrivateKeyFile, PublicKey, error) {
+	if ring.Version == "" {
+		ring.Version = Version
+	}
+	if ring.Version != Version {
+		return Keyring{}, PrivateKeyFile{}, PublicKey{}, errors.New("unsupported keyring version")
+	}
+	priv, pub, err := Generate(approver, now)
+	if err != nil {
+		return Keyring{}, PrivateKeyFile{}, PublicKey{}, err
+	}
+	for _, existing := range ring.Keys {
+		if existing.KeyID == pub.KeyID {
+			return Keyring{}, PrivateKeyFile{}, PublicKey{}, errors.New("generated duplicate key id")
+		}
+	}
+	if disableOld {
+		for i := range ring.Keys {
+			if ring.Keys[i].Approver == pub.Approver {
+				ring.Keys[i].Enabled = false
+			}
+		}
+	}
+	ring.Keys = append(ring.Keys, pub)
+	return ring, priv, pub, nil
+}
+
+// SetEnabled changes trust for one key while refusing to leave an approver with
+// no enabled key unless allowNoEnabled is explicitly set.
+func SetEnabled(ring Keyring, keyID string, enabled, allowNoEnabled bool) (Keyring, error) {
+	found := false
+	approver := ""
+	for i := range ring.Keys {
+		if ring.Keys[i].KeyID == keyID {
+			found = true
+			approver = ring.Keys[i].Approver
+			ring.Keys[i].Enabled = enabled
+			break
+		}
+	}
+	if !found {
+		return Keyring{}, fmt.Errorf("approval key %q not found", keyID)
+	}
+	if !enabled && !allowNoEnabled {
+		remaining := 0
+		for _, key := range ring.Keys {
+			if key.Approver == approver && key.Enabled {
+				remaining++
+			}
+		}
+		if remaining == 0 {
+			return Keyring{}, fmt.Errorf("refusing to disable the final enabled key for approver %q", approver)
+		}
+	}
+	return ring, nil
+}
+
+// LoadEnvelope loads one strict signed approval envelope.
+func LoadEnvelope(path string) (Envelope, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return Envelope{}, err
+	}
+	var env Envelope
+	if err := strictJSON(b, &env); err != nil {
+		return env, err
+	}
+	if env.Version != Version || env.TransactionID == "" || env.TransactionDigest == "" || env.Signature == "" {
+		return env, errors.New("invalid approval envelope")
+	}
+	return env, nil
+}

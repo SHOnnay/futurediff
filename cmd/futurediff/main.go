@@ -16,7 +16,7 @@ import (
 )
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: futurediff [--socket path] <version|health|create|execute|get|prepare-github-branch|prepare-github-pr|prepare-slack-message|effects|refresh-effect|seal|verify|approval-material|approve|approve-signed|commit|recover|abort|events> ...")
+	fmt.Fprintln(os.Stderr, "usage: futurediff [--socket path] <version|health|create|execute|get|prepare-github-branch|prepare-github-pr|prepare-slack-message|effects|refresh-effect|seal|verify|approval-material|approve|approve-signed|approve-quorum|commit|recover|abort|events> ...")
 	os.Exit(2)
 }
 func main() {
@@ -135,6 +135,19 @@ func main() {
 			fatal(err)
 		}
 		method, path, body = "POST", "/v1/transactions/"+args[1]+"/approve", map[string]any{"approval_envelope": env}
+	case "approve-quorum":
+		if len(args) < 3 {
+			usage()
+		}
+		b, err := os.ReadFile(args[2])
+		if err != nil {
+			fatal(err)
+		}
+		var bundle any
+		if err := json.Unmarshal(b, &bundle); err != nil {
+			fatal(err)
+		}
+		method, path, body = "POST", "/v1/transactions/"+args[1]+"/approve", map[string]any{"approval_bundle": bundle}
 	case "commit":
 		if len(args) < 3 {
 			usage()

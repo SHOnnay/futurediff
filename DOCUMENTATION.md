@@ -30,6 +30,7 @@ Machine-readable contracts:
 - `docs/tasks/TASK-045-redacted-support-bundle.md`
 - `docs/progress/PROGRESS-AUDIT-TASK-045.md`
 
+
 ## Tasks 046–050
 
 - `docs/tasks/TASK-046-signed-operator-approvals.md`
@@ -37,7 +38,23 @@ Machine-readable contracts:
 - `docs/tasks/TASK-048-transaction-diff-summary.md`
 - `docs/tasks/TASK-049-offline-upgrade-rehearsal.md`
 - `docs/tasks/TASK-050-contributor-compatibility-harness.md`
-- `docs/progress/PROGRESS-AUDIT-TASK-050.md`
 
-Latest validation: `docs/tasks/TASK-046-050-validation.md`
-Latest progress audit: `docs/progress/PROGRESS-AUDIT-TASK-050.md`
+## Tasks 051–055
+
+- `docs/tasks/TASK-051-maintenance-mode-coordination.md`
+- `docs/tasks/TASK-052-encrypted-runtime-evidence.md`
+- `docs/tasks/TASK-053-approval-key-rotation.md`
+- `docs/tasks/TASK-054-transaction-timeline.md`
+- `docs/tasks/TASK-055-threat-model-self-test.md`
+- `docs/tasks/TASK-051-055-validation.md`
+- `docs/progress/PROGRESS-AUDIT-TASK-055.md`
+
+## Tasks 056–060
+
+- `docs/tasks/TASK-056-configuration-snapshot-attestation.md`
+- `docs/tasks/TASK-057-multi-operator-approval-quorum.md`
+- `docs/tasks/TASK-058-evidence-encryption-key-rotation.md`
+- `docs/tasks/TASK-059-incident-reconstruction-report.md`
+- `docs/tasks/TASK-060-bounded-daemon-drain.md`
+- `docs/tasks/TASK-056-060-validation.md`
+- `docs/progress/PROGRESS-AUDIT-TASK-060.md`

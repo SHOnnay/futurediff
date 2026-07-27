@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://futurediff.dev/schemas/incident/report.schema.json",
+  "title": "FutureDiff incident reconstruction report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["version", "generated_at", "transaction_id", "severity", "status", "diff", "timeline", "replay", "recommended_actions", "digest"],
+  "properties": {
+    "version": {"const": "0.1"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "transaction_id": {"type": "string", "minLength": 1},
+    "severity": {"enum": ["informational", "medium", "high", "critical"]},
+    "status": {"type": "string", "minLength": 1},
+    "recommended_actions": {"type": "array", "items": {"type": "string"}},
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  }
+}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/SHOnnay/futurediff/internal/adapters/githubbranch"
@@ -14,6 +15,7 @@ import (
 	"github.com/SHOnnay/futurediff/internal/adapters/slackoutbox"
 	"github.com/SHOnnay/futurediff/internal/credentials"
 	"github.com/SHOnnay/futurediff/internal/domain"
+	"github.com/SHOnnay/futurediff/internal/evidencecrypto"
 	"github.com/SHOnnay/futurediff/internal/ledger"
 	"github.com/SHOnnay/futurediff/internal/operatorapproval"
 	"github.com/SHOnnay/futurediff/internal/runtimeoci"
@@ -32,7 +34,9 @@ type Service struct {
 	Slack                  *slackoutbox.Adapter
 	CoordinatorID          string
 	ApprovalKeys           *operatorapproval.Keyring
+	ApprovalQuorum         *operatorapproval.QuorumPolicy
 	RequireSignedApprovals bool
+	EvidenceCipher         evidencecrypto.FileCipher
 }
 
 type CreateRequest struct {
@@ -111,7 +115,12 @@ func (s *Service) CredentialStatus() map[string]any {
 }
 
 func (s *Service) ApprovalStatus() map[string]any {
-	return map[string]any{"configured": s.ApprovalKeys != nil, "signed_required": s.RequireSignedApprovals}
+	status := map[string]any{"configured": s.ApprovalKeys != nil, "signed_required": s.RequireSignedApprovals}
+	if s.ApprovalQuorum != nil {
+		status["quorum_threshold"] = s.ApprovalQuorum.Threshold
+		status["quorum_required_approvers"] = s.ApprovalQuorum.RequiredApprovers
+	}
+	return status
 }
 
 func (s *Service) RuntimeStatus(ctx context.Context) map[string]any {
@@ -164,7 +173,7 @@ func (s *Service) Execute(ctx context.Context, id string, req ExecuteRequest) (E
 	if result.Evidence.ExecutionID == "" {
 		return ExecuteView{}, runErr
 	}
-	record, persistErr := persistRuntimeEvidence(workspace.ArtifactsPath, result)
+	record, persistErr := persistRuntimeEvidence(workspace.ArtifactsPath, result, s.EvidenceCipher)
 	if persistErr != nil {
 		return ExecuteView{}, persistErr
 	}
@@ -178,26 +187,43 @@ func (s *Service) Execute(ctx context.Context, id string, req ExecuteRequest) (E
 	return view, nil
 }
 
-func persistRuntimeEvidence(artifactsPath string, result runtimeoci.Result) (domain.RuntimeExecution, error) {
+func persistRuntimeEvidence(artifactsPath string, result runtimeoci.Result, evidenceCipher evidencecrypto.FileCipher) (domain.RuntimeExecution, error) {
 	dir := filepath.Join(artifactsPath, "executions", result.Evidence.ExecutionID)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return domain.RuntimeExecution{}, err
 	}
-	stdoutPath := filepath.Join(dir, "stdout.log")
-	stderrPath := filepath.Join(dir, "stderr.log")
-	evidencePath := filepath.Join(dir, "evidence.json")
-	if err := os.WriteFile(stdoutPath, result.Stdout, 0o600); err != nil {
-		return domain.RuntimeExecution{}, err
+	suffix := ""
+	if evidenceCipher != nil {
+		suffix = ".fde"
 	}
-	if err := os.WriteFile(stderrPath, result.Stderr, 0o600); err != nil {
-		return domain.RuntimeExecution{}, err
-	}
+	stdoutPath := filepath.Join(dir, "stdout.log"+suffix)
+	stderrPath := filepath.Join(dir, "stderr.log"+suffix)
+	evidencePath := filepath.Join(dir, "evidence.json"+suffix)
 	encoded, err := json.MarshalIndent(result.Evidence, "", "  ")
 	if err != nil {
 		return domain.RuntimeExecution{}, err
 	}
-	if err := os.WriteFile(evidencePath, append(encoded, '\n'), 0o600); err != nil {
-		return domain.RuntimeExecution{}, err
+	if evidenceCipher != nil {
+		baseAAD := result.Evidence.TransactionID + ":" + result.Evidence.ExecutionID + ":"
+		if err := evidenceCipher.WriteFile(stdoutPath, result.Stdout, []byte(baseAAD+"stdout")); err != nil {
+			return domain.RuntimeExecution{}, err
+		}
+		if err := evidenceCipher.WriteFile(stderrPath, result.Stderr, []byte(baseAAD+"stderr")); err != nil {
+			return domain.RuntimeExecution{}, err
+		}
+		if err := evidenceCipher.WriteFile(evidencePath, append(encoded, '\n'), []byte(baseAAD+"evidence")); err != nil {
+			return domain.RuntimeExecution{}, err
+		}
+	} else {
+		if err := os.WriteFile(stdoutPath, result.Stdout, 0o600); err != nil {
+			return domain.RuntimeExecution{}, err
+		}
+		if err := os.WriteFile(stderrPath, result.Stderr, 0o600); err != nil {
+			return domain.RuntimeExecution{}, err
+		}
+		if err := os.WriteFile(evidencePath, append(encoded, '\n'), 0o600); err != nil {
+			return domain.RuntimeExecution{}, err
+		}
 	}
 	e := result.Evidence
 	return domain.RuntimeExecution{
@@ -296,8 +322,8 @@ func (s *Service) ApprovalMaterial(id string) (map[string]string, error) {
 	return map[string]string{"transaction_id": id, "transaction_digest": digest}, nil
 }
 func (s *Service) Approve(id, digest, approver string) (TransactionView, error) {
-	if s.RequireSignedApprovals {
-		return TransactionView{}, errors.New("signed approval envelope required")
+	if s.RequireSignedApprovals || s.ApprovalQuorum != nil {
+		return TransactionView{}, errors.New("signed approval envelope or quorum bundle required")
 	}
 	if approver == "" {
 		approver = "local-user"
@@ -309,6 +335,13 @@ func (s *Service) Approve(id, digest, approver string) (TransactionView, error) 
 }
 
 func (s *Service) ApproveSigned(id string, env operatorapproval.Envelope) (TransactionView, error) {
+	if s.ApprovalQuorum != nil {
+		bundle, err := operatorapproval.NewBundle([]operatorapproval.Envelope{env})
+		if err != nil {
+			return TransactionView{}, err
+		}
+		return s.ApproveSignedQuorum(id, bundle)
+	}
 	if s.ApprovalKeys == nil {
 		return TransactionView{}, errors.New("approval keyring is not configured")
 	}
@@ -321,6 +354,31 @@ func (s *Service) ApproveSigned(id string, env operatorapproval.Envelope) (Trans
 	}
 	ref := operatorapproval.SignatureReference(env)
 	if _, err := s.Ledger.ApproveWithEvidence(id, expected, env.Approver, ref, &env.ExpiresAt); err != nil {
+		return TransactionView{}, err
+	}
+	return s.Get(id)
+}
+
+func (s *Service) ApproveSignedQuorum(id string, bundle operatorapproval.Bundle) (TransactionView, error) {
+	if s.ApprovalKeys == nil || s.ApprovalQuorum == nil {
+		return TransactionView{}, errors.New("approval quorum is not configured")
+	}
+	expected, err := s.Ledger.ApprovalMaterial(id)
+	if err != nil {
+		return TransactionView{}, err
+	}
+	result, err := operatorapproval.VerifyQuorum(*s.ApprovalKeys, *s.ApprovalQuorum, bundle, id, expected, time.Now())
+	if err != nil {
+		return TransactionView{}, err
+	}
+	expires := bundle.Envelopes[0].ExpiresAt
+	for _, env := range bundle.Envelopes[1:] {
+		if env.ExpiresAt.Before(expires) {
+			expires = env.ExpiresAt
+		}
+	}
+	approver := "quorum:" + strings.Join(result.DistinctApprovers, ",")
+	if _, err := s.Ledger.ApproveWithEvidence(id, expected, approver, operatorapproval.QuorumSignatureReference(result), &expires); err != nil {
 		return TransactionView{}, err
 	}
 	return s.Get(id)

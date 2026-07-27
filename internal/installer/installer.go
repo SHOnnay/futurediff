@@ -30,6 +30,8 @@ var DefaultBinaries = []string{
 	"futurediff-export", "futurediff-restore", "futurediff-replay", "futurediff-config-lint", "futurediff-api-diff",
 	"futurediff-effectspec", "futurediff-policy-explain", "futurediff-recovery-drill", "futurediff-metrics", "futurediff-support-bundle",
 	"futurediff-approval", "futurediff-policy-bundle", "futurediff-diff", "futurediff-upgrade-rehearsal", "futurediff-compat",
+	"futurediff-maintenance", "futurediff-evidence", "futurediff-timeline", "futurediff-threat-test",
+	"futurediff-config-snapshot", "futurediff-approval-quorum", "futurediff-incident", "futurediff-drain",
 }
 
 type Options struct {
@@ -42,6 +44,9 @@ type Options struct {
 	RuntimeImage           string      `json:"runtime_image,omitempty"`
 	CredentialConfig       string      `json:"credential_config,omitempty"`
 	ApprovalKeyring        string      `json:"approval_keyring,omitempty"`
+	ApprovalQuorumPolicy   string      `json:"approval_quorum_policy,omitempty"`
+	EvidenceKey            string      `json:"evidence_key,omitempty"`
+	EvidenceKeyring        string      `json:"evidence_keyring,omitempty"`
 	RequireSignedApprovals bool        `json:"require_signed_approvals,omitempty"`
 	DryRun                 bool        `json:"dry_run"`
 }
@@ -99,8 +104,23 @@ func (o Options) Normalize() (Options, error) {
 	if o.CredentialConfig != "" && !filepath.IsAbs(o.CredentialConfig) {
 		return o, errors.New("credential config must be an absolute path")
 	}
+	if o.EvidenceKeyring != "" && !filepath.IsAbs(o.EvidenceKeyring) {
+		return o, errors.New("evidence keyring must be an absolute path")
+	}
+	if o.EvidenceKey != "" && !filepath.IsAbs(o.EvidenceKey) {
+		return o, errors.New("evidence key must be an absolute path")
+	}
+	if o.ApprovalQuorumPolicy != "" && !filepath.IsAbs(o.ApprovalQuorumPolicy) {
+		return o, errors.New("approval quorum policy must be an absolute path")
+	}
 	if o.ApprovalKeyring != "" && !filepath.IsAbs(o.ApprovalKeyring) {
 		return o, errors.New("approval keyring must be an absolute path")
+	}
+	if o.EvidenceKey != "" && o.EvidenceKeyring != "" {
+		return o, errors.New("evidence key and evidence keyring are mutually exclusive")
+	}
+	if o.ApprovalQuorumPolicy != "" && o.ApprovalKeyring == "" {
+		return o, errors.New("approval quorum policy requires an approval keyring")
 	}
 	if o.RequireSignedApprovals && o.ApprovalKeyring == "" {
 		return o, errors.New("signed approvals require an approval keyring")
@@ -235,6 +255,14 @@ func daemonArgs(o Options) []string {
 	}
 	if o.ApprovalKeyring != "" {
 		args = append(args, "--approval-keyring", o.ApprovalKeyring)
+	}
+	if o.ApprovalQuorumPolicy != "" {
+		args = append(args, "--approval-quorum-policy", o.ApprovalQuorumPolicy)
+	}
+	if o.EvidenceKeyring != "" {
+		args = append(args, "--evidence-keyring", o.EvidenceKeyring)
+	} else if o.EvidenceKey != "" {
+		args = append(args, "--evidence-key", o.EvidenceKey)
 	}
 	if o.RequireSignedApprovals {
 		args = append(args, "--require-signed-approvals")

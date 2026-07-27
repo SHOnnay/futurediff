@@ -4,7 +4,7 @@ FutureDiff is a transactional effect layer for autonomous AI agents.
 
 > Existing agents decide what to do. FutureDiff controls whether and how those decisions become persistent reality.
 
-## Current milestone: Task 045
+## Current milestone: Task 055
 
 The canonical implementation is Go and supports the staged transaction chain below, plus a unified real-environment certification command:
 
@@ -49,7 +49,12 @@ Implemented capabilities:
 - verification-policy explanation and simulation;
 - no-blind-retry recovery drills;
 - privacy-preserving JSON/Prometheus metrics;
-- verified redacted support bundles.
+- verified redacted support bundles;
+- digest-protected daemon maintenance mode;
+- AES-256-GCM runtime evidence encryption;
+- approval-key rotation and revocation;
+- transaction timeline export;
+- executable local threat-model regression testing.
 
 ## Repository provenance
 
@@ -85,7 +90,7 @@ go test -race ./...
 go build ./cmd/...
 ```
 
-The build produces 30 commands, including the daemon, trusted CLI, MCP bridge, certification, audit, export, restore, replay, configuration-lint, and API-diff tools. Run `ls bin/` after `make build` for the complete inventory.
+The build produces 39 commands, including the daemon, trusted CLI, MCP bridge, certification, audit, export, restore, replay, configuration-lint, and API-diff tools. Run `ls bin/` after `make build` for the complete inventory.
 
 ## Start the daemon
 
@@ -252,12 +257,17 @@ GitHub resources are closed/deleted and the Slack message is deleted. Use only d
 - `docs/tasks/TASK-043-recovery-planner-drill.md`
 - `docs/tasks/TASK-044-privacy-preserving-metrics.md`
 - `docs/tasks/TASK-045-redacted-support-bundle.md`
+- `docs/tasks/TASK-051-maintenance-mode-coordination.md`
+- `docs/tasks/TASK-052-encrypted-runtime-evidence.md`
+- `docs/tasks/TASK-053-approval-key-rotation.md`
+- `docs/tasks/TASK-054-transaction-timeline.md`
+- `docs/tasks/TASK-055-threat-model-self-test.md`
 
 ## Current progress estimate
 
 - architecture and research: **99%**;
-- public open-source MVP: **98.5%**;
-- production-grade platform: **70%**.
+- public open-source MVP: **99.2%**;
+- production-grade platform: **75%**.
 
 These are weighted acceptance-criteria estimates, not line-count estimates.
 
@@ -414,36 +424,83 @@ futurediff-support-bundle --verify support.zip
 
 Metrics are aggregate-only. Support bundles exclude ledger bytes, transaction patches, and credential configuration contents.
 
-## Signed operator approvals
+
+## Maintenance mode
 
 ```bash
-futurediff-approval generate \
-  --approver operator@example.com \
-  --private ~/.futurediff/operator-private.json \
-  --keyring ~/.futurediff/operator-keyring.json
-
-futurediff-approval sign \
-  --private ~/.futurediff/operator-private.json \
-  --transaction <transaction-id> \
-  --digest <approval-material-digest> \
-  --output approval.json
-
-futurediff approve-signed <transaction-id> approval.json
+futurediff-maintenance --root "$HOME/.futurediff"   --action enable --reason "offline maintenance" --ttl 30m
 ```
 
-Start the daemon with `--approval-keyring` and `--require-signed-approvals` to reject unsigned approval requests.
+While enabled, daemon GET operations remain available but all HTTP mutations fail with `503 maintenance_mode`.
 
-## Policy bundle, diff, and upgrade rehearsal
+## Runtime evidence encryption
 
 ```bash
-futurediff-policy-bundle \
-  --contract examples/verification/basic.verify.json \
-  --policy-id default-safe \
-  --output default.fdpolicy
+futurediff-evidence generate-key   --output "$HOME/.futurediff/evidence-key.json"
 
-futurediff-diff --root ~/.futurediff \
+futurediffd --root "$HOME/.futurediff"   --evidence-key "$HOME/.futurediff/evidence-key.json"
+```
+
+## Transaction timeline and threat checks
+
+```bash
+futurediff-timeline --root "$HOME/.futurediff"   --transaction <transaction-id> --format markdown
+
+futurediff-threat-test --output threat-model-report.json
+```
+
+## Configuration attestation
+
+```bash
+futurediff-config-snapshot build \
+  --file credentials=$HOME/.futurediff/credentials.json \
+  --file approval-keyring=$HOME/.futurediff/operator-keyring.json \
+  --output $HOME/.futurediff/config.snapshot.json
+
+futurediff-config-snapshot verify \
+  --manifest $HOME/.futurediff/config.snapshot.json
+```
+
+## Multi-operator approvals
+
+Start the daemon with a trusted keyring and quorum policy:
+
+```bash
+futurediffd \
+  --approval-keyring $HOME/.futurediff/operator-keyring.json \
+  --approval-quorum-policy $HOME/.futurediff/quorum-policy.json
+```
+
+Assemble independently signed envelopes:
+
+```bash
+futurediff-approval-quorum assemble \
+  --envelope alice.approval.json \
+  --envelope bob.approval.json \
+  --output approval.bundle.json
+
+futurediff approve-quorum <transaction-id> approval.bundle.json
+```
+
+## Evidence-key rotation
+
+```bash
+futurediff-evidence init-keyring \
+  --keyring $HOME/.futurediff/evidence-keyring.json \
+  --key $HOME/.futurediff/evidence-key-001.json
+
+futurediff-evidence rotate-keyring \
+  --keyring $HOME/.futurediff/evidence-keyring.json \
+  --new-key $HOME/.futurediff/evidence-key-002.json
+```
+
+## Incident reconstruction and daemon drain
+
+```bash
+futurediff-incident --root $HOME/.futurediff \
   --transaction <transaction-id> --format markdown
 
-futurediff-upgrade-rehearsal --root ~/.futurediff
-futurediff-compat --manifest examples/compatibility.manifest.json
+futurediff-drain \
+  --pid-file $HOME/.futurediff/futurediff.pid \
+  --confirm DRAIN_FUTUREDIFF_DAEMON
 ```

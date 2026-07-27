@@ -21,6 +21,11 @@ func main() {
 	runtimeKind := flag.String("runtime", "", "optional docker or podman runtime")
 	image := flag.String("runtime-image", "", "optional digest-pinned runtime image")
 	creds := flag.String("credential-config", "", "optional absolute credential metadata path")
+	approvalKeyring := flag.String("approval-keyring", "", "optional absolute operator approval keyring")
+	requireSigned := flag.Bool("require-signed-approvals", false, "require signed operator approvals")
+	approvalQuorum := flag.String("approval-quorum-policy", "", "optional absolute approval quorum policy")
+	evidenceKey := flag.String("evidence-key", "", "optional absolute AES-GCM evidence key")
+	evidenceKeyring := flag.String("evidence-keyring", "", "optional absolute evidence keyring")
 	dry := flag.Bool("dry-run", false, "print plan without writing")
 	version := flag.Bool("version", false, "print build information")
 	flag.Parse()
@@ -28,7 +33,7 @@ func main() {
 		fmt.Printf("%+v\n", buildinfo.Current())
 		return
 	}
-	opts := installer.Options{SourceDir: *source, Prefix: *prefix, DataRoot: *root, Socket: *socket, Service: installer.ServiceKind(*service), Runtime: *runtimeKind, RuntimeImage: *image, CredentialConfig: *creds, DryRun: *dry}
+	opts := installer.Options{SourceDir: *source, Prefix: *prefix, DataRoot: *root, Socket: *socket, Service: installer.ServiceKind(*service), Runtime: *runtimeKind, RuntimeImage: *image, CredentialConfig: *creds, ApprovalKeyring: *approvalKeyring, ApprovalQuorumPolicy: *approvalQuorum, RequireSignedApprovals: *requireSigned, EvidenceKey: *evidenceKey, EvidenceKeyring: *evidenceKeyring, DryRun: *dry}
 	plan, err := installer.BuildPlan(opts)
 	if err != nil {
 		fatal(err)

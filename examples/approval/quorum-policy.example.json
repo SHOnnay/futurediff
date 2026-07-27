@@ -1,0 +1,12 @@
+{
+  "version": "0.1",
+  "threshold": 2,
+  "allowed_approvers": [
+    "security@example.com",
+    "release@example.com",
+    "service-owner@example.com"
+  ],
+  "required_approvers": [
+    "service-owner@example.com"
+  ]
+}

@@ -22,6 +22,12 @@ func main() {
 		sign(os.Args[2:])
 	case "verify":
 		verify(os.Args[2:])
+	case "rotate":
+		rotate(os.Args[2:])
+	case "set-enabled":
+		setEnabled(os.Args[2:])
+	case "list":
+		list(os.Args[2:])
 	case "version":
 		printJSON(buildinfo.Current())
 	default:
@@ -81,8 +87,56 @@ func verify(args []string) {
 	must(operatorapproval.Verify(ring, env, *tx, *digest, time.Now()))
 	printJSON(map[string]any{"verified": true, "approver": env.Approver, "key_id": env.KeyID, "signature_ref": operatorapproval.SignatureReference(env), "expires_at": env.ExpiresAt})
 }
+
+func rotate(args []string) {
+	fs := flag.NewFlagSet("rotate", flag.ExitOnError)
+	keyringPath := fs.String("keyring", "", "trusted keyring to update")
+	approver := fs.String("approver", "", "operator identity")
+	private := fs.String("private", "", "new private key output")
+	disableOld := fs.Bool("disable-old", false, "disable older keys for the same approver")
+	_ = fs.Parse(args)
+	if *keyringPath == "" || *approver == "" || *private == "" {
+		usage()
+	}
+	ring, err := operatorapproval.LoadKeyring(*keyringPath)
+	must(err)
+	ring, priv, pub, err := operatorapproval.Rotate(ring, *approver, *disableOld, time.Now())
+	must(err)
+	must(operatorapproval.WritePrivate(*private, priv))
+	must(operatorapproval.WriteKeyring(*keyringPath, ring))
+	printJSON(map[string]any{"keyring": *keyringPath, "private_file": *private, "new_key_id": pub.KeyID, "disable_old": *disableOld})
+}
+func setEnabled(args []string) {
+	fs := flag.NewFlagSet("set-enabled", flag.ExitOnError)
+	keyringPath := fs.String("keyring", "", "trusted keyring")
+	keyID := fs.String("key-id", "", "key id")
+	enabled := fs.Bool("enabled", true, "new enabled state")
+	allowNone := fs.Bool("allow-no-enabled", false, "allow disabling the final key for an approver")
+	_ = fs.Parse(args)
+	if *keyringPath == "" || *keyID == "" {
+		usage()
+	}
+	ring, err := operatorapproval.LoadKeyring(*keyringPath)
+	must(err)
+	ring, err = operatorapproval.SetEnabled(ring, *keyID, *enabled, *allowNone)
+	must(err)
+	must(operatorapproval.WriteKeyring(*keyringPath, ring))
+	printJSON(map[string]any{"keyring": *keyringPath, "key_id": *keyID, "enabled": *enabled})
+}
+func list(args []string) {
+	fs := flag.NewFlagSet("list", flag.ExitOnError)
+	keyringPath := fs.String("keyring", "", "trusted keyring")
+	_ = fs.Parse(args)
+	if *keyringPath == "" {
+		usage()
+	}
+	ring, err := operatorapproval.LoadKeyring(*keyringPath)
+	must(err)
+	printJSON(ring)
+}
+
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: futurediff-approval <generate|sign|verify|version> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: futurediff-approval <generate|sign|verify|rotate|set-enabled|list|version> [flags]")
 	os.Exit(2)
 }
 func must(err error) {

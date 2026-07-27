@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://futurediff.dev/schemas/approval/quorum-policy.schema.json",
+  "title": "FutureDiff approval quorum policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "threshold"],
+  "properties": {
+    "version": {"const": "0.1"},
+    "threshold": {"type": "integer", "minimum": 1},
+    "allowed_approvers": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "required_approvers": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+  }
+}

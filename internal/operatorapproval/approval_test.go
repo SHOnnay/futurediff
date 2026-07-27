@@ -61,3 +61,40 @@ func TestPrivatePermissions(t *testing.T) {
 		t.Fatal("weak permissions accepted")
 	}
 }
+
+func TestRotateAndRevokeKeyring(t *testing.T) {
+	now := time.Now().UTC()
+	oldPriv, oldPub, err := Generate("alice@example.com", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ring := Keyring{Version: Version, Keys: []PublicKey{oldPub}}
+	ring, newPriv, newPub, err := Rotate(ring, "alice@example.com", false, now.Add(time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ring.Keys) != 2 || !ring.Keys[0].Enabled || !ring.Keys[1].Enabled {
+		t.Fatalf("ring=%+v", ring)
+	}
+	oldEnv, _ := Sign(oldPriv, "tx", "digest", time.Hour, now)
+	newEnv, _ := Sign(newPriv, "tx", "digest", time.Hour, now)
+	if err := Verify(ring, oldEnv, "tx", "digest", now.Add(2*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if err := Verify(ring, newEnv, "tx", "digest", now.Add(2*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	ring, err = SetEnabled(ring, oldPub.KeyID, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if Verify(ring, oldEnv, "tx", "digest", now.Add(2*time.Minute)) == nil {
+		t.Fatal("disabled key accepted")
+	}
+	if err := Verify(ring, newEnv, "tx", "digest", now.Add(2*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := SetEnabled(ring, newPub.KeyID, false, false); err == nil {
+		t.Fatal("final enabled key disabled")
+	}
+}
