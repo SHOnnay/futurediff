@@ -251,7 +251,7 @@ GitHub resources are closed/deleted and the Slack message is deleted. Use only d
 
 ## Documentation
 
-- `docs/tasks/TASK-011-controlled-github-branch-publication.md`
+- `ARCHITECTURE.md`
 - `docs/tasks/TASK-011-controlled-github-branch-publication.md`
 - `docs/tasks/TASK-012-slack-durable-outbox.md`
 - `docs/tasks/TASK-013-generic-mcp-bridge.md`
