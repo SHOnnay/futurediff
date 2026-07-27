@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://futurediff.dev/schemas/policy/bundle-manifest-0.1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format_version", "policy_id", "policy_version", "contract_digest", "bundle_digest"],
+  "properties": {
+    "format_version": {"const": "0.1"},
+    "policy_id": {"type": "string", "minLength": 1},
+    "policy_version": {"type": "string", "minLength": 1},
+    "contract_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "bundle_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "labels": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+  }
+}

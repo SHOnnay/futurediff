@@ -12,8 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SHOnnay/futurediff/internal/apicontract"
 	"github.com/SHOnnay/futurediff/internal/app"
 	"github.com/SHOnnay/futurediff/internal/buildinfo"
+	"github.com/SHOnnay/futurediff/internal/operatorapproval"
 	"github.com/SHOnnay/futurediff/internal/verification"
 )
 
@@ -40,8 +42,9 @@ func writeErr(w http.ResponseWriter, status int, code string, err error) {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/health", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, 200, map[string]any{"status": "ok", "implementation": "go", "build": buildinfo.Current(), "time": time.Now().UTC(), "oci": s.Service.RuntimeStatus(r.Context()), "credentials": s.Service.CredentialStatus()})
+		writeJSON(w, 200, map[string]any{"status": "ok", "implementation": "go", "build": buildinfo.Current(), "time": time.Now().UTC(), "oci": s.Service.RuntimeStatus(r.Context()), "credentials": s.Service.CredentialStatus(), "approvals": s.Service.ApprovalStatus()})
 	})
+	mux.HandleFunc("GET /v1/contract", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, apicontract.Current()) })
 	mux.HandleFunc("POST /v1/transactions", s.create)
 	mux.HandleFunc("GET /v1/transactions/{id}", s.get)
 	mux.HandleFunc("POST /v1/transactions/{id}/execute", s.execute)
@@ -221,14 +224,21 @@ func (s *Server) approvalMaterial(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) approve(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Digest   string `json:"transaction_digest"`
-		Approver string `json:"approver"`
+		Digest   string                     `json:"transaction_digest,omitempty"`
+		Approver string                     `json:"approver,omitempty"`
+		Envelope *operatorapproval.Envelope `json:"approval_envelope,omitempty"`
 	}
 	if err := decode(r, &req); err != nil {
 		writeErr(w, 400, "invalid_request", err)
 		return
 	}
-	v, err := s.Service.Approve(r.PathValue("id"), req.Digest, req.Approver)
+	var v app.TransactionView
+	var err error
+	if req.Envelope != nil {
+		v, err = s.Service.ApproveSigned(r.PathValue("id"), *req.Envelope)
+	} else {
+		v, err = s.Service.Approve(r.PathValue("id"), req.Digest, req.Approver)
+	}
 	if err != nil {
 		writeErr(w, 409, "approval_failed", err)
 		return

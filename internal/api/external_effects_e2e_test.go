@@ -92,7 +92,7 @@ func TestUnixSocketGitHubDraftPREffectLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc := &app.Service{Ledger: store, Staging: staging.Manager{RuntimeRoot: filepath.Join(tmp, "runtime")}, Verifier: verification.Engine{}, Credentials: broker, GitHub: &githubdraft.Adapter{HTTPClient: &http.Client{Transport: fake}}, CoordinatorID: "api-test"}
-	socket := shortSocketPath(t, "fd-api-github-")
+	socket := shortSocketPath(t, "fd-api-effects-")
 	server := &Server{Service: svc, SocketPath: socket}
 	go func() { _ = server.Serve() }()
 	defer server.Close()

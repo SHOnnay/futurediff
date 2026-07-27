@@ -19,6 +19,7 @@ import (
 	"github.com/SHOnnay/futurediff/internal/credentials"
 	"github.com/SHOnnay/futurediff/internal/egress"
 	"github.com/SHOnnay/futurediff/internal/ledger"
+	"github.com/SHOnnay/futurediff/internal/operatorapproval"
 	"github.com/SHOnnay/futurediff/internal/runtimeoci"
 	"github.com/SHOnnay/futurediff/internal/staging"
 	"github.com/SHOnnay/futurediff/internal/verification"
@@ -33,6 +34,8 @@ func main() {
 	runtimeBinary := flag.String("runtime-binary", "", "optional OCI runtime binary path")
 	runtimeImage := flag.String("runtime-image", "", "digest-pinned image enabling enforced mode")
 	credentialConfig := flag.String("credential-config", "", "0600 JSON credential metadata configuration; secret values remain in their configured source")
+	approvalKeyring := flag.String("approval-keyring", "", "trusted Ed25519 operator approval keyring")
+	requireSignedApprovals := flag.Bool("require-signed-approvals", false, "reject unsigned approval requests")
 	githubAPIBase := flag.String("github-api-base", "https://api.github.com", "GitHub API base URL for the built-in draft-PR adapter")
 	slackAPIBase := flag.String("slack-api-base", "https://slack.com/api", "Slack API base URL for the built-in message outbox")
 	version := flag.Bool("version", false, "print build information")
@@ -84,6 +87,17 @@ func main() {
 	if err != nil {
 		log.Fatalf("Slack egress transport: %v", err)
 	}
+	var approvalKeys *operatorapproval.Keyring
+	if *approvalKeyring != "" {
+		ring, err := operatorapproval.LoadKeyring(*approvalKeyring)
+		if err != nil {
+			log.Fatalf("approval keyring: %v", err)
+		}
+		approvalKeys = &ring
+		log.Printf("operator approval keyring configured: keys=%d signed_required=%t", len(ring.Keys), *requireSignedApprovals)
+	} else if *requireSignedApprovals {
+		log.Fatal("--require-signed-approvals requires --approval-keyring")
+	}
 	var broker *credentials.Broker
 	if *credentialConfig != "" {
 		config, err := credentials.LoadConfig(*credentialConfig)
@@ -97,15 +111,17 @@ func main() {
 		log.Printf("credential broker configured: adapters=%d credentials=%d", len(config.Adapters), len(config.Credentials))
 	}
 	svc := &app.Service{
-		Ledger:        repo,
-		Staging:       staging.Manager{RuntimeRoot: filepath.Join(*root, "runtime")},
-		Verifier:      verification.Engine{AllowLocalCommands: false, OCI: runner},
-		OCI:           runner,
-		Credentials:   broker,
-		GitHub:        &githubdraft.Adapter{BaseURL: *githubAPIBase, HTTPClient: githubHTTP},
-		GitHubBranch:  &githubbranch.Adapter{},
-		Slack:         &slackoutbox.Adapter{BaseURL: *slackAPIBase, HTTPClient: slackHTTP},
-		CoordinatorID: fmt.Sprintf("daemon-%d", os.Getpid()),
+		Ledger:                 repo,
+		Staging:                staging.Manager{RuntimeRoot: filepath.Join(*root, "runtime")},
+		Verifier:               verification.Engine{AllowLocalCommands: false, OCI: runner},
+		OCI:                    runner,
+		Credentials:            broker,
+		GitHub:                 &githubdraft.Adapter{BaseURL: *githubAPIBase, HTTPClient: githubHTTP},
+		GitHubBranch:           &githubbranch.Adapter{},
+		Slack:                  &slackoutbox.Adapter{BaseURL: *slackAPIBase, HTTPClient: slackHTTP},
+		CoordinatorID:          fmt.Sprintf("daemon-%d", os.Getpid()),
+		ApprovalKeys:           approvalKeys,
+		RequireSignedApprovals: *requireSignedApprovals,
 	}
 	server := &api.Server{Service: svc, SocketPath: *socket}
 	errCh := make(chan error, 1)

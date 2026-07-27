@@ -209,6 +209,19 @@ func ProbeContext(ctx context.Context, kind RuntimeKind, binary string) (Backend
 	return backend, nil
 }
 
+func ensureImageAvailable(ctx context.Context, backend Backend, image string) error {
+	if _, err := commandOutput(ctx, backend.Binary, "image", "inspect", image); err == nil {
+		return nil
+	}
+	if _, err := commandOutput(ctx, backend.Binary, "pull", image); err != nil {
+		return fmt.Errorf("ensure OCI image available: %w", err)
+	}
+	if _, err := commandOutput(ctx, backend.Binary, "image", "inspect", image); err != nil {
+		return fmt.Errorf("inspect OCI image after pull: %w", err)
+	}
+	return nil
+}
+
 func BuildPlan(backend Backend, workspace string, command []string, policy Policy) (Plan, error) {
 	if err := policy.Validate(); err != nil {
 		return Plan{}, err
@@ -270,6 +283,11 @@ func (r Runner) Execute(ctx context.Context, request Request) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
+	ctx, cancel := context.WithTimeout(ctx, r.Policy.Timeout)
+	defer cancel()
+	if err := ensureImageAvailable(ctx, backend, r.Policy.Image); err != nil {
+		return Result{}, err
+	}
 	root := r.ScratchRoot
 	if root == "" {
 		root = os.TempDir()
@@ -310,8 +328,6 @@ func (r Runner) Execute(ctx context.Context, request Request) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	ctx, cancel := context.WithTimeout(ctx, r.Policy.Timeout)
-	defer cancel()
 	stdout, stderr := newBounded(r.Policy.MaxOutputBytes), newBounded(r.Policy.MaxOutputBytes)
 	started := time.Now().UTC()
 	cmd := exec.CommandContext(ctx, plan.Binary, plan.Args...)

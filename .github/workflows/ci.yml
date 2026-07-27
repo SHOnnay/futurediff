@@ -36,6 +36,8 @@ jobs:
         run: |
           ./bin/futurediff-integrate --target opencode --mcp-binary "$PWD/bin/futurediff-mcp" --socket "$RUNNER_TEMP/futurediff.sock" --output "$RUNNER_TEMP/opencode.json"
           ./bin/futurediff-integrate --target hermes --mcp-binary "$PWD/bin/futurediff-mcp" --socket "$RUNNER_TEMP/futurediff.sock" --output "$RUNNER_TEMP/hermes.yaml"
+      - name: Local certification suite
+        run: ./bin/futurediff-cert-suite --target local --mcp-binary "$PWD/bin/futurediff-mcp" --socket "$RUNNER_TEMP/futurediff.sock" --output "$RUNNER_TEMP/certification.json"
       - name: Ledger fault-injection self-test
         run: ./bin/futurediff-admin --root "$RUNNER_TEMP/fd-admin" --fault-self-test "$RUNNER_TEMP/fd-faults"
       - name: Local provenance statement

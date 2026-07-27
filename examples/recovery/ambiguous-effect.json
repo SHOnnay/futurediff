@@ -1,0 +1,9 @@
+{
+  "name": "ambiguous-provider-response",
+  "transaction_status": "needs_reconciliation",
+  "effect_status": "unknown",
+  "provider_status": "unknown",
+  "has_receipt": false,
+  "repository_published": true,
+  "source_moved": false
+}

@@ -512,12 +512,7 @@ func appendEffectEvent(tx *Tx, transactionID, effectID, kind string, payload any
 	if err != nil {
 		return err
 	}
-	var fence any
-	if fencingToken > 0 {
-		fence = fencingToken
-	}
-	_, err = tx.Exec(`INSERT INTO events(event_id,transaction_id,effect_id,event_type,payload_json,payload_digest,fencing_token,created_at) VALUES(?,?,?,?,?,?,?,?)`, domain.NewID("event"), transactionID, effectID, kind, string(b), domain.SHA256Bytes(b), fence, ts(at))
-	return err
+	return appendChainedEvent(tx, transactionID, effectID, kind, b, domain.SHA256Bytes(b), fencingToken, ts(at))
 }
 
 func (r *Repository) AbortPreparedEffects(transactionID, reason string) error {

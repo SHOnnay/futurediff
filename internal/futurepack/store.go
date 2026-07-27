@@ -242,3 +242,79 @@ func sanitizeName(name string) string {
 	}
 	return cleaned
 }
+
+// VerifyArchive validates a .futurepack archive without extracting it.
+func VerifyArchive(path string) (Manifest, error) {
+	zr, err := zip.OpenReader(path)
+	if err != nil {
+		return Manifest{}, fmt.Errorf("open futurepack: %w", err)
+	}
+	defer zr.Close()
+	var manifest Manifest
+	seen := map[string]bool{}
+	blobs := map[string][]byte{}
+	for _, file := range zr.File {
+		clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(file.Name)))
+		if clean != file.Name || strings.HasPrefix(clean, "../") || strings.HasPrefix(clean, "/") || file.FileInfo().Mode()&os.ModeType != 0 {
+			return Manifest{}, fmt.Errorf("unsafe futurepack entry %q", file.Name)
+		}
+		if seen[clean] {
+			return Manifest{}, fmt.Errorf("duplicate futurepack entry %q", clean)
+		}
+		seen[clean] = true
+		if file.UncompressedSize64 > 64<<20 {
+			return Manifest{}, fmt.Errorf("futurepack entry too large: %s", clean)
+		}
+		rc, openErr := file.Open()
+		if openErr != nil {
+			return Manifest{}, openErr
+		}
+		payload, readErr := io.ReadAll(io.LimitReader(rc, (64<<20)+1))
+		closeErr := rc.Close()
+		if readErr != nil {
+			return Manifest{}, readErr
+		}
+		if closeErr != nil {
+			return Manifest{}, closeErr
+		}
+		if len(payload) > 64<<20 {
+			return Manifest{}, fmt.Errorf("futurepack entry too large: %s", clean)
+		}
+		if clean == "manifest.json" {
+			if err := json.Unmarshal(payload, &manifest); err != nil {
+				return Manifest{}, fmt.Errorf("decode manifest: %w", err)
+			}
+		} else {
+			blobs[clean] = payload
+		}
+	}
+	if manifest.FormatVersion == "" || manifest.TransactionID == "" {
+		return Manifest{}, errors.New("futurepack manifest is incomplete")
+	}
+	expected := map[string]bool{"manifest.json": true}
+	referenceDigests := map[string]bool{}
+	for _, ref := range manifest.Artifacts {
+		if referenceDigests[ref.SHA256] {
+			return Manifest{}, fmt.Errorf("duplicate artifact reference %s", ref.SHA256)
+		}
+		referenceDigests[ref.SHA256] = true
+		if err := validateRef(ref); err != nil {
+			return Manifest{}, err
+		}
+		expected[ref.RelativePath] = true
+		payload, ok := blobs[ref.RelativePath]
+		if !ok {
+			return Manifest{}, fmt.Errorf("missing artifact %s", ref.RelativePath)
+		}
+		sum := sha256.Sum256(payload)
+		if hex.EncodeToString(sum[:]) != ref.SHA256 || int64(len(payload)) != ref.SizeBytes {
+			return Manifest{}, fmt.Errorf("artifact verification failed: %s", ref.Name)
+		}
+	}
+	for name := range seen {
+		if !expected[name] {
+			return Manifest{}, fmt.Errorf("unreferenced futurepack entry %s", name)
+		}
+	}
+	return manifest, nil
+}

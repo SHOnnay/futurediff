@@ -1,0 +1,18 @@
+{
+  "effectspec": "0.1",
+  "adapter": "example",
+  "tool": "example.create",
+  "capabilities": {
+    "prepare": true,
+    "preview": true,
+    "verify": true,
+    "commit": true,
+    "abort": true,
+    "compensate": true,
+    "status": true
+  },
+  "mutates_state": true,
+  "open_world": true,
+  "reversibility": "compensatable",
+  "preview_fidelity": "exact_payload"
+}

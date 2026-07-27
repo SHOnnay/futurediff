@@ -1,0 +1,112 @@
+{
+  "options": {
+    "source_dir": "/mnt/data/fd_task025_029/FutureDiff_Go_Task_024_Complete/bin",
+    "prefix": "/mnt/data/fd-install-final/prefix",
+    "data_root": "/mnt/data/fd-install-final/data",
+    "socket": "/mnt/data/fd-install-final/data/fd.sock",
+    "service": "none",
+    "dry_run": false
+  },
+  "actions": [
+    {
+      "source": "/mnt/data/fd_task025_029/FutureDiff_Go_Task_024_Complete/bin/futurediff",
+      "target": "/mnt/data/fd-install-final/prefix/bin/futurediff",
+      "mode": 493,
+      "kind": "binary"
+    },
+    {
+      "source": "/mnt/data/fd_task025_029/FutureDiff_Go_Task_024_Complete/bin/futurediff-admin",
+      "target": "/mnt/data/fd-install-final/prefix/bin/futurediff-admin",
+      "mode": 493,
+      "kind": "binary"
+    },
+    {
+      "source": "/mnt/data/fd_task025_029/FutureDiff_Go_Task_024_Complete/bin/futurediff-agent-bench",
+      "target": "/mnt/data/fd-install-final/prefix/bin/futurediff-agent-bench",
+      "mode": 493,
+      "kind": "binary"
+    },
+    {
+      "source": "/mnt/data/fd_task025_029/FutureDiff_Go_Task_024_Complete/bin/futurediff-bench",
+      "target": "/mnt/data/fd-install-final/prefix/bin/futurediff-bench",
+      "mode": 493,
+      "kind": "binary"
+    },
+    {
+      "source": "/mnt/data/fd_task025_029/FutureDiff_Go_Task_024_Complete/bin/futurediff-cert-suite",
+      "target": "/mnt/data/fd-install-final/prefix/bin/futurediff-cert-suite",
+      "mode": 493,
+      "kind": "binary"
+    },
+    {
+      "source": "/mnt/data/fd_task025_029/FutureDiff_Go_Task_024_Complete/bin/futurediff-certify",
+      "target": "/mnt/data/fd-install-final/prefix/bin/futurediff-certify",
+      "mode": 493,
+      "kind": "binary"
+    },
+    {
+      "source": "/mnt/data/fd_task025_029/FutureDiff_Go_Task_024_Complete/bin/futurediff-demo",
+      "target": "/mnt/data/fd-install-final/prefix/bin/futurediff-demo",
+      "mode": 493,
+      "kind": "binary"
+    },
+    {
+      "source": "/mnt/data/fd_task025_029/FutureDiff_Go_Task_024_Complete/bin/futurediff-install",
+      "target": "/mnt/data/fd-install-final/prefix/bin/futurediff-install",
+      "mode": 493,
+      "kind": "binary"
+    },
+    {
+      "source": "/mnt/data/fd_task025_029/FutureDiff_Go_Task_024_Complete/bin/futurediff-integrate",
+      "target": "/mnt/data/fd-install-final/prefix/bin/futurediff-integrate",
+      "mode": 493,
+      "kind": "binary"
+    },
+    {
+      "source": "/mnt/data/fd_task025_029/FutureDiff_Go_Task_024_Complete/bin/futurediff-mcp",
+      "target": "/mnt/data/fd-install-final/prefix/bin/futurediff-mcp",
+      "mode": 493,
+      "kind": "binary"
+    },
+    {
+      "source": "/mnt/data/fd_task025_029/FutureDiff_Go_Task_024_Complete/bin/futurediff-platform",
+      "target": "/mnt/data/fd-install-final/prefix/bin/futurediff-platform",
+      "mode": 493,
+      "kind": "binary"
+    },
+    {
+      "source": "/mnt/data/fd_task025_029/FutureDiff_Go_Task_024_Complete/bin/futurediff-provenance",
+      "target": "/mnt/data/fd-install-final/prefix/bin/futurediff-provenance",
+      "mode": 493,
+      "kind": "binary"
+    },
+    {
+      "source": "/mnt/data/fd_task025_029/FutureDiff_Go_Task_024_Complete/bin/futurediff-provider-cert",
+      "target": "/mnt/data/fd-install-final/prefix/bin/futurediff-provider-cert",
+      "mode": 493,
+      "kind": "binary"
+    },
+    {
+      "source": "/mnt/data/fd_task025_029/FutureDiff_Go_Task_024_Complete/bin/futurediff-sbom",
+      "target": "/mnt/data/fd-install-final/prefix/bin/futurediff-sbom",
+      "mode": 493,
+      "kind": "binary"
+    },
+    {
+      "source": "/mnt/data/fd_task025_029/FutureDiff_Go_Task_024_Complete/bin/futurediff-verify-release",
+      "target": "/mnt/data/fd-install-final/prefix/bin/futurediff-verify-release",
+      "mode": 493,
+      "kind": "binary"
+    },
+    {
+      "source": "/mnt/data/fd_task025_029/FutureDiff_Go_Task_024_Complete/bin/futurediffd",
+      "target": "/mnt/data/fd-install-final/prefix/bin/futurediffd",
+      "mode": 493,
+      "kind": "binary"
+    }
+  ],
+  "notes": [
+    "installation never enables provider credentials automatically",
+    "service files use the private FutureDiff data root"
+  ]
+}

@@ -29,6 +29,8 @@ type DB struct {
 	faults FaultInjector
 }
 
+func SQLiteVersion() string { return C.GoString(C.sqlite3_libversion()) }
+
 type Value any
 
 type Row map[string]Value

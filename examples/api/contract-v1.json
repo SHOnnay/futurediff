@@ -1,0 +1,115 @@
+{
+  "version": "1.0",
+  "transport": "unix-http",
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/v1/contract",
+      "operation_id": "contract",
+      "agent_safe": true
+    },
+    {
+      "method": "GET",
+      "path": "/v1/health",
+      "operation_id": "health",
+      "agent_safe": true
+    },
+    {
+      "method": "POST",
+      "path": "/v1/transactions",
+      "operation_id": "transaction_create",
+      "agent_safe": true
+    },
+    {
+      "method": "GET",
+      "path": "/v1/transactions/{id}",
+      "operation_id": "transaction_get",
+      "agent_safe": true
+    },
+    {
+      "method": "POST",
+      "path": "/v1/transactions/{id}/abort",
+      "operation_id": "transaction_abort",
+      "agent_safe": false
+    },
+    {
+      "method": "GET",
+      "path": "/v1/transactions/{id}/approval-material",
+      "operation_id": "approval_material",
+      "agent_safe": false
+    },
+    {
+      "method": "POST",
+      "path": "/v1/transactions/{id}/approve",
+      "operation_id": "transaction_approve",
+      "agent_safe": false
+    },
+    {
+      "method": "POST",
+      "path": "/v1/transactions/{id}/commit",
+      "operation_id": "transaction_commit",
+      "agent_safe": false
+    },
+    {
+      "method": "GET",
+      "path": "/v1/transactions/{id}/effects",
+      "operation_id": "effects_list",
+      "agent_safe": true
+    },
+    {
+      "method": "POST",
+      "path": "/v1/transactions/{id}/effects/github/branch",
+      "operation_id": "github_branch_prepare",
+      "agent_safe": true
+    },
+    {
+      "method": "POST",
+      "path": "/v1/transactions/{id}/effects/github/draft-pull-request",
+      "operation_id": "github_pr_prepare",
+      "agent_safe": true
+    },
+    {
+      "method": "POST",
+      "path": "/v1/transactions/{id}/effects/slack/message",
+      "operation_id": "slack_message_prepare",
+      "agent_safe": true
+    },
+    {
+      "method": "POST",
+      "path": "/v1/transactions/{id}/effects/{effectID}/refresh",
+      "operation_id": "effect_refresh",
+      "agent_safe": true
+    },
+    {
+      "method": "GET",
+      "path": "/v1/transactions/{id}/events",
+      "operation_id": "events_list",
+      "agent_safe": true
+    },
+    {
+      "method": "POST",
+      "path": "/v1/transactions/{id}/execute",
+      "operation_id": "transaction_execute",
+      "agent_safe": true
+    },
+    {
+      "method": "POST",
+      "path": "/v1/transactions/{id}/recover",
+      "operation_id": "transaction_recover",
+      "agent_safe": false
+    },
+    {
+      "method": "POST",
+      "path": "/v1/transactions/{id}/seal",
+      "operation_id": "transaction_seal",
+      "agent_safe": true
+    },
+    {
+      "method": "POST",
+      "path": "/v1/transactions/{id}/verify",
+      "operation_id": "transaction_verify",
+      "agent_safe": true
+    }
+  ],
+  "digest": "aeb5b6a53e1e20ff25921a01bcd19768ac2c49e5d3dd2a61c531544e47d98b3b"
+}

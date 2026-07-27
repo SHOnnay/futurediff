@@ -497,3 +497,153 @@ The SQLite bridge contains an internal-only fault-injection hook. Release checks
 ### Release provenance
 
 Release packages include an in-toto Statement v1 using SLSA provenance v1. Tagged GitHub workflows additionally request a signed GitHub artifact attestation through `actions/attest`. Embedded provenance and signed attestation are distinct evidence layers.
+
+---
+
+# Architecture update v2.4 — Task 024
+
+## Unified certification plane
+
+FutureDiff now has a target-oriented certification orchestrator. It binds local
+integration, rootless OCI, GitHub readiness, Slack readiness, OpenCode, Hermes,
+and signed release-attestation checks into one machine-readable report.
+
+Certification has four explicit states:
+
+```text
+pass     check was executed and its invariant held
+fail     check was executed and the invariant did not hold
+blocked  required external prerequisite was unavailable
+skip     target or optional check was intentionally not executed
+```
+
+A blocked target cannot make the report certified. Source implementation,
+readiness, and live mutation certification remain separate claims.
+
+Provider readiness uses the daemon-owned controlled egress transport and accepts
+credential environment-variable names rather than values. The general suite does
+not create branches, pull requests, or Slack messages; externally visible
+certification requires an explicit disposable-resource workflow.
+
+---
+
+# Architecture update v2.9 — Tasks 025–029
+
+## Installation plane
+
+Installation is expressed as a declarative JSON plan before files are written. The plan identifies every binary and user-service file, allowing dry-run review and future package-manager integration. The installer creates a private data root but never enables credentials or provider mutations automatically.
+
+Linux uses a systemd user service with `NoNewPrivileges`, `PrivateTmp`, a read-only home boundary, and an explicit writable FutureDiff root. macOS uses a launchd user agent. Starting or enabling those services remains an explicit operator action.
+
+## Platform plane
+
+Platform support is no longer inferred from whether the Go compiler can emit a binary. Linux amd64 is the supported primary target. Linux arm64 and macOS amd64/arm64 are experimental native test targets. Windows is explicitly unsupported until named-pipe transport, Windows service management, SQLite packaging, and enforced credential isolation are designed and tested.
+
+## Agent-measurement plane
+
+Real-agent performance evidence uses a versioned measured-run record. Token counts, model calls, repair turns, wall time, verification time, compute time, and effect outcomes are supplied by the benchmark runner or provider records. FutureDiff computes overhead relative to a named baseline but never fabricates missing metrics.
+
+## Release-consumer verification plane
+
+Release verification is offline-first. A consumer can safely extract an archive, verify `SHA256SUMS`, validate the SPDX document, and verify every in-toto/SLSA subject digest. A GitHub-signed attestation can be required as an additional trust layer.
+
+## Explicit provider-mutation certification plane
+
+Provider readiness and provider mutation certification are distinct. The mutation certifier requires a hard confirmation phrase and dedicated disposable resources. GitHub certification creates an unreachable commit, temporary `futurediff-cert/*` branch, and draft PR, then closes and deletes the reachable resources. Slack certification posts and deletes a marked message. Missing credentials produce `blocked`; cleanup failure produces `fail`.
+
+---
+
+# Architecture update v3.5 — Tasks 030–035
+
+## Tamper-evident ledger plane
+
+Events are now linked by a per-transaction SHA-256 chain. Opening the ledger backfills legacy rows and refuses an existing-chain mismatch. The chain is an integrity detector, not an externally anchored signature.
+
+## Invariant-audit plane
+
+A read-only auditor combines SQLite integrity with semantic cross-table checks: approval bindings, repository materialization, receipts, unknown states, terminal-state cleanup, dependency cycles, and event-chain continuity.
+
+## Retention plane
+
+Terminal runtime artifacts can be removed through a deterministic, confirmation-gated plan. Durable metadata, retention evidence, and published Git refs remain intact. Paths outside the managed transaction root fail closed.
+
+## Operator-diagnostics plane
+
+The doctor command joins environment, permission, runtime, daemon, and ledger readiness into one machine-readable report without resolving secrets.
+
+## Contract-compatibility plane
+
+The local daemon exposes a versioned API inventory and digest. Agent-safe operations are explicitly separated from approval, commit, recovery, and abort authority. Clients can refuse a daemon whose contract digest differs.
+
+---
+
+# Architecture update v4.0 — Tasks 036–040
+
+## Portable forensic plane
+
+A transaction can now be exported as a verified `.futurepack`. The export contains durable non-secret projections and the exact patch artifact when available. Content addressing, archive path validation, duplicate-reference rejection, and defense-in-depth token redaction make the artifact suitable for review, incident response, and reproducible bug reports.
+
+## Offline recovery plane
+
+Ledger restoration is a separate offline operation. The supplied backup is copied before validation, bound to an expected SHA-256, checked through SQLite integrity, migration identity, semantic audit, and event-chain verification, and published only after a consistent pre-restore backup of the current ledger exists.
+
+## Projection replay plane
+
+The event chain is now used for more than row-tamper detection. A read-only replay engine reconstructs transaction, approval, and effect status and compares those results with materialized SQLite projections. This is a consistency check, not a claim that all FutureDiff storage is fully event sourced.
+
+## Configuration assurance plane
+
+Credentials, verification contracts, measured benchmark records, installer plans, and strict OpenCode profiles can be linted before use. Authority-expanding OpenCode profiles fail closed.
+
+## Semantic compatibility plane
+
+API contracts now support structural validation and semantic diffing. Endpoint removal, operation-identity changes, major-version changes, and any agent-safety reclassification are incompatible. Additive endpoints remain visible without being incorrectly classified as breaking.
+
+
+---
+
+# Architecture update v4.5 — Tasks 041–045
+
+## Adapter assurance plane
+
+EffectSpec now has a reusable lifecycle conformance suite. Adapter authors can prove descriptor validity, preparation identity, preview and verification evidence, commit receipts, status semantics, abort behavior, and compensation behavior without loading their code into the trusted daemon.
+
+## Policy-understanding plane
+
+Verification contracts can be explained and simulated before execution. The simulator resolves the dependency DAG and models blocked checks, but it has no authority to write verification evidence or transition a transaction.
+
+## Recovery-assurance plane
+
+The recovery planner codifies the no-blind-retry rule as executable scenarios. Ambiguous provider outcomes require status queries; re-arm requires proof that no mutation occurred; insufficient evidence escalates.
+
+## Privacy-preserving observability plane
+
+Operational metrics contain aggregate counts and bounded status labels only. Transaction identifiers, repository paths, provider destinations, message content, and credential identities are excluded.
+
+## Supportability plane
+
+A verified support bundle combines build metadata, operator diagnostics, semantic ledger audit, aggregate metrics, and the API contract. The ledger, transaction artifacts, and credential configuration contents remain outside the bundle.
+
+---
+
+# Architecture update v5.0 — Tasks 046–050
+
+## Cryptographic approval plane
+
+Operators can create short-lived Ed25519 approval envelopes bound to the exact transaction ID and approval-material digest. A daemon may require signed approvals using a trusted public-key keyring. Private key material remains outside the daemon; the ledger stores a signature reference and expiry only.
+
+## Portable policy plane
+
+Verification contracts can be distributed as deterministic `.fdpolicy` archives. The archive manifest binds policy identity, policy version, normalized labels, and the exact verification-contract digest.
+
+## Human review projection
+
+The transaction diff provides a compact non-secret explanation of the staged repository result, deterministic verification outcome, and ordered external effects. JSON and Markdown share the same summary digest.
+
+## Upgrade assurance plane
+
+Ledger migrations can be rehearsed against an offline SQLite clone before changing the live installation. The rehearsal requires source immutability, stable durable counts, and a healthy post-migration semantic audit.
+
+## Contributor compatibility plane
+
+A manifest-driven compatibility harness combines API contract diffing, verification-contract parsing, EffectSpec descriptor validation, policy-bundle verification, and integration-profile linting into one local release gate.

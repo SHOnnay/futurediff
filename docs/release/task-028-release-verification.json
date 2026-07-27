@@ -1,0 +1,117 @@
+{
+  "source": "dist/futurediff-v0.29.0-linux-amd64.tar.gz",
+  "root": "/tmp/futurediff-release-verify-2043693619/futurediff-v0.29.0-linux-amd64",
+  "checks": [
+    {
+      "id": "checksum_futurediff",
+      "status": "pass",
+      "detail": "sha256=265bccc9ff5d9166f03e8504a4973aacf689c943f709ca2457041f9d7b740917"
+    },
+    {
+      "id": "checksum_futurediff-admin",
+      "status": "pass",
+      "detail": "sha256=ae6bb0aa9bf4714190f02cc661bf3d03cb62aaeb5683bc1bb61df2978bbd6317"
+    },
+    {
+      "id": "checksum_futurediff-agent-bench",
+      "status": "pass",
+      "detail": "sha256=6acf566a84746d0803de92cdd9d3620d3accb38d67236c7d83dc2976af1e7c7b"
+    },
+    {
+      "id": "checksum_futurediff-bench",
+      "status": "pass",
+      "detail": "sha256=25c091a79b812ea6d41058fc9cfbbde49583aa31a0eba7009714f9d6c68f6b63"
+    },
+    {
+      "id": "checksum_futurediff-cert-suite",
+      "status": "pass",
+      "detail": "sha256=54f72a8c07b3b8161f1d7a2f58a782acaa2e832c91a56095a87564921f004433"
+    },
+    {
+      "id": "checksum_futurediff-certify",
+      "status": "pass",
+      "detail": "sha256=952025af5bddb4ecc391a844ad716a4a3e7f5bc833b2c41d3a380e411c37b120"
+    },
+    {
+      "id": "checksum_futurediff-demo",
+      "status": "pass",
+      "detail": "sha256=4136ab79b62a1a88a4c36467658e8d9d0e46c177d490ab6613b2b2e4d5f454d6"
+    },
+    {
+      "id": "checksum_futurediff-install",
+      "status": "pass",
+      "detail": "sha256=b1d67b7dc83dae78bdd7552bb16705c256c8d9e0b8f28242fae751b9eda407fa"
+    },
+    {
+      "id": "checksum_futurediff-integrate",
+      "status": "pass",
+      "detail": "sha256=a32a21c3637d963acf564acec6d9c61d16c48af1bdfd3339a9c5a12216f6be18"
+    },
+    {
+      "id": "checksum_futurediff-mcp",
+      "status": "pass",
+      "detail": "sha256=740123e46f068d75224dec00f44db1c8e38510909e82a4c3c3a9849cfa28df9b"
+    },
+    {
+      "id": "checksum_futurediff-platform",
+      "status": "pass",
+      "detail": "sha256=3de54a03927aeb40e77ed5d353e253e237bccca153326b47a45bf0ef870b6efe"
+    },
+    {
+      "id": "checksum_futurediff-provenance",
+      "status": "pass",
+      "detail": "sha256=aebf452588263e2584105e47cbbd09f6f427dfd37bf6be1079ddc909155080ef"
+    },
+    {
+      "id": "checksum_futurediff-provider-cert",
+      "status": "pass",
+      "detail": "sha256=edfc76f8e71af3805ddccb8dc77ef0169fa3970893f671f73f570eed3345766f"
+    },
+    {
+      "id": "checksum_futurediff-sbom",
+      "status": "pass",
+      "detail": "sha256=6559fb3d00a226a423fcc0fa661ab0192cb501f6bd3a7918eaaa69887ae5a253"
+    },
+    {
+      "id": "checksum_futurediff-verify-release",
+      "status": "pass",
+      "detail": "sha256=98d585cdf66e8810be62d6de7b549c38c564451e8916d7253ef5b940c5d2127a"
+    },
+    {
+      "id": "checksum_futurediff.intoto.jsonl",
+      "status": "pass",
+      "detail": "sha256=63b6e47041e3bb9bea08f626e4f8bc48577586caecb285f2b722cad39d77e1a0"
+    },
+    {
+      "id": "checksum_futurediff.spdx.json",
+      "status": "pass",
+      "detail": "sha256=891e4985960d6067d8d2840ee2fa89a4448cd25c889bc88862301d7e800ed043"
+    },
+    {
+      "id": "checksum_futurediffd",
+      "status": "pass",
+      "detail": "sha256=2438dbf5ea2c38c49edc8e2c5a1273822cc1799b46692d23df8ff9d9e2236b21"
+    },
+    {
+      "id": "checksums_nonempty",
+      "status": "pass",
+      "detail": "entries=18"
+    },
+    {
+      "id": "spdx_sbom",
+      "status": "pass",
+      "detail": "packages=1 files=354"
+    },
+    {
+      "id": "intoto_provenance",
+      "status": "pass",
+      "detail": "subjects=17"
+    },
+    {
+      "id": "signed_attestation",
+      "status": "skip",
+      "detail": "signed attestation verification was not requested"
+    }
+  ],
+  "verified": true
+}

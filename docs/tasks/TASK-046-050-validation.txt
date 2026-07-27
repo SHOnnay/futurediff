@@ -1,0 +1,177 @@
+== FORMAT ==
+PASS
+== VET ==
+PASS
+== TEST ==
+?   	github.com/SHOnnay/futurediff/cmd/futurediff	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-admin	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-agent-bench	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-api-contract	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-api-diff	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-approval	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-audit	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-bench	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-cert-suite	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-certify	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-compat	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-config-lint	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-demo	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-diff	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-doctor	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-effectspec	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-export	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-install	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-integrate	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-mcp	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-metrics	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-platform	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-policy-bundle	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-policy-explain	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-provenance	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-provider-cert	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-prune	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-recovery-drill	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-replay	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-sbom	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-restore	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-support-bundle	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-upgrade-rehearsal	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-verify-release	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediffd	[no test files]
+ok  	github.com/SHOnnay/futurediff/effectspec	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/adapters/githubbranch	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/adapters/githubdraft	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/adapters/slackoutbox	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/agentbench	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/api	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/apicontract	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/app	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/benchmark	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/buildinfo	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/certification	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/certsuite	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/compatibility	0.003s
+ok  	github.com/SHOnnay/futurediff/internal/configlint	0.004s
+ok  	github.com/SHOnnay/futurediff/internal/credentials	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/demo	0.106s
+ok  	github.com/SHOnnay/futurediff/internal/diffsummary	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/doctor	0.049s
+ok  	github.com/SHOnnay/futurediff/internal/domain	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/egress	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/futurepack	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/installer	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/integrations	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/ledger	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/ledgerrestore	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/mcpbridge	0.005s
+ok  	github.com/SHOnnay/futurediff/internal/metrics	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/operatorapproval	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/platformsupport	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/policybundle	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/policysim	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/providercert	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/recoverydrill	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/release	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/releaseverify	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/replay	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/retention	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/runtimeoci	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/staging	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/supportbundle	0.037s
+ok  	github.com/SHOnnay/futurediff/internal/transactionsnapshot	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/upgraderehearsal	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/verification	(cached)
+== RACE ==
+?   	github.com/SHOnnay/futurediff/cmd/futurediff	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-admin	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-agent-bench	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-api-contract	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-api-diff	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-approval	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-audit	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-bench	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-cert-suite	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-certify	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-compat	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-config-lint	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-demo	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-diff	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-doctor	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-effectspec	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-export	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-install	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-integrate	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-mcp	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-metrics	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-platform	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-policy-bundle	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-policy-explain	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-provenance	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-provider-cert	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-prune	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-recovery-drill	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-replay	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-restore	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-sbom	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-support-bundle	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-upgrade-rehearsal	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediff-verify-release	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediffd	[no test files]
+ok  	github.com/SHOnnay/futurediff/effectspec	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/adapters/githubbranch	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/adapters/githubdraft	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/adapters/slackoutbox	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/agentbench	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/api	1.431s
+ok  	github.com/SHOnnay/futurediff/internal/apicontract	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/app	2.138s
+ok  	github.com/SHOnnay/futurediff/internal/benchmark	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/buildinfo	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/certification	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/certsuite	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/compatibility	1.011s
+ok  	github.com/SHOnnay/futurediff/internal/configlint	1.014s
+ok  	github.com/SHOnnay/futurediff/internal/credentials	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/demo	1.102s
+ok  	github.com/SHOnnay/futurediff/internal/diffsummary	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/doctor	1.057s
+ok  	github.com/SHOnnay/futurediff/internal/domain	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/egress	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/futurepack	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/installer	1.009s
+ok  	github.com/SHOnnay/futurediff/internal/integrations	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/ledger	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/ledgerrestore	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/mcpbridge	1.022s
+ok  	github.com/SHOnnay/futurediff/internal/metrics	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/operatorapproval	1.013s
+ok  	github.com/SHOnnay/futurediff/internal/platformsupport	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/policybundle	1.016s
+ok  	github.com/SHOnnay/futurediff/internal/policysim	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/providercert	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/recoverydrill	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/release	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/releaseverify	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/replay	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/retention	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/runtimeoci	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/staging	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/supportbundle	1.054s
+ok  	github.com/SHOnnay/futurediff/internal/transactionsnapshot	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/upgraderehearsal	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/verification	(cached)
+== BUILD ==
+mkdir -p bin
+binary_count=35
+== JSON SCHEMAS ==
+PASS
+== SIGNED DAEMON LIFECYCLE ==
+status=committed live=current future=signed future
+== POLICY BUNDLE ==
+PASS
+== DEMO DIFF ==
+PASS
+== UPGRADE REHEARSAL ==
+PASS
+== COMPATIBILITY ==
+PASS

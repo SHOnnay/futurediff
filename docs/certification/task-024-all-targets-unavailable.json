@@ -1,0 +1,142 @@
+{
+  "format_version": "0.1",
+  "generated_at": "2026-07-27T07:58:17.558781339Z",
+  "build": {
+    "version": "dev",
+    "commit": "unknown",
+    "date": "unknown",
+    "dirty": "unknown",
+    "go_version": "go1.23.2",
+    "platform": "linux/amd64",
+    "module": "github.com/SHOnnay/futurediff"
+  },
+  "host": {
+    "goos": "linux",
+    "goarch": "amd64"
+  },
+  "targets": [
+    {
+      "target": "local",
+      "requested": true,
+      "certified": true,
+      "checks": [
+        {
+          "id": "mcp_binary",
+          "status": "pass",
+          "required": true,
+          "detail": "executable exists",
+          "evidence": {
+            "path": "/mnt/data/fd_task024/futurediff/bin/futurediff-mcp"
+          }
+        },
+        {
+          "id": "daemon_socket",
+          "status": "pass",
+          "required": true,
+          "detail": "daemon socket path is absolute",
+          "evidence": {
+            "path": "/tmp/futurediff-task024.sock"
+          }
+        },
+        {
+          "id": "opencode_profile_generation",
+          "status": "pass",
+          "required": true,
+          "detail": "strict OpenCode profile generated"
+        },
+        {
+          "id": "hermes_profile_generation",
+          "status": "pass",
+          "required": true,
+          "detail": "strict Hermes profile generated"
+        },
+        {
+          "id": "release_authority_absent",
+          "status": "pass",
+          "required": true,
+          "detail": "generated agent profiles contain no approval, commit, or credential tool"
+        }
+      ]
+    },
+    {
+      "target": "oci",
+      "requested": true,
+      "certified": false,
+      "checks": [
+        {
+          "id": "oci_prerequisites",
+          "status": "blocked",
+          "required": true,
+          "detail": "--oci-image with a sha256 digest is required"
+        }
+      ]
+    },
+    {
+      "target": "github",
+      "requested": true,
+      "certified": false,
+      "checks": [
+        {
+          "id": "github_prerequisites",
+          "status": "blocked",
+          "required": true,
+          "detail": "GitHub owner, repo, and token environment-variable name are required"
+        }
+      ]
+    },
+    {
+      "target": "slack",
+      "requested": true,
+      "certified": false,
+      "checks": [
+        {
+          "id": "slack_prerequisites",
+          "status": "blocked",
+          "required": true,
+          "detail": "Slack channel and token environment-variable name are required"
+        }
+      ]
+    },
+    {
+      "target": "opencode",
+      "requested": true,
+      "certified": false,
+      "checks": [
+        {
+          "id": "opencode_binary",
+          "status": "blocked",
+          "required": true,
+          "detail": "agent binary path was not provided"
+        }
+      ]
+    },
+    {
+      "target": "hermes",
+      "requested": true,
+      "certified": false,
+      "checks": [
+        {
+          "id": "hermes_binary",
+          "status": "blocked",
+          "required": true,
+          "detail": "agent binary path was not provided"
+        }
+      ]
+    },
+    {
+      "target": "attestation",
+      "requested": true,
+      "certified": false,
+      "checks": [
+        {
+          "id": "attestation_prerequisites",
+          "status": "blocked",
+          "required": true,
+          "detail": "artifact path and GitHub repository are required"
+        }
+      ]
+    }
+  ],
+  "certified": false,
+  "report_digest": "d88017e3ef52a73a1ce7af12fba4cae8ecc12bd757bfc32a44824d729c9f1561"
+}

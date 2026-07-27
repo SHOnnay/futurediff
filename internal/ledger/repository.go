@@ -64,7 +64,10 @@ func (r *Repository) migrate() error {
 			return fmt.Errorf("migration %s: %w", e.Name(), err)
 		}
 	}
-	return r.verifyMigrationArtifacts()
+	if err := r.verifyMigrationArtifacts(); err != nil {
+		return err
+	}
+	return r.backfillEventChains()
 }
 
 func (r *Repository) verifyMigrationArtifacts() error {
@@ -287,6 +290,10 @@ func (r *Repository) RecordVerification(id string, report domain.VerificationRep
 }
 
 func (r *Repository) Approve(id, digest, approver string) (domain.Transaction, error) {
+	return r.ApproveWithEvidence(id, digest, approver, "", nil)
+}
+
+func (r *Repository) ApproveWithEvidence(id, digest, approver, signatureRef string, expiresAt *time.Time) (domain.Transaction, error) {
 	now := time.Now().UTC()
 	err := r.db.WithTx(func(tx *Tx) error {
 		row, err := tx.QueryOne("SELECT * FROM transactions WHERE transaction_id=?", id)
@@ -307,7 +314,7 @@ func (r *Repository) Approve(id, digest, approver string) (domain.Transaction, e
 		if digest != expected {
 			return errors.New("approval digest mismatch")
 		}
-		_, err = tx.Exec(`INSERT INTO approvals(approval_id,transaction_id,transaction_digest,material_revision,approver_identity,scope,decision,created_at) VALUES(?,?,?,?,?,'entire_transaction','approved',?)`, domain.NewID("approval"), id, digest, cur.MaterialRevision, approver, ts(now))
+		_, err = tx.Exec(`INSERT INTO approvals(approval_id,transaction_id,transaction_digest,material_revision,approver_identity,scope,decision,signature_ref,created_at,expires_at) VALUES(?,?,?,?,?,'entire_transaction','approved',?,?,?)`, domain.NewID("approval"), id, digest, cur.MaterialRevision, approver, nullString(signatureRef), ts(now), nullTime(expiresAt))
 		if err != nil {
 			return err
 		}
@@ -318,7 +325,7 @@ func (r *Repository) Approve(id, digest, approver string) (domain.Transaction, e
 		if changes != 1 {
 			return errors.New("concurrent transaction update")
 		}
-		return appendEvent(tx, id, "transaction.approved", map[string]any{"digest": digest, "approver": approver}, now)
+		return appendEvent(tx, id, "transaction.approved", map[string]any{"digest": digest, "approver": approver, "signature_ref": signatureRef, "expires_at": expiresAt}, now)
 	})
 	if err != nil {
 		return domain.Transaction{}, err
@@ -444,7 +451,7 @@ func (r *Repository) MarkNeedsReconciliation(id, reason string) (domain.Transact
 }
 
 func (r *Repository) Events(id string) ([]Row, error) {
-	return r.db.Query("SELECT sequence,event_type,payload_json,payload_digest,created_at FROM events WHERE transaction_id=? ORDER BY sequence", id)
+	return r.db.Query("SELECT sequence,event_id,event_type,payload_json,payload_digest,previous_event_hash,event_hash,created_at FROM events WHERE transaction_id=? ORDER BY sequence", id)
 }
 
 func appendEvent(tx *Tx, id, kind string, payload any, at time.Time) error {
@@ -452,8 +459,7 @@ func appendEvent(tx *Tx, id, kind string, payload any, at time.Time) error {
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(`INSERT INTO events(event_id,transaction_id,event_type,payload_json,payload_digest,created_at) VALUES(?,?,?,?,?,?)`, domain.NewID("event"), id, kind, string(b), domain.SHA256Bytes(b), ts(at))
-	return err
+	return appendChainedEvent(tx, id, "", kind, b, domain.SHA256Bytes(b), 0, ts(at))
 }
 func verificationOutcome(results []domain.VerificationCheckResult) string {
 	required := 0
@@ -522,6 +528,12 @@ func nullString(s string) any {
 		return nil
 	}
 	return s
+}
+func nullTime(t *time.Time) any {
+	if t == nil {
+		return nil
+	}
+	return ts(*t)
 }
 
 func (r *Repository) RecordRuntimeExecution(record domain.RuntimeExecution) error {

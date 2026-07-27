@@ -1,9 +1,6 @@
-COMMANDS := futurediff futurediffd futurediff-mcp futurediff-certify futurediff-certify-providers futurediff-bench futurediff-sbom futurediff-admin futurediff-demo futurediff-integrate futurediff-provenance
+COMMANDS := futurediff futurediffd futurediff-mcp futurediff-certify futurediff-bench futurediff-sbom futurediff-admin futurediff-demo futurediff-integrate futurediff-provenance futurediff-cert-suite futurediff-install futurediff-platform futurediff-agent-bench futurediff-verify-release futurediff-provider-cert futurediff-audit futurediff-prune futurediff-doctor futurediff-api-contract futurediff-export futurediff-restore futurediff-replay futurediff-config-lint futurediff-api-diff futurediff-effectspec futurediff-policy-explain futurediff-recovery-drill futurediff-metrics futurediff-support-bundle futurediff-approval futurediff-policy-bundle futurediff-diff futurediff-upgrade-rehearsal futurediff-compat
 
-.PHONY: fmt test race vet build check demo benchmark provider-smoke provider-certify-live rootless-certify rootless-certify-live sbom release clean
-
-
-
+.PHONY: fmt test race vet build check demo benchmark sbom release clean
 
 fmt:
 	gofmt -w ./cmd ./effectspec ./internal
@@ -32,18 +29,6 @@ demo:
 
 benchmark:
 	go run ./cmd/futurediff-bench --scenarios examples/benchmark --json benchmark-report.json --markdown benchmark-report.md
-
-provider-smoke:
-	go run ./cmd/futurediff-certify-providers $(ARGS)
-
-provider-certify-live:
-	bash ./scripts/certify-providers.sh
-
-rootless-certify-live:
-	bash ./scripts/certify-rootless-oci.sh
-
-rootless-certify:
-	go run ./cmd/futurediff-certify $(ARGS)
 
 sbom:
 	go run ./cmd/futurediff-sbom --root . --output futurediff.spdx.json

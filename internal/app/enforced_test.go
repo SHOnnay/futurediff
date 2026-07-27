@@ -112,12 +112,30 @@ func TestEnforcedModeRejectedWithoutRuntime(t *testing.T) {
 
 func writeAppFakeDocker(t *testing.T) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "fake-docker")
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fake-docker")
+	state := filepath.Join(dir, "image-present")
+	if err := os.WriteFile(state, []byte("present\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	script := `#!/bin/sh
 set -eu
+state="` + state + `"
 case "$1" in
   version) echo "fake-1.0" ;;
   info) echo '["name=rootless"]' ;;
+  image)
+    shift
+    [ "$1" = inspect ] || exit 125
+    shift
+    [ -f "$state" ] || exit 1
+    echo '[{"Id":"sha256:test"}]'
+    ;;
+  pull)
+    shift
+    : > "$state"
+    echo "pulled $1"
+    ;;
   run)
     shift
     src=""
@@ -126,7 +144,7 @@ case "$1" in
         --rm|--init|--pull=never|--read-only) shift ;;
         --network|--cap-drop|--security-opt|--pids-limit|--memory|--cpus|--tmpfs|--workdir|--user|--userns|--env) shift 2 ;;
         --mount) src=$(printf '%s' "$2" | sed -n 's/.*src=\([^,]*\).*/\1/p'); shift 2 ;;
-        *@sha256:*) shift; break ;;
+        *@sha256:*) [ -f "$state" ] || exit 125; shift; break ;;
         *) exit 125 ;;
       esac
     done

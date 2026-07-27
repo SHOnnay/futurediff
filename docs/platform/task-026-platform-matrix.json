@@ -1,0 +1,73 @@
+{
+  "current": {
+    "goos": "linux",
+    "goarch": "amd64",
+    "level": "supported",
+    "transport": "Unix domain socket",
+    "service": "systemd user",
+    "oci": "Docker rootless or Podman rootless",
+    "notes": [
+      "primary release target",
+      "SQLite uses system libsqlite3 through cgo"
+    ]
+  },
+  "matrix": [
+    {
+      "goos": "darwin",
+      "goarch": "amd64",
+      "level": "experimental",
+      "transport": "Unix domain socket",
+      "service": "launchd user",
+      "oci": "Docker Desktop or Podman machine; enforced certification pending",
+      "notes": [
+        "build and unit-test target"
+      ]
+    },
+    {
+      "goos": "darwin",
+      "goarch": "arm64",
+      "level": "experimental",
+      "transport": "Unix domain socket",
+      "service": "launchd user",
+      "oci": "Docker Desktop or Podman machine; enforced certification pending",
+      "notes": [
+        "Apple Silicon build and unit-test target"
+      ]
+    },
+    {
+      "goos": "linux",
+      "goarch": "amd64",
+      "level": "supported",
+      "transport": "Unix domain socket",
+      "service": "systemd user",
+      "oci": "Docker rootless or Podman rootless",
+      "notes": [
+        "primary release target",
+        "SQLite uses system libsqlite3 through cgo"
+      ]
+    },
+    {
+      "goos": "linux",
+      "goarch": "arm64",
+      "level": "experimental",
+      "transport": "Unix domain socket",
+      "service": "systemd user",
+      "oci": "Docker rootless or Podman rootless",
+      "notes": [
+        "native CI runner required for cgo release certification"
+      ]
+    },
+    {
+      "goos": "windows",
+      "goarch": "amd64",
+      "level": "unsupported",
+      "transport": "named-pipe implementation required",
+      "service": "Windows service implementation required",
+      "oci": "not designed",
+      "notes": [
+        "do not run through compatibility layers for enforced mode",
+        "explicitly unsupported until named-pipe and credential isolation are implemented"
+      ]
+    }
+  ]
+}

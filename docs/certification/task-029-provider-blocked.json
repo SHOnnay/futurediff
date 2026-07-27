@@ -1,0 +1,30 @@
+{
+  "format_version": "0.1",
+  "generated_at": "2026-07-27T08:21:19.782941814Z",
+  "nonce": "1785140479782932611",
+  "targets": [
+    {
+      "name": "github",
+      "checks": [
+        {
+          "id": "github_token",
+          "status": "blocked",
+          "detail": "token environment variable is empty"
+        }
+      ],
+      "certified": false
+    },
+    {
+      "name": "slack",
+      "checks": [
+        {
+          "id": "not_requested",
+          "status": "skip",
+          "detail": "target not requested"
+        }
+      ],
+      "certified": false
+    }
+  ],
+  "certified": false
+}

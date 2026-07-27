@@ -15,21 +15,24 @@ import (
 	"github.com/SHOnnay/futurediff/internal/credentials"
 	"github.com/SHOnnay/futurediff/internal/domain"
 	"github.com/SHOnnay/futurediff/internal/ledger"
+	"github.com/SHOnnay/futurediff/internal/operatorapproval"
 	"github.com/SHOnnay/futurediff/internal/runtimeoci"
 	"github.com/SHOnnay/futurediff/internal/staging"
 	"github.com/SHOnnay/futurediff/internal/verification"
 )
 
 type Service struct {
-	Ledger        *ledger.Repository
-	Staging       staging.Manager
-	Verifier      verification.Engine
-	OCI           *runtimeoci.Runner
-	Credentials   *credentials.Broker
-	GitHub        *githubdraft.Adapter
-	GitHubBranch  *githubbranch.Adapter
-	Slack         *slackoutbox.Adapter
-	CoordinatorID string
+	Ledger                 *ledger.Repository
+	Staging                staging.Manager
+	Verifier               verification.Engine
+	OCI                    *runtimeoci.Runner
+	Credentials            *credentials.Broker
+	GitHub                 *githubdraft.Adapter
+	GitHubBranch           *githubbranch.Adapter
+	Slack                  *slackoutbox.Adapter
+	CoordinatorID          string
+	ApprovalKeys           *operatorapproval.Keyring
+	RequireSignedApprovals bool
 }
 
 type CreateRequest struct {
@@ -105,6 +108,10 @@ func (s *Service) CredentialStatus() map[string]any {
 		return map[string]any{"configured": false, "secret_values_persisted": false}
 	}
 	return s.Credentials.Status()
+}
+
+func (s *Service) ApprovalStatus() map[string]any {
+	return map[string]any{"configured": s.ApprovalKeys != nil, "signed_required": s.RequireSignedApprovals}
 }
 
 func (s *Service) RuntimeStatus(ctx context.Context) map[string]any {
@@ -289,10 +296,31 @@ func (s *Service) ApprovalMaterial(id string) (map[string]string, error) {
 	return map[string]string{"transaction_id": id, "transaction_digest": digest}, nil
 }
 func (s *Service) Approve(id, digest, approver string) (TransactionView, error) {
+	if s.RequireSignedApprovals {
+		return TransactionView{}, errors.New("signed approval envelope required")
+	}
 	if approver == "" {
 		approver = "local-user"
 	}
 	if _, err := s.Ledger.Approve(id, digest, approver); err != nil {
+		return TransactionView{}, err
+	}
+	return s.Get(id)
+}
+
+func (s *Service) ApproveSigned(id string, env operatorapproval.Envelope) (TransactionView, error) {
+	if s.ApprovalKeys == nil {
+		return TransactionView{}, errors.New("approval keyring is not configured")
+	}
+	expected, err := s.Ledger.ApprovalMaterial(id)
+	if err != nil {
+		return TransactionView{}, err
+	}
+	if err := operatorapproval.Verify(*s.ApprovalKeys, env, id, expected, time.Now()); err != nil {
+		return TransactionView{}, err
+	}
+	ref := operatorapproval.SignatureReference(env)
+	if _, err := s.Ledger.ApproveWithEvidence(id, expected, env.Approver, ref, &env.ExpiresAt); err != nil {
 		return TransactionView{}, err
 	}
 	return s.Get(id)

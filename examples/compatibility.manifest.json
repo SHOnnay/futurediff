@@ -1,0 +1,9 @@
+{
+  "format_version": "0.1",
+  "api_contracts": ["api/contract-v1.json"],
+  "verification_contracts": ["verification/basic.verify.json"],
+  "effectspec_descriptors": ["effectspec/descriptor.example.json"],
+  "configs": [
+    {"path": "integrations/opencode.futurediff.json", "kind": "opencode"}
+  ]
+}

@@ -30,6 +30,16 @@ func gitCmd(t *testing.T, dir string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
+func shortSocketPath(t *testing.T, prefix string) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("/tmp", prefix)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	return filepath.Join(dir, "fd.sock")
+}
+
 func TestUnixSocketLifecycle(t *testing.T) {
 	tmp := t.TempDir()
 	repoPath := filepath.Join(tmp, "repo")
@@ -50,7 +60,6 @@ func TestUnixSocketLifecycle(t *testing.T) {
 	defer store.Close()
 	svc := &app.Service{Ledger: store, Staging: staging.Manager{RuntimeRoot: filepath.Join(tmp, "runtime")}, Verifier: verification.Engine{}}
 	socket := shortSocketPath(t, "fd-api-")
-
 	server := &Server{Service: svc, SocketPath: socket}
 	go func() { _ = server.Serve() }()
 	defer server.Close()
@@ -200,12 +209,30 @@ func TestUnixSocketEnforcedOCIExecution(t *testing.T) {
 
 func writeAPIFakeDocker(t *testing.T) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "fake-docker")
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fake-docker")
+	state := filepath.Join(dir, "image-present")
+	if err := os.WriteFile(state, []byte("present\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	script := `#!/bin/sh
 set -eu
+state="` + state + `"
 case "$1" in
   version) echo "fake-1.0" ;;
   info) echo '["name=rootless"]' ;;
+  image)
+    shift
+    [ "$1" = inspect ] || exit 125
+    shift
+    [ -f "$state" ] || exit 1
+    echo '[{"Id":"sha256:test"}]'
+    ;;
+  pull)
+    shift
+    : > "$state"
+    echo "pulled $1"
+    ;;
   run)
     shift
     src=""
@@ -214,7 +241,7 @@ case "$1" in
         --rm|--init|--pull=never|--read-only) shift ;;
         --network|--cap-drop|--security-opt|--pids-limit|--memory|--cpus|--tmpfs|--workdir|--user|--userns|--env) shift 2 ;;
         --mount) src=$(printf '%s' "$2" | sed -n 's/.*src=\([^,]*\).*/\1/p'); shift 2 ;;
-        *@sha256:*) shift; break ;;
+        *@sha256:*) [ -f "$state" ] || exit 125; shift; break ;;
         *) exit 125 ;;
       esac
     done

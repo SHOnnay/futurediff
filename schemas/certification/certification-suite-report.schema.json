@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://futurediff.dev/schemas/certification-suite-report-0.1.json",
+  "title": "FutureDiff Certification Suite Report",
+  "type": "object",
+  "required": ["format_version", "generated_at", "build", "host", "targets", "certified", "report_digest"],
+  "properties": {
+    "format_version": {"const": "0.1"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "build": {"type": "object"},
+    "host": {
+      "type": "object",
+      "required": ["goos", "goarch"],
+      "properties": {
+        "goos": {"type": "string"},
+        "goarch": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "targets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["target", "requested", "certified", "checks"],
+        "properties": {
+          "target": {"enum": ["local", "oci", "github", "slack", "opencode", "hermes", "attestation"]},
+          "requested": {"type": "boolean"},
+          "certified": {"type": "boolean"},
+          "checks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "status", "required", "detail"],
+              "properties": {
+                "id": {"type": "string", "minLength": 1},
+                "status": {"enum": ["pass", "fail", "blocked", "skip"]},
+                "required": {"type": "boolean"},
+                "detail": {"type": "string"},
+                "evidence": {"type": "object"}
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "certified": {"type": "boolean"},
+    "report_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  },
+  "additionalProperties": false
+}

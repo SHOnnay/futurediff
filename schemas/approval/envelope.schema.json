@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://futurediff.dev/schemas/approval/envelope-0.1.json",
+  "title": "FutureDiff signed approval envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "transaction_id", "transaction_digest", "approver", "key_id", "signed_at", "expires_at", "nonce", "signature"],
+  "properties": {
+    "version": {"const": "0.1"},
+    "transaction_id": {"type": "string", "minLength": 1},
+    "transaction_digest": {"type": "string", "minLength": 1},
+    "approver": {"type": "string", "minLength": 1},
+    "key_id": {"type": "string", "pattern": "^ed25519-[0-9a-f]{16}$"},
+    "signed_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "nonce": {"type": "string", "minLength": 16},
+    "signature": {"type": "string", "minLength": 40}
+  }
+}

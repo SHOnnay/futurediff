@@ -78,7 +78,7 @@ func TestRunnerSynchronizesSuccessfulMutationWithoutGitMetadata(t *testing.T) {
 	mustWrite(t, filepath.Join(workspace, ".git"), "gitdir: protected\n")
 	mustWrite(t, filepath.Join(workspace, "tracked.txt"), "before\n")
 	mustWrite(t, filepath.Join(workspace, "delete.txt"), "delete\n")
-	runner := Runner{Kind: Docker, Binary: fakeDocker(t), Policy: DefaultPolicy(testImage), ScratchRoot: t.TempDir()}
+	runner := Runner{Kind: Docker, Binary: fakeDocker(t, true), Policy: DefaultPolicy(testImage), ScratchRoot: t.TempDir()}
 	result, err := runner.Execute(context.Background(), Request{TransactionID: "tx", ExecutionID: "exec", Workspace: workspace, Command: []string{"/bin/sh", "-c", "test ! -e .git; printf 'after\\n' > tracked.txt; rm delete.txt; mkdir generated; printf 'new\\n' > generated/file.txt"}, Purpose: Mutation, SyncWorkspace: true})
 	if err != nil {
 		t.Fatalf("run: %v stdout=%s stderr=%s", err, result.Stdout, result.Stderr)
@@ -100,7 +100,7 @@ func TestFailedMutationDoesNotSynchronize(t *testing.T) {
 	}
 	workspace := t.TempDir()
 	mustWrite(t, filepath.Join(workspace, "tracked.txt"), "before\n")
-	runner := Runner{Kind: Docker, Binary: fakeDocker(t), Policy: DefaultPolicy(testImage), ScratchRoot: t.TempDir()}
+	runner := Runner{Kind: Docker, Binary: fakeDocker(t, true), Policy: DefaultPolicy(testImage), ScratchRoot: t.TempDir()}
 	result, err := runner.Execute(context.Background(), Request{TransactionID: "tx", ExecutionID: "exec", Workspace: workspace, Command: []string{"/bin/sh", "-c", "printf 'unsafe\\n' > tracked.txt; exit 7"}, Purpose: Mutation, SyncWorkspace: true})
 	if err == nil {
 		t.Fatal("failed command returned nil error")
@@ -117,7 +117,7 @@ func TestVerificationNeverSynchronizes(t *testing.T) {
 	}
 	workspace := t.TempDir()
 	mustWrite(t, filepath.Join(workspace, "tracked.txt"), "before\n")
-	runner := Runner{Kind: Docker, Binary: fakeDocker(t), Policy: DefaultPolicy(testImage), ScratchRoot: t.TempDir()}
+	runner := Runner{Kind: Docker, Binary: fakeDocker(t, true), Policy: DefaultPolicy(testImage), ScratchRoot: t.TempDir()}
 	result, err := runner.Execute(context.Background(), Request{TransactionID: "tx", ExecutionID: "verify", Workspace: workspace, Command: []string{"/bin/sh", "-c", "printf 'side-effect\\n' > tracked.txt"}, Purpose: Verification, SyncWorkspace: false})
 	if err != nil {
 		t.Fatal(err)
@@ -135,7 +135,7 @@ func TestOutputIsBounded(t *testing.T) {
 	p := DefaultPolicy(testImage)
 	p.MaxOutputBytes = 32
 	p.Timeout = 2 * time.Second
-	runner := Runner{Kind: Docker, Binary: fakeDocker(t), Policy: p, ScratchRoot: t.TempDir()}
+	runner := Runner{Kind: Docker, Binary: fakeDocker(t, true), Policy: p, ScratchRoot: t.TempDir()}
 	result, err := runner.Execute(context.Background(), Request{TransactionID: "tx", ExecutionID: "out", Workspace: t.TempDir(), Command: []string{"/bin/sh", "-c", "printf 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'"}, Purpose: Verification})
 	if err != nil {
 		t.Fatal(err)
@@ -155,14 +155,46 @@ func TestNonRootlessRuntimeRejected(t *testing.T) {
 	}
 }
 
-func fakeDocker(t *testing.T) string {
+func TestRunnerPullsMissingImageBeforeExecution(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake runtime uses POSIX shell")
+	}
+	workspace := t.TempDir()
+	mustWrite(t, filepath.Join(workspace, "tracked.txt"), "before\n")
+	runner := Runner{Kind: Docker, Binary: fakeDocker(t, false), Policy: DefaultPolicy(testImage), ScratchRoot: t.TempDir()}
+	result, err := runner.Execute(context.Background(), Request{TransactionID: "tx", ExecutionID: "pull", Workspace: workspace, Command: []string{"/bin/sh", "-c", "printf 'after\\n' > tracked.txt"}, Purpose: Mutation, SyncWorkspace: true})
+	if err != nil {
+		t.Fatalf("run: %v stdout=%s stderr=%s", err, result.Stdout, result.Stderr)
+	}
+	assertContent(t, filepath.Join(workspace, "tracked.txt"), "after\n")
+}
+
+func fakeDocker(t *testing.T, imagePresent bool) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "fake-docker")
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fake-docker")
+	state := filepath.Join(dir, "image-present")
+	if imagePresent {
+		mustWrite(t, state, "present\n")
+	}
 	script := `#!/bin/sh
 set -eu
+state="` + state + `"
 case "$1" in
   version) echo "fake-1.0" ;;
   info) echo '["name=rootless"]' ;;
+  image)
+    shift
+    [ "$1" = inspect ] || exit 125
+    shift
+    [ -f "$state" ] || exit 1
+    echo '[{"Id":"sha256:test"}]'
+    ;;
+  pull)
+    shift
+    : > "$state"
+    echo "pulled $1"
+    ;;
   run)
     shift
     src=""
@@ -171,7 +203,7 @@ case "$1" in
         --rm|--init|--pull=never|--read-only) shift ;;
         --network|--cap-drop|--security-opt|--pids-limit|--memory|--cpus|--tmpfs|--workdir|--user|--userns|--env) shift 2 ;;
         --mount) src=$(printf '%s' "$2" | sed -n 's/.*src=\([^,]*\).*/\1/p'); shift 2 ;;
-        *@sha256:*) shift; break ;;
+        *@sha256:*) [ -f "$state" ] || exit 125; shift; break ;;
         *) echo "unexpected argument: $1" >&2; exit 125 ;;
       esac
     done
