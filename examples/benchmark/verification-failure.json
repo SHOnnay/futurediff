@@ -1,0 +1,10 @@
+{
+  "format_version": "0.1",
+  "id": "verification_failure_after_external_preparation",
+  "description": "A repository mutation and Slack notification are followed by a failed verification.",
+  "steps": [
+    {"id": "edit", "kind": "repository_mutation"},
+    {"id": "notify", "kind": "external_effect", "effect_key": "slack:#backend"},
+    {"id": "tests", "kind": "verification", "fails": true}
+  ]
+}

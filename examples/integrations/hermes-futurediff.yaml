@@ -1,0 +1,24 @@
+mcp_servers:
+  futurediff:
+    command: "/opt/futurediff/bin/futurediff-mcp"
+    args:
+      - --socket
+      - "/home/USER/.futurediff/futurediff.sock"
+    enabled: true
+    timeout: 120
+    connect_timeout: 20
+    supports_parallel_tool_calls: false
+    tools:
+      include:
+        - futurediff.transaction_create
+        - futurediff.transaction_status
+        - futurediff.transaction_execute
+        - futurediff.transaction_seal
+        - futurediff.transaction_verify
+        - futurediff.effects_list
+        - futurediff.github_branch_prepare
+        - futurediff.github_pr_prepare
+        - futurediff.slack_message_prepare
+      resources: false
+      prompts: false
+

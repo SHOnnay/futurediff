@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://futurediff.dev/schemas/approval-snapshot-0.1.schema.json",
+  "title": "FutureDiff Approval Snapshot 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "snapshot_version",
+    "snapshot_id",
+    "transaction_id",
+    "transaction_fingerprint",
+    "created_at",
+    "approval_mode",
+    "approval_decision",
+    "policy_bundle_version",
+    "policy_bundle_hash",
+    "verification_bundle_hash",
+    "effect_set_hash",
+    "commit_plan_hash",
+    "resource_set_hash",
+    "approver_records",
+    "effect_bindings",
+    "transaction_summary"
+  ],
+  "properties": {
+    "snapshot_version": { "const": "0.1" },
+    "snapshot_id": { "type": "string", "minLength": 1 },
+    "transaction_id": { "type": "string", "minLength": 1 },
+    "transaction_fingerprint": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": ["string", "null"], "format": "date-time" },
+    "approval_mode": { "type": "string", "enum": ["human_required", "policy_only", "human_plus_policy"] },
+    "approval_decision": { "type": "string", "enum": ["approved", "rejected"] },
+    "policy_bundle_version": { "type": "string", "minLength": 1 },
+    "policy_bundle_hash": { "type": "string", "minLength": 1 },
+    "verification_bundle_hash": { "type": "string", "minLength": 1 },
+    "effect_set_hash": { "type": "string", "minLength": 1 },
+    "commit_plan_hash": { "type": "string", "minLength": 1 },
+    "resource_set_hash": { "type": "string", "minLength": 1 },
+    "approver_records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["approver_type", "approver_id", "approver_display", "decision", "decision_reason", "approved_at", "auth_context_ref", "signature_or_attestation_ref"],
+        "properties": {
+          "approver_type": { "type": "string", "enum": ["human", "policy", "mixed"] },
+          "approver_id": { "type": "string", "minLength": 1 },
+          "approver_display": { "type": "string", "minLength": 1 },
+          "decision": { "type": "string", "enum": ["approved", "rejected"] },
+          "decision_reason": { "type": "string", "minLength": 1 },
+          "approved_at": { "type": "string", "format": "date-time" },
+          "auth_context_ref": { "type": "string", "minLength": 1 },
+          "signature_or_attestation_ref": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "effect_bindings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["effect_id", "adapter_name", "adapter_version", "effect_class", "support_level", "prepared_fingerprint", "preview_fingerprint", "preview_summary_hash", "resource_uris", "verification_refs", "commit_priority"],
+        "properties": {
+          "effect_id": { "type": "string", "minLength": 1 },
+          "adapter_name": { "type": "string", "minLength": 1 },
+          "adapter_version": { "type": "string", "minLength": 1 },
+          "effect_class": { "type": "string", "enum": ["R", "P", "O", "C", "I"] },
+          "support_level": { "type": "string", "enum": ["exact_prepare_commit", "preview_with_freshness_check", "idempotent_best_effort", "unsupported"] },
+          "prepared_fingerprint": { "type": "string", "minLength": 1 },
+          "preview_fingerprint": { "type": "string", "minLength": 1 },
+          "preview_summary_hash": { "type": "string", "minLength": 1 },
+          "resource_uris": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+          "resource_versions": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["resource_uri", "version"], "properties": { "resource_uri": { "type": "string", "minLength": 1 }, "version": { "type": "string", "minLength": 1 } } } },
+          "idempotency_key_ref": { "type": ["string", "null"] },
+          "verification_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "commit_priority": { "type": "integer" },
+          "limitations": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+        }
+      }
+    },
+    "transaction_summary": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

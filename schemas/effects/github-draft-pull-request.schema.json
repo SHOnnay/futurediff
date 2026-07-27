@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://futurediff.dev/schemas/effects/github-draft-pull-request-0.1.json",
+  "title": "FutureDiff GitHub Draft Pull Request Effect",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["credential_id", "input"],
+  "properties": {
+    "credential_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "repo", "title", "head", "base"],
+      "properties": {
+        "owner": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,100}$"},
+        "repo": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,100}$"},
+        "title": {"type": "string", "minLength": 1, "maxLength": 256},
+        "body": {"type": "string", "maxLength": 65536},
+        "head": {"type": "string", "minLength": 1, "maxLength": 255},
+        "base": {"type": "string", "minLength": 1, "maxLength": 255}
+      }
+    }
+  }
+}

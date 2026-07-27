@@ -1,0 +1,21 @@
+{
+  "format_version": "0.1",
+  "generated_at": "2026-07-27T07:11:41.815072599Z",
+  "runtime": {
+    "kind": "",
+    "binary": "",
+    "version": "",
+    "rootless": false
+  },
+  "image": "alpine@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "checks": [
+    {
+      "id": "runtime_ready",
+      "status": "fail",
+      "detail": "exec: \"docker\": executable file not found in $PATH",
+      "required": true
+    }
+  ],
+  "certified": false,
+  "report_digest": "d6b14f9ab146b06f2b8625ac0b6818f72b0c68698fb4629d28600792fa45d42e"
+}

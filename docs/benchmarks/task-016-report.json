@@ -1,0 +1,168 @@
+{
+  "format_version": "0.1",
+  "kind": "deterministic_effect_safety_model",
+  "generated_at": "2026-07-27T07:11:41.278971319Z",
+  "results": [
+    {
+      "scenario_id": "duplicate_retry_after_lost_response",
+      "metrics": [
+        {
+          "mode": "direct",
+          "task_completed": true,
+          "verification_passed": true,
+          "released_effects": 2,
+          "unsafe_released_effects": 0,
+          "duplicate_effects": 1,
+          "human_approvals": 0,
+          "compensations_required": 0,
+          "recovery_succeeded": true,
+          "repository_changed_on_failure": false
+        },
+        {
+          "mode": "permission_only",
+          "task_completed": true,
+          "verification_passed": true,
+          "released_effects": 2,
+          "unsafe_released_effects": 0,
+          "duplicate_effects": 1,
+          "human_approvals": 1,
+          "compensations_required": 0,
+          "recovery_succeeded": true,
+          "repository_changed_on_failure": false
+        },
+        {
+          "mode": "sandbox_only",
+          "task_completed": true,
+          "verification_passed": true,
+          "released_effects": 2,
+          "unsafe_released_effects": 0,
+          "duplicate_effects": 1,
+          "human_approvals": 0,
+          "compensations_required": 0,
+          "recovery_succeeded": true,
+          "repository_changed_on_failure": false
+        },
+        {
+          "mode": "futurediff",
+          "task_completed": true,
+          "verification_passed": true,
+          "released_effects": 1,
+          "unsafe_released_effects": 0,
+          "duplicate_effects": 0,
+          "human_approvals": 1,
+          "compensations_required": 0,
+          "recovery_succeeded": true,
+          "repository_changed_on_failure": false
+        }
+      ]
+    },
+    {
+      "scenario_id": "successful_repository_pr_and_notification",
+      "metrics": [
+        {
+          "mode": "direct",
+          "task_completed": true,
+          "verification_passed": true,
+          "released_effects": 3,
+          "unsafe_released_effects": 0,
+          "duplicate_effects": 0,
+          "human_approvals": 0,
+          "compensations_required": 0,
+          "recovery_succeeded": true,
+          "repository_changed_on_failure": true
+        },
+        {
+          "mode": "permission_only",
+          "task_completed": true,
+          "verification_passed": true,
+          "released_effects": 3,
+          "unsafe_released_effects": 0,
+          "duplicate_effects": 0,
+          "human_approvals": 4,
+          "compensations_required": 0,
+          "recovery_succeeded": true,
+          "repository_changed_on_failure": true
+        },
+        {
+          "mode": "sandbox_only",
+          "task_completed": true,
+          "verification_passed": true,
+          "released_effects": 3,
+          "unsafe_released_effects": 0,
+          "duplicate_effects": 0,
+          "human_approvals": 0,
+          "compensations_required": 0,
+          "recovery_succeeded": true,
+          "repository_changed_on_failure": false
+        },
+        {
+          "mode": "futurediff",
+          "task_completed": true,
+          "verification_passed": true,
+          "released_effects": 3,
+          "unsafe_released_effects": 0,
+          "duplicate_effects": 0,
+          "human_approvals": 1,
+          "compensations_required": 0,
+          "recovery_succeeded": true,
+          "repository_changed_on_failure": false
+        }
+      ]
+    },
+    {
+      "scenario_id": "verification_failure_after_external_preparation",
+      "metrics": [
+        {
+          "mode": "direct",
+          "task_completed": false,
+          "verification_passed": false,
+          "released_effects": 1,
+          "unsafe_released_effects": 1,
+          "duplicate_effects": 0,
+          "human_approvals": 0,
+          "compensations_required": 1,
+          "recovery_succeeded": true,
+          "repository_changed_on_failure": true
+        },
+        {
+          "mode": "permission_only",
+          "task_completed": false,
+          "verification_passed": false,
+          "released_effects": 1,
+          "unsafe_released_effects": 1,
+          "duplicate_effects": 0,
+          "human_approvals": 2,
+          "compensations_required": 1,
+          "recovery_succeeded": true,
+          "repository_changed_on_failure": true
+        },
+        {
+          "mode": "sandbox_only",
+          "task_completed": false,
+          "verification_passed": false,
+          "released_effects": 1,
+          "unsafe_released_effects": 1,
+          "duplicate_effects": 0,
+          "human_approvals": 0,
+          "compensations_required": 1,
+          "recovery_succeeded": true,
+          "repository_changed_on_failure": false
+        },
+        {
+          "mode": "futurediff",
+          "task_completed": false,
+          "verification_passed": false,
+          "released_effects": 0,
+          "unsafe_released_effects": 0,
+          "duplicate_effects": 0,
+          "human_approvals": 1,
+          "compensations_required": 0,
+          "recovery_succeeded": true,
+          "repository_changed_on_failure": false
+        }
+      ]
+    }
+  ],
+  "report_digest": "304603e9c04f5ed1e7fa368f2b7ac4a130a4006d318f3578ad1c57a02e4c0648",
+  "disclaimer": "Synthetic benchmark: this models effect-release semantics. It does not measure model quality, real provider latency, or token use."
+}

@@ -1,0 +1,51 @@
+name: rootless-certification
+
+on:
+  workflow_dispatch:
+    inputs:
+      runtime:
+        description: OCI runtime to certify.
+        required: true
+        default: docker
+        type: choice
+        options:
+          - docker
+          - podman
+      image:
+        description: Digest-pinned image to certify against.
+        required: true
+        type: string
+      runtime_binary:
+        description: Optional absolute runtime binary path override.
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  rootless-certification:
+    runs-on:
+      - self-hosted
+      - linux
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+          cache: true
+      - name: Build commands
+        run: make build
+      - name: Run rootless certification
+        run: |
+          ./bin/futurediff-certify \
+            --runtime '${{ inputs.runtime }}' \
+            --runtime-binary '${{ inputs.runtime_binary }}' \
+            --image '${{ inputs.image }}' \
+            --scratch "$RUNNER_TEMP/futurediff-certification" \
+            --output "$RUNNER_TEMP/rootless-certification.json"
+      - name: Upload rootless certification artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rootless-certification-${{ inputs.runtime }}
+          path: ${{ runner.temp }}/rootless-certification.json
+          if-no-files-found: error

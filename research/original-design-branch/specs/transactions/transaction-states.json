@@ -1,0 +1,18 @@
+{
+  "version": "0.1",
+  "states": [
+    { "name": "NEW", "terminal": false },
+    { "name": "ACTIVE", "terminal": false },
+    { "name": "VERIFYING", "terminal": false },
+    { "name": "AWAITING_APPROVAL", "terminal": false },
+    { "name": "READY_TO_COMMIT", "terminal": false },
+    { "name": "COMMITTING", "terminal": false },
+    { "name": "COMMITTED", "terminal": true },
+    { "name": "ABORTING", "terminal": false },
+    { "name": "ABORTED", "terminal": true },
+    { "name": "RECONCILING", "terminal": false },
+    { "name": "COMPENSATING", "terminal": false },
+    { "name": "COMPENSATED", "terminal": true },
+    { "name": "FAILED_MANUAL_INTERVENTION", "terminal": true }
+  ]
+}

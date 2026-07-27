@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "futurediff": {
+      "command": "/absolute/path/to/futurediff-mcp",
+      "args": [
+        "--socket",
+        "/home/USER/.futurediff/futurediff.sock"
+      ]
+    }
+  }
+}

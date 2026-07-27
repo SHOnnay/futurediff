@@ -1,0 +1,9 @@
+{
+  "format_version": "0.1",
+  "id": "duplicate_retry_after_lost_response",
+  "description": "An external provider accepts an effect but its response is lost and the caller retries.",
+  "steps": [
+    {"id": "issue", "kind": "external_effect", "effect_key": "github:issue", "retry_after_loss": true},
+    {"id": "verify", "kind": "verification"}
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "version": "0.1",
+  "cases": [
+    {
+      "name": "lowercase scheme and authority",
+      "input": "GITHUB://GitHub.COM/acme/payments/pulls/",
+      "normalized": "github://github.com/acme/payments/pulls"
+    },
+    {
+      "name": "collapse duplicate slashes",
+      "input": "postgres://DB.EXAMPLE.COM/app//schema/public/table/users",
+      "normalized": "postgres://db.example.com/app/schema/public/table/users"
+    },
+    {
+      "name": "sort query parameters",
+      "input": "postgres://db.example.com/app/schema/public/table/users?column=zeta&column=alpha",
+      "normalized": "postgres://db.example.com/app/schema/public/table/users?column=alpha&column=zeta"
+    },
+    {
+      "name": "remove trailing slash on non root",
+      "input": "slack://T123/channel/C456/",
+      "normalized": "slack://T123/channel/C456"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "ui query is not canonical",
+      "input": "github://github.com/acme/payments/pull/431?tab=files",
+      "reason": "presentation query parameters are forbidden"
+    }
+  ]
+}

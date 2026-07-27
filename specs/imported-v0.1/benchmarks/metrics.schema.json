@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://futurediff.dev/schemas/benchmark-metrics-0.1.schema.json",
+  "title": "FutureDiff Benchmark Metrics 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_completion_rate",
+    "irreversible_effect_failures",
+    "duplicate_effects",
+    "successful_abort_rate",
+    "successful_recovery_rate",
+    "successful_compensation_rate",
+    "false_blocks",
+    "approvals_required",
+    "wall_clock_overhead_ms",
+    "compute_overhead_ms",
+    "token_overhead",
+    "diff_accuracy",
+    "unsupported_effect_detection_rate"
+  ],
+  "properties": {
+    "task_completion_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+    "irreversible_effect_failures": { "type": "integer", "minimum": 0 },
+    "duplicate_effects": { "type": "integer", "minimum": 0 },
+    "successful_abort_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+    "successful_recovery_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+    "successful_compensation_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+    "false_blocks": { "type": "integer", "minimum": 0 },
+    "approvals_required": { "type": "integer", "minimum": 0 },
+    "wall_clock_overhead_ms": { "type": "integer", "minimum": 0 },
+    "compute_overhead_ms": { "type": "integer", "minimum": 0 },
+    "token_overhead": { "type": "integer", "minimum": 0 },
+    "diff_accuracy": { "type": "number", "minimum": 0, "maximum": 1 },
+    "unsupported_effect_detection_rate": { "type": "number", "minimum": 0, "maximum": 1 }
+  }
+}

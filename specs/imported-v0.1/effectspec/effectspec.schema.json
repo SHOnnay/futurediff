@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://futurediff.dev/schemas/effectspec-0.1.schema.json",
+  "title": "FutureDiff EffectSpec 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "effectspec_version",
+    "adapter_name",
+    "adapter_version",
+    "tool_name",
+    "effect_class",
+    "support_level",
+    "mutates_state",
+    "open_world",
+    "destructive",
+    "idempotent_commit",
+    "resource_uri_patterns",
+    "lifecycle_support",
+    "freshness_check_support",
+    "compensation_support",
+    "redaction_ruleset",
+    "timeout_policy",
+    "retry_policy",
+    "max_payload_size_bytes",
+    "commit_priority"
+  ],
+  "properties": {
+    "effectspec_version": {
+      "const": "0.1"
+    },
+    "adapter_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "adapter_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tool_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "effect_class": {
+      "type": "string",
+      "enum": ["R", "P", "O", "C", "I"]
+    },
+    "support_level": {
+      "type": "string",
+      "enum": [
+        "exact_prepare_commit",
+        "preview_with_freshness_check",
+        "idempotent_best_effort",
+        "unsupported"
+      ]
+    },
+    "mutates_state": { "type": "boolean" },
+    "open_world": { "type": "boolean" },
+    "destructive": { "type": "boolean" },
+    "idempotent_commit": { "type": "boolean" },
+    "resource_uri_patterns": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "lifecycle_support": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["describe", "prepare", "preview", "verify", "commit", "abort", "compensate", "status"],
+      "properties": {
+        "describe": { "type": "boolean" },
+        "prepare": { "type": "boolean" },
+        "preview": { "type": "boolean" },
+        "verify": { "type": "boolean" },
+        "commit": { "type": "boolean" },
+        "abort": { "type": "boolean" },
+        "compensate": { "type": "boolean" },
+        "status": { "type": "boolean" }
+      }
+    },
+    "freshness_check_support": {
+      "oneOf": [
+        { "type": "boolean" },
+        { "type": "string", "minLength": 1 }
+      ]
+    },
+    "compensation_support": {
+      "oneOf": [
+        { "type": "boolean" },
+        { "type": "string", "minLength": 1 }
+      ]
+    },
+    "redaction_ruleset": {
+      "type": "string",
+      "minLength": 1
+    },
+    "timeout_policy": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "retry_policy": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "max_payload_size_bytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "commit_priority": {
+      "type": "integer"
+    }
+  }
+}

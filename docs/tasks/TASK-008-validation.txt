@@ -1,0 +1,67 @@
+# FutureDiff Task 008 validation output
+
+## Environment
+go version go1.23.2 linux/amd64
+CGO_ENABLED=1
+git version 2.47.3
+gcc (Debian 14.2.0-19) 14.2.0
+docker=unavailable
+podman=unavailable
+
+## gofmt
+PASS: no unformatted Go files
+
+## go vet
+PASS: go vet ./...
+
+## tests
+?   	github.com/SHOnnay/futurediff/cmd/futurediff	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediffd	[no test files]
+ok  	github.com/SHOnnay/futurediff/effectspec	0.004s
+ok  	github.com/SHOnnay/futurediff/internal/api	0.170s
+ok  	github.com/SHOnnay/futurediff/internal/app	0.189s
+ok  	github.com/SHOnnay/futurediff/internal/domain	0.002s
+ok  	github.com/SHOnnay/futurediff/internal/ledger	0.040s
+ok  	github.com/SHOnnay/futurediff/internal/runtimeoci	0.030s
+ok  	github.com/SHOnnay/futurediff/internal/staging	0.049s
+ok  	github.com/SHOnnay/futurediff/internal/verification	0.002s
+
+## race tests
+?   	github.com/SHOnnay/futurediff/cmd/futurediff	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediffd	[no test files]
+ok  	github.com/SHOnnay/futurediff/effectspec	1.007s
+ok  	github.com/SHOnnay/futurediff/internal/api	1.170s
+ok  	github.com/SHOnnay/futurediff/internal/app	1.193s
+ok  	github.com/SHOnnay/futurediff/internal/domain	1.010s
+ok  	github.com/SHOnnay/futurediff/internal/ledger	1.039s
+ok  	github.com/SHOnnay/futurediff/internal/runtimeoci	1.032s
+ok  	github.com/SHOnnay/futurediff/internal/staging	1.059s
+ok  	github.com/SHOnnay/futurediff/internal/verification	1.011s
+
+## coverage
+	github.com/SHOnnay/futurediff/cmd/futurediff		coverage: 0.0% of statements
+	github.com/SHOnnay/futurediff/cmd/futurediffd		coverage: 0.0% of statements
+ok  	github.com/SHOnnay/futurediff/effectspec	(cached)	coverage: 55.6% of statements
+ok  	github.com/SHOnnay/futurediff/internal/api	(cached)	coverage: 60.5% of statements
+ok  	github.com/SHOnnay/futurediff/internal/app	(cached)	coverage: 47.4% of statements
+ok  	github.com/SHOnnay/futurediff/internal/domain	(cached)	coverage: 47.4% of statements
+ok  	github.com/SHOnnay/futurediff/internal/ledger	(cached)	coverage: 37.7% of statements
+ok  	github.com/SHOnnay/futurediff/internal/runtimeoci	(cached)	coverage: 69.1% of statements
+ok  	github.com/SHOnnay/futurediff/internal/staging	(cached)	coverage: 63.2% of statements
+ok  	github.com/SHOnnay/futurediff/internal/verification	(cached)	coverage: 51.0% of statements
+
+## builds
+PASS: CLI and daemon built
+
+## certification script syntax
+PASS: shell syntax
+
+## source statistics
+GO_FILES=23
+GO_LOC=4012
+TEST_FILES=9
+DOC_FILES=11
+
+## qualification
+PASS: source compilation, unit/integration tests, race tests, fake-OCI orchestration, and certification-script syntax
+PENDING: real Docker-rootless and Podman-rootless host certification (runtime unavailable)

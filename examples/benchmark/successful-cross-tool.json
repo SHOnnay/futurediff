@@ -1,0 +1,12 @@
+{
+  "format_version": "0.1",
+  "id": "successful_repository_pr_and_notification",
+  "description": "A verified repository change releases a branch, pull request, and Slack notification.",
+  "steps": [
+    {"id": "edit", "kind": "repository_mutation"},
+    {"id": "branch", "kind": "external_effect", "effect_key": "github:branch"},
+    {"id": "pr", "kind": "external_effect", "effect_key": "github:pr"},
+    {"id": "slack", "kind": "external_effect", "effect_key": "slack:#backend"},
+    {"id": "tests", "kind": "verification"}
+  ]
+}

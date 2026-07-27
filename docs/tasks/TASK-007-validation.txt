@@ -1,0 +1,59 @@
+# FutureDiff Task 007 validation output
+
+## Environment
+go version go1.23.2 linux/amd64
+CGO_ENABLED=1
+git version 2.47.3
+gcc (Debian 14.2.0-19) 14.2.0
+
+## gofmt
+PASS: no unformatted Go files
+
+## go vet
+PASS: go vet ./...
+
+## race tests
+?   	github.com/SHOnnay/futurediff/cmd/futurediff	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediffd	[no test files]
+ok  	github.com/SHOnnay/futurediff/effectspec	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/api	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/app	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/domain	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/ledger	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/runtimeoci	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/staging	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/verification	(cached)
+
+## coverage tests
+	github.com/SHOnnay/futurediff/cmd/futurediff		coverage: 0.0% of statements
+	github.com/SHOnnay/futurediff/cmd/futurediffd		coverage: 0.0% of statements
+ok  	github.com/SHOnnay/futurediff/effectspec	0.006s	coverage: 55.6% of statements
+ok  	github.com/SHOnnay/futurediff/internal/api	0.108s	coverage: 59.9% of statements
+ok  	github.com/SHOnnay/futurediff/internal/app	0.109s	coverage: 44.2% of statements
+ok  	github.com/SHOnnay/futurediff/internal/domain	0.002s	coverage: 47.4% of statements
+ok  	github.com/SHOnnay/futurediff/internal/ledger	0.024s	coverage: 39.9% of statements
+ok  	github.com/SHOnnay/futurediff/internal/runtimeoci	0.003s	coverage: 8.3% of statements
+ok  	github.com/SHOnnay/futurediff/internal/staging	0.051s	coverage: 63.2% of statements
+ok  	github.com/SHOnnay/futurediff/internal/verification	0.002s	coverage: 59.7% of statements
+
+## build
+PASS: Go CLI and daemon built
+bin/futurediff:  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=28315cde1cb975f768d001a870122d91e2d2c1d6, for GNU/Linux 3.2.0, with debug_info, not stripped
+bin/futurediffd: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=fd0f3d84cb7d1475cea045036b524fdc156d6f3b, for GNU/Linux 3.2.0, with debug_info, not stripped
+
+## linked SQLite
+	libsqlite3.so.0 => /lib/x86_64-linux-gnu/libsqlite3.so.0 (0x00007f7e26773000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f7e2657f000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f7e2648f000)
+
+## process smoke
+health=ok
+status=committed
+live=current
+future=future
+socket_mode=600
+
+## unavailable certification
+Docker: unavailable
+Podman: unavailable
+Rootless OCI execution: not certified in this environment

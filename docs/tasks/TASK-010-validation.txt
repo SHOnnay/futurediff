@@ -1,0 +1,89 @@
+FutureDiff Task 010 validation
+Date: 2026-07-27
+
+== Formatting ==
+PASS: gofmt
+
+== Static analysis ==
+PASS: go vet
+
+== Full tests ==
+?   	github.com/SHOnnay/futurediff/cmd/futurediff	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediffd	[no test files]
+ok  	github.com/SHOnnay/futurediff/effectspec	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/adapters/githubdraft	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/api	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/app	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/credentials	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/domain	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/ledger	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/runtimeoci	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/staging	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/verification	(cached)
+PASS: go test
+
+== Race tests ==
+?   	github.com/SHOnnay/futurediff/cmd/futurediff	[no test files]
+?   	github.com/SHOnnay/futurediff/cmd/futurediffd	[no test files]
+ok  	github.com/SHOnnay/futurediff/effectspec	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/adapters/githubdraft	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/api	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/app	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/credentials	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/domain	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/ledger	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/runtimeoci	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/staging	(cached)
+ok  	github.com/SHOnnay/futurediff/internal/verification	(cached)
+PASS: go test -race
+
+== Task 010 focused tests ==
+=== RUN   TestPrepareCreateAndStatus
+--- PASS: TestPrepareCreateAndStatus (0.00s)
+=== RUN   TestAmbiguousCreateCanBeRecoveredWithoutSecondPost
+--- PASS: TestAmbiguousCreateCanBeRecoveredWithoutSecondPost (0.00s)
+=== RUN   TestFreshnessAndInputValidation
+--- PASS: TestFreshnessAndInputValidation (0.00s)
+PASS
+ok  	github.com/SHOnnay/futurediff/internal/adapters/githubdraft	0.003s
+=== RUN   TestGitHubDraftPRTransactionCommitsOnce
+--- PASS: TestGitHubDraftPRTransactionCommitsOnce (0.09s)
+=== RUN   TestAmbiguousGitHubCreateRecoversWithoutDuplicate
+--- PASS: TestAmbiguousGitHubCreateRecoversWithoutDuplicate (0.08s)
+=== RUN   TestGitHubRefChangeInvalidatesApprovalBeforeRelease
+--- PASS: TestGitHubRefChangeInvalidatesApprovalBeforeRelease (0.06s)
+=== RUN   TestDefiniteProviderRejectionCanRearm
+--- PASS: TestDefiniteProviderRejectionCanRearm (0.08s)
+=== RUN   TestPreparedEffectIsBoundIntoApprovalAndAbortIsDurable
+--- PASS: TestPreparedEffectIsBoundIntoApprovalAndAbortIsDurable (0.04s)
+=== RUN   TestEffectRefreshChangesApprovalDigest
+--- PASS: TestEffectRefreshChangesApprovalDigest (0.06s)
+PASS
+ok  	github.com/SHOnnay/futurediff/internal/app	0.409s
+testing: warning: no tests to run
+PASS
+ok  	github.com/SHOnnay/futurediff/internal/api	0.003s [no tests to run]
+PASS: focused tests
+
+== Builds ==
+PASS: CLI and daemon builds
+
+== Coverage ==
+	github.com/SHOnnay/futurediff/cmd/futurediff		coverage: 0.0% of statements
+	github.com/SHOnnay/futurediff/cmd/futurediffd		coverage: 0.0% of statements
+ok  	github.com/SHOnnay/futurediff/effectspec	(cached)	coverage: 55.6% of statements
+ok  	github.com/SHOnnay/futurediff/internal/adapters/githubdraft	(cached)	coverage: 68.9% of statements
+ok  	github.com/SHOnnay/futurediff/internal/api	(cached)	coverage: 59.2% of statements
+ok  	github.com/SHOnnay/futurediff/internal/app	(cached)	coverage: 63.6% of statements
+ok  	github.com/SHOnnay/futurediff/internal/credentials	(cached)	coverage: 72.3% of statements
+ok  	github.com/SHOnnay/futurediff/internal/domain	(cached)	coverage: 47.4% of statements
+ok  	github.com/SHOnnay/futurediff/internal/ledger	(cached)	coverage: 27.0% of statements
+ok  	github.com/SHOnnay/futurediff/internal/runtimeoci	(cached)	coverage: 69.3% of statements
+ok  	github.com/SHOnnay/futurediff/internal/staging	(cached)	coverage: 63.2% of statements
+ok  	github.com/SHOnnay/futurediff/internal/verification	(cached)	coverage: 51.3% of statements
+
+== Focused Unix-socket external-effect API test ==
+=== RUN   TestUnixSocketGitHubDraftPREffectLifecycle
+--- PASS: TestUnixSocketGitHubDraftPREffectLifecycle (0.10s)
+PASS
+ok  	github.com/SHOnnay/futurediff/internal/api	0.100s

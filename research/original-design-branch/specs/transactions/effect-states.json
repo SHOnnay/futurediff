@@ -1,0 +1,16 @@
+{
+  "version": "0.1",
+  "states": [
+    { "name": "DECLARED", "terminal": false },
+    { "name": "PREPARED", "terminal": false },
+    { "name": "PREVIEWED", "terminal": false },
+    { "name": "VERIFIED", "terminal": false },
+    { "name": "APPROVED", "terminal": false },
+    { "name": "COMMITTING", "terminal": false },
+    { "name": "COMMITTED", "terminal": true },
+    { "name": "ABORTED", "terminal": true },
+    { "name": "COMPENSATING", "terminal": false },
+    { "name": "COMPENSATED", "terminal": true },
+    { "name": "UNKNOWN", "terminal": false }
+  ]
+}

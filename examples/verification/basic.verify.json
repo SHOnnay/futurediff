@@ -1,0 +1,14 @@
+{
+  "format_version": "0.1",
+  "contract_id": "basic-repository-check",
+  "policy_version": "policy-0.1",
+  "checks": [
+    {
+      "check_id": "readme-exists",
+      "required": true,
+      "executor": "workspace_assertion",
+      "type": "file_exists",
+      "path": "README.md"
+    }
+  ]
+}

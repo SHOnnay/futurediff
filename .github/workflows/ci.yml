@@ -1,0 +1,42 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+          cache: true
+      - name: Install SQLite development library
+        run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
+      - name: Format check
+        run: test -z "$(gofmt -l ./cmd ./effectspec ./internal)"
+      - name: Vet
+        run: go vet ./...
+      - name: Race tests
+        run: go test -race ./...
+      - name: Build all commands
+        run: make build
+      - name: One-command demo
+        run: ./bin/futurediff-demo --root "$RUNNER_TEMP/futurediff-demo"
+      - name: Deterministic safety benchmark
+        run: ./bin/futurediff-bench --scenarios examples/benchmark --json "$RUNNER_TEMP/benchmark.json" --markdown "$RUNNER_TEMP/benchmark.md"
+      - name: SPDX SBOM generation
+        run: ./bin/futurediff-sbom --root . --output "$RUNNER_TEMP/futurediff.spdx.json"
+      - name: Generate OpenCode and Hermes integration profiles
+        run: |
+          ./bin/futurediff-integrate --target opencode --mcp-binary "$PWD/bin/futurediff-mcp" --socket "$RUNNER_TEMP/futurediff.sock" --output "$RUNNER_TEMP/opencode.json"
+          ./bin/futurediff-integrate --target hermes --mcp-binary "$PWD/bin/futurediff-mcp" --socket "$RUNNER_TEMP/futurediff.sock" --output "$RUNNER_TEMP/hermes.yaml"
+      - name: Ledger fault-injection self-test
+        run: ./bin/futurediff-admin --root "$RUNNER_TEMP/fd-admin" --fault-self-test "$RUNNER_TEMP/fd-faults"
+      - name: Local provenance statement
+        run: ./bin/futurediff-provenance --artifact ./bin/futurediff --artifact ./bin/futurediffd --output "$RUNNER_TEMP/futurediff.intoto.jsonl" --builder-id "https://github.com/${{ github.workflow_ref }}" --invocation-id "${{ github.run_id }}" --source-uri "${{ github.server_url }}/${{ github.repository }}" --source-digest "${{ github.sha }}"
