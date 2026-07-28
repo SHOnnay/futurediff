@@ -1,0 +1,28 @@
+{
+  "allowed_producers": [
+    "github-actions",
+    "futurediff-certifier",
+    "independent-security-review"
+  ],
+  "allowed_sources": [
+    "github-hosted-runner",
+    "self-hosted-certifier",
+    "independent-review"
+  ],
+  "default_max_age_hours": 72,
+  "environment": "production",
+  "max_age_hours_by_type": {
+    "container-runtime": 168,
+    "hosted-ci": 72,
+    "provider-effect": 24,
+    "security-review": 720
+  },
+  "max_future_skew_seconds": 300,
+  "require_non_synthetic": true,
+  "required_types": [
+    "container-runtime",
+    "hosted-ci",
+    "provider-effect",
+    "security-review"
+  ]
+}

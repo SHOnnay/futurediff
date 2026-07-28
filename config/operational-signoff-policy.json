@@ -1,0 +1,4 @@
+{
+  "required_roles": ["release-manager", "security", "operations", "on-call"],
+  "minimum_distinct_approvers": 4
+}

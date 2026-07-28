@@ -1,0 +1,39 @@
+{
+  "deletion_verification_required": true,
+  "backup_max_retention_days": 35,
+  "data_classes": [
+    {
+      "name": "transaction_metadata",
+      "retention_days": 365,
+      "deletion_method": "cryptographic-and-row-deletion",
+      "contains_personal_data": false,
+      "contains_credentials": false,
+      "storage": "ledger"
+    },
+    {
+      "name": "approval_identity",
+      "retention_days": 365,
+      "deletion_method": "policy-controlled-redaction",
+      "contains_personal_data": true,
+      "legal_basis": "security-and-audit",
+      "contains_credentials": false,
+      "storage": "ledger"
+    },
+    {
+      "name": "provider_credentials",
+      "retention_days": 0,
+      "deletion_method": "ephemeral-revocation",
+      "contains_personal_data": false,
+      "contains_credentials": true,
+      "storage": "credential_broker_only"
+    },
+    {
+      "name": "sanitized_evidence",
+      "retention_days": 90,
+      "deletion_method": "verified-object-deletion",
+      "contains_personal_data": false,
+      "contains_credentials": false,
+      "storage": "evidence_store"
+    }
+  ]
+}

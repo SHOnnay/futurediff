@@ -1,0 +1,15 @@
+{
+  "maximum_error_rate": 0.001,
+  "maximum_p95_latency_ms": 500,
+  "maximum_unknown_outcomes": 0,
+  "maximum_unreconciled_effects": 0,
+  "minimum_availability": 0.999,
+  "minimum_duration_seconds": 900,
+  "required_health_checks": [
+    "api",
+    "ledger",
+    "effect-reconciliation",
+    "credential-broker",
+    "audit-export"
+  ]
+}

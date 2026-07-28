@@ -1,0 +1,13 @@
+{
+  "environment": "production-like",
+  "archive_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "checks": [
+    {"id": "health", "passed": true, "synthetic": true},
+    {"id": "transaction-create", "passed": true, "synthetic": true},
+    {"id": "approval-bind", "passed": true, "synthetic": true},
+    {"id": "effect-idempotency", "passed": true, "synthetic": true},
+    {"id": "audit-chain", "passed": true, "synthetic": true},
+    {"id": "metrics-export", "passed": true, "synthetic": true}
+  ]
+}

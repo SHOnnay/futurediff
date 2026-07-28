@@ -1,0 +1,9 @@
+{
+  "duration_seconds": 14400,
+  "transaction_count": 50000,
+  "error_rate": 0.001,
+  "memory_growth_mb_per_hour": 5,
+  "fd_growth_per_hour": 1,
+  "queue_lag_peak_seconds": 5,
+  "unknown_outcomes": 0
+}

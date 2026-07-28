@@ -1,0 +1,61 @@
+name: release-promotion
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Workflow run containing production-certification-inputs
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  id-token: write
+  attestations: write
+
+env:
+  PYTHON_VERSION: '3.13'
+
+jobs:
+  promotion:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Check out protected source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Run promotion policy tests
+        run: python -m unittest discover -s tests -p test_promotion.py -v
+      - name: Download certification inputs
+        uses: actions/download-artifact@v7
+        with:
+          name: production-certification-inputs
+          path: incoming
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ github.token }}
+      - name: Evaluate release promotion
+        run: |
+          ./scripts/release-promotion.sh \
+            incoming/evidence \
+            incoming/external-evidence-specification.json \
+            incoming/hosted-claims.json \
+            incoming/release-candidate.json \
+            incoming/release-approvals.json \
+            dist/promotion
+      - name: Attest promotion evidence
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/promotion/FutureDiff-production-promotion.zip
+      - name: Upload promotion result
+        uses: actions/upload-artifact@v7
+        with:
+          name: production-promotion-result
+          path: dist/promotion/
+          if-no-files-found: error
+          retention-days: 90

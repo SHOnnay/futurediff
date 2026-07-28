@@ -1,0 +1,12 @@
+{
+  "from_version": "1.25.0",
+  "to_version": "1.40.0",
+  "steps": [
+    {"id": "backup-ledger", "kind": "backup", "timeout_seconds": 300},
+    {"id": "migrate-schema", "kind": "migration", "timeout_seconds": 300, "rollback_step": "rollback-schema", "destructive": false, "backup_required": true},
+    {"id": "deploy-runtime", "kind": "deploy", "timeout_seconds": 600, "rollback_step": "rollback-runtime", "destructive": false, "backup_required": true},
+    {"id": "verify-health", "kind": "verify", "timeout_seconds": 300},
+    {"id": "rollback-runtime", "kind": "rollback", "timeout_seconds": 600},
+    {"id": "rollback-schema", "kind": "rollback", "timeout_seconds": 300}
+  ]
+}

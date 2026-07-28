@@ -1,0 +1,10 @@
+{
+  "subject_organization": "FutureDiff",
+  "reviewer": {"organization": "EXTERNAL-REVIEWER-PLACEHOLDER", "independent": true},
+  "scope": ["transaction-kernel", "provider-adapters", "credential-broker", "release-supply-chain", "tenant-boundaries"],
+  "findings": [],
+  "report_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "signed_by": "PLACEHOLDER",
+  "signed_at": "2026-07-28T00:00:00Z",
+  "synthetic": true
+}

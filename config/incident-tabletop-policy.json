@@ -1,0 +1,5 @@
+{
+  "required_scenarios": ["credential_exposure", "provider_unknown_outcome", "ledger_corruption", "runtime_escape_attempt"],
+  "minimum_scenario_score": 80,
+  "minimum_participants": 3
+}

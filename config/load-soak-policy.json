@@ -1,0 +1,8 @@
+{
+  "min_duration_hours": 24,
+  "min_request_count": 100000,
+  "max_error_rate": 0.001,
+  "max_p95_latency_ms": 500,
+  "max_memory_growth_pct": 5,
+  "max_unknown_outcomes": 0
+}

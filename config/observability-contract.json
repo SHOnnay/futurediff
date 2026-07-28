@@ -1,0 +1,14 @@
+{
+  "metrics": [
+    "futurediff_transactions_total",
+    "futurediff_transaction_duration_seconds",
+    "futurediff_effect_attempts_total",
+    "futurediff_unknown_outcomes",
+    "futurediff_reconciliation_backlog",
+    "futurediff_approval_wait_seconds"
+  ],
+  "log_fields": ["timestamp", "level", "transaction_id", "event", "outcome", "trace_id"],
+  "trace_spans": ["transaction.prepare", "transaction.verify", "effect.release", "effect.reconcile"],
+  "retention_days": 30,
+  "trace_sampling_ratio": 0.1
+}

@@ -1,0 +1,9 @@
+{
+  "allow_exceptions": true,
+  "allowed_exception_scopes": [
+    "non-critical-documentation",
+    "non-production-observability",
+    "temporary-capacity-headroom"
+  ],
+  "required_approval_roles": ["security", "operations", "release-manager"]
+}

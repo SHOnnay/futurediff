@@ -1,0 +1,7 @@
+{
+  "synthetic": true,
+  "duration_hours": 24,
+  "request_count": 100000,
+  "metrics": {"error_rate": 0.0, "p95_latency_ms": 100, "memory_growth_pct": 1, "unknown_outcomes": 0},
+  "evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+}

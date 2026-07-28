@@ -1,0 +1,53 @@
+{
+  "command_timeout_seconds": 180,
+  "commands": [
+    [
+      "python3",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_*.py"
+    ]
+  ],
+  "external_evidence_report": "external-evidence-report.json",
+  "license_policy": "config/license-policy.json",
+  "required_directories": [
+    "docs",
+    "schemas",
+    "scripts",
+    "tests",
+    "tools"
+  ],
+  "required_external_evidence": [],
+  "required_files": [
+    "LICENSE",
+    "README.md",
+    "SECURITY.md",
+    "config/deployment-contract.json",
+    "config/external-evidence-policy.json",
+    "config/final-production-gate-policy.json",
+    "config/hosted-identity-policy.json",
+    "config/postdeploy-policy.json",
+    "config/promotion-policy.json",
+    "config/rollback-decision-policy.json",
+    "docs/EXTERNAL_CERTIFICATION_INTAKE.md",
+    "docs/OPERATIONAL_EVIDENCE.md",
+    "docs/POST_DEPLOYMENT_AND_ROLLBACK.md",
+    "docs/PRODUCTION_LAUNCH.md",
+    "docs/PRODUCTION_RUNBOOK.md",
+    "docs/RELEASE_PROMOTION.md",
+    "docs/THREAT_MODEL.md",
+    "scripts/operations-assurance.sh",
+    "scripts/production-launch.sh",
+    "scripts/release-promotion.sh",
+    "tools/futurediff_assurance.py",
+    "tools/futurediff_operations.py",
+    "tools/futurediff_promotion.py"
+  ],
+  "scan_excludes": [
+    "dist"
+  ]
+}

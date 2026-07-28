@@ -1,0 +1,13 @@
+{
+  "participants": ["security-lead", "operations-lead", "service-owner", "incident-commander"],
+  "scenarios": [
+    {"type": "credential_exposure", "detection": "secret scanner and provider alert", "containment": "revoke and quarantine", "recovery": "rotate credentials and verify effects", "communications": "security incident channel", "lessons": "shorten token lifetime", "score": 92},
+    {"type": "provider_unknown_outcome", "detection": "unknown outcome metric", "containment": "pause release lane", "recovery": "provider reconciliation", "communications": "operations incident channel", "lessons": "expand provider receipt checks", "score": 94},
+    {"type": "ledger_corruption", "detection": "integrity verification", "containment": "stop writers", "recovery": "restore verified backup and replay", "communications": "critical incident process", "lessons": "increase verification frequency", "score": 90},
+    {"type": "runtime_escape_attempt", "detection": "sandbox policy denial", "containment": "terminate workload and isolate host", "recovery": "rebuild host and revalidate evidence", "communications": "security incident channel", "lessons": "tighten runtime profile", "score": 91}
+  ],
+  "actions": [
+    {"action": "automate provider receipt sampling", "owner": "operations-lead", "due_date": "2026-09-01"},
+    {"action": "review credential TTL defaults", "owner": "security-lead", "due_date": "2026-09-01"}
+  ]
+}

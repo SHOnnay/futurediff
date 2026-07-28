@@ -1,0 +1,4 @@
+{
+  "required_severities": ["critical", "high", "medium"],
+  "maximum_ack_minutes": {"critical": 5, "high": 15, "medium": 60}
+}

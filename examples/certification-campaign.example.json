@@ -1,0 +1,15 @@
+{
+  "required_targets": ["docker-rootless", "podman-rootless", "github-effects", "slack-effects", "opencode", "hermes", "hosted-linux", "hosted-macos", "hosted-windows", "hosted-attestation"],
+  "targets": [
+    {"id": "docker-rootless", "owner": "platform", "environment": "disposable-linux", "runner": "self-hosted", "evidence_type": "runtime-certification", "command": "scripts/certify-docker-rootless.sh"},
+    {"id": "podman-rootless", "owner": "platform", "environment": "disposable-linux", "runner": "self-hosted", "evidence_type": "runtime-certification", "command": "scripts/certify-podman-rootless.sh"},
+    {"id": "github-effects", "owner": "integrations", "environment": "disposable-github", "runner": "self-hosted", "evidence_type": "provider-certification", "command": "scripts/certify-github-effects.sh"},
+    {"id": "slack-effects", "owner": "integrations", "environment": "disposable-slack", "runner": "self-hosted", "evidence_type": "provider-certification", "command": "scripts/certify-slack-effects.sh"},
+    {"id": "opencode", "owner": "agents", "environment": "disposable-linux", "runner": "self-hosted", "evidence_type": "agent-certification", "command": "scripts/certify-opencode.sh"},
+    {"id": "hermes", "owner": "agents", "environment": "disposable-linux", "runner": "self-hosted", "evidence_type": "agent-certification", "command": "scripts/certify-hermes.sh"},
+    {"id": "hosted-linux", "owner": "release", "environment": "github-hosted", "runner": "ubuntu", "evidence_type": "hosted-platform", "command": "workflow:production-closure"},
+    {"id": "hosted-macos", "owner": "release", "environment": "github-hosted", "runner": "macos", "evidence_type": "hosted-platform", "command": "workflow:production-closure"},
+    {"id": "hosted-windows", "owner": "release", "environment": "github-hosted", "runner": "windows", "evidence_type": "hosted-platform", "command": "workflow:production-closure"},
+    {"id": "hosted-attestation", "owner": "release", "environment": "github-hosted", "runner": "ubuntu", "evidence_type": "artifact-attestation", "command": "scripts/github-attestation-verify.sh"}
+  ]
+}

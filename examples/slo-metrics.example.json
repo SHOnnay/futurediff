@@ -1,0 +1,8 @@
+{
+  "availability": 0.9995,
+  "error_rate": 0.0004,
+  "p95_latency_ms": 175,
+  "restore_rpo_seconds": 120,
+  "restore_rto_seconds": 480,
+  "unknown_outcomes": 0
+}

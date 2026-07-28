@@ -1,0 +1,8 @@
+{
+  "required_combinations": [
+    {"os": "linux", "runtime": "docker-rootless", "database": "sqlite"},
+    {"os": "linux", "runtime": "podman-rootless", "database": "sqlite"},
+    {"os": "macos", "runtime": "native", "database": "sqlite"},
+    {"os": "windows", "runtime": "native", "database": "sqlite"}
+  ]
+}

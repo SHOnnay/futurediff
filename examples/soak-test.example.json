@@ -1,0 +1,12 @@
+{
+  "evidence_id": "soak-local-conformance",
+  "source_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "duration_seconds": 21600,
+  "transaction_count": 80000,
+  "error_rate": 0.0001,
+  "memory_growth_mb_per_hour": 1.2,
+  "fd_growth_per_hour": 0,
+  "queue_lag_peak_seconds": 1.5,
+  "unknown_outcomes": 0,
+  "scope": "synthetic-local-policy-example"
+}

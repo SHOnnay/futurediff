@@ -1,0 +1,12 @@
+{
+  "command_timeout_seconds": 300,
+  "commands": [
+    ["python3", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py"]
+  ],
+  "external_evidence_report": "external-evidence-report.json",
+  "license_policy": "config/license-policy.json",
+  "required_directories": ["docs", "scripts", "tools", "tests"],
+  "required_external_evidence": ["docker", "podman", "github", "slack", "opencode", "hermes", "macos", "attestation"],
+  "required_files": ["README.md", "SECURITY.md", "LICENSE", "docs/THREAT_MODEL.md", "docs/PRODUCTION_RUNBOOK.md", "tools/futurediff_assurance.py"],
+  "scan_excludes": ["dist"]
+}

@@ -1,0 +1,14 @@
+{
+  "actor": "replace-with-github-actor",
+  "aud": "futurediff-production",
+  "event_name": "workflow_dispatch",
+  "exp": "2026-07-28T00:15:00Z",
+  "iat": "2026-07-28T00:00:00Z",
+  "iss": "https://token.actions.githubusercontent.com",
+  "ref": "refs/heads/main",
+  "ref_protected": true,
+  "repository": "SHOnnay/futurediff",
+  "run_id": "1",
+  "sha": "0000000000000000000000000000000000000000",
+  "workflow_ref": "SHOnnay/futurediff/.github/workflows/release-promotion.yml@refs/heads/main"
+}

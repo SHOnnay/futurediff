@@ -1,0 +1,13 @@
+{
+  "required_metrics": [
+    "futurediff_transactions_total",
+    "futurediff_transaction_duration_seconds",
+    "futurediff_effect_attempts_total",
+    "futurediff_unknown_outcomes",
+    "futurediff_reconciliation_backlog",
+    "futurediff_approval_wait_seconds"
+  ],
+  "required_log_fields": ["timestamp", "level", "transaction_id", "event", "outcome", "trace_id"],
+  "required_trace_spans": ["transaction.prepare", "transaction.verify", "effect.release", "effect.reconcile"],
+  "forbidden_log_fields": ["password", "token", "secret", "private_key", "credential"]
+}

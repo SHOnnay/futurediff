@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "entries": {"items": {"type": "object"}, "type": "array"},
+    "entry_count": {"minimum": 0, "type": "integer"},
+    "format_version": {"const": "1.0"},
+    "head": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+    "ledger_digest": {"pattern": "^[0-9a-f]{64}$", "type": "string"}
+  },
+  "required": ["format_version", "entries", "head", "entry_count", "ledger_digest"],
+  "title": "FutureDiff transparency ledger",
+  "type": "object"
+}

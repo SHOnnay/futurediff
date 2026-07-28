@@ -1,0 +1,8 @@
+{
+  "artifacts": [
+    {"id": "promotion-decision", "path": "promotion-decision.json"},
+    {"id": "postdeploy-health", "path": "postdeploy-health.json"},
+    {"id": "rollback-decision", "path": "rollback-decision.json"},
+    {"id": "transparency-ledger", "path": "transparency-ledger.json"}
+  ]
+}

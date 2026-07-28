@@ -1,0 +1,5 @@
+{
+  "minimum_approvals": 2,
+  "required_roles": ["security", "operations"],
+  "disallow_self_approval": true
+}

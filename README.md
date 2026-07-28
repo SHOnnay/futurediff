@@ -1,24 +1,26 @@
 # FutureDiff
 
-FutureDiff is a local-first transaction and safety layer for AI agents. It stages repository and provider changes in isolation, verifies exact material, binds approval to cryptographic digests, and releases effects only through controlled, recoverable adapters.
+FutureDiff is a transaction and safety layer for AI agents. It stages repository and provider changes in isolation, verifies exact material, binds approval to cryptographic digests, and releases effects only through controlled, recoverable adapters.
 
-## Status
+## Current state
 
-- Baseline: **v0.95.0**
+- Core transaction baseline: **v0.95.0**
+- Imported assurance/promotion/closure overlay: **through task 170**
 - Local API contract: **v1.1**
 - Commands: **70 Go binaries**
-- Position: **feature-complete local MVP**
-- Still pending: external Docker/Podman, GitHub, Slack, OpenCode, Hermes, macOS, and hosted-attestation certification
+- Position: **strong local product baseline with production-assurance tooling present**
+- External production completion: **not yet proven**
 
-## Core guarantees
+## What it guarantees
 
 - exact Git-tree staging without mutating the live checkout
 - digest-bound approval and deterministic verification
-- rootless OCI execution for enforced preparation
-- durable effect orchestration for GitHub branch, draft PR, and Slack release flows
+- rootless OCI preparation for enforced execution
+- durable GitHub branch, draft PR, and Slack effect release flows
 - idempotent receipts, reconciliation, and crash recovery
 - kernel-authenticated local ownership, sharing, RBAC, and access audit chains
-- tamper-evident evidence, audit, and integrity checkpoints
+- tamper-evident evidence, audit, integrity, and retention controls
+- imported promotion, launch, and production-closure assurance workflows
 
 ## Requirements
 
@@ -32,17 +34,19 @@ Enforced mode additionally requires:
 - rootless Docker or rootless Podman
 - digest-pinned OCI image: `name@sha256:<digest>`
 
-## Build and test
+## Build and verify
 
 ```bash
 make build
 go test ./...
+bash ./scripts/release.sh
 ```
 
-Release archive:
+Imported assurance tooling:
 
 ```bash
-bash ./scripts/release.sh
+bash ./scripts/validate-overlay.sh
+python3 -m unittest discover -s tests -p 'test_*.py' -v
 ```
 
 ## Start the daemon
@@ -67,17 +71,32 @@ export FUTUREDIFF_SLACK_TOKEN='test-or-production-token'
 ./bin/futurediff commit <transaction-id> <transaction-digest>
 ```
 
-Provider effects are prepared before commit through the GitHub branch, GitHub draft PR, and Slack commands.
+## Production-assurance and closure tooling
 
-## Documentation
+```bash
+./scripts/operations-assurance.sh dist/operations
+./scripts/release-promotion.sh <inputs...> dist/promotion
+./scripts/production-launch.sh <inputs...> dist/launch
+./scripts/production-closure.sh <canonical-repo> <base-archive> <historical-zips-dir> dist/closure
+```
+
+These tools are present and locally validated. They do **not** turn placeholder, synthetic, skipped, or locally authored evidence into an external production pass.
+
+## Root docs
 
 - `ARCHITECTURE.md`
-- `docs/progress/MASTER-STATUS-v0.95.0.md`
-- `docs/progress/PROGRESS-AUDIT-TASK-095.md`
-- `docs/tasks/TASK-091-095-validation.md`
-- `docs/tasks/`
-- `docs/adr/`
+- `SECURITY.md`
+
+## Key docs
+
+- `docs/progress/MASTER-STATUS-v1.70.0.md`
+- `docs/progress/PROGRESS-AUDIT-TASK-170.md`
+- `docs/PRODUCTION_RUNBOOK.md`
+- `docs/RELEASE_PROMOTION.md`
+- `docs/PRODUCTION_LAUNCH.md`
+- `docs/PRODUCTION_CLOSURE.md`
+- `docs/THREAT_MODEL.md`
 
 ## Claims boundary
 
-FutureDiff is ready as a serious local product baseline. It is **not** yet claiming external production certification, distributed HA, enterprise IAM, Windows support, or a production UI.
+FutureDiff is a serious local product baseline with imported assurance and closure machinery. It is **not yet externally production-complete** until real provider, runtime, hosted-platform, security-review, load/soak, disaster-recovery, deployment-smoke, rollback, and sign-off evidence all pass.

@@ -1,0 +1,8 @@
+{
+  "last_tested_at": "2026-07-28T00:00:00Z",
+  "routes": [
+    {"severity": "critical", "primary": "oncall-primary", "secondary": "incident-commander", "ack_minutes": 5, "escalation_after_minutes": 10},
+    {"severity": "high", "primary": "service-owner", "secondary": "oncall-primary", "ack_minutes": 15, "escalation_after_minutes": 30},
+    {"severity": "medium", "primary": "service-owner", "secondary": "platform-team", "ack_minutes": 60, "escalation_after_minutes": 120}
+  ]
+}

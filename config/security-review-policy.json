@@ -1,0 +1,4 @@
+{
+  "required_scope": ["transaction-kernel", "provider-adapters", "credential-broker", "release-supply-chain", "tenant-boundaries"],
+  "allowed_open_severities": ["informational", "low"]
+}

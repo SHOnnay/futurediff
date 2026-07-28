@@ -1,0 +1,8 @@
+{
+  "results": [
+    {"os": "linux", "runtime": "docker-rootless", "database": "sqlite", "status": "passed", "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+    {"os": "linux", "runtime": "podman-rootless", "database": "sqlite", "status": "passed", "evidence_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+    {"os": "macos", "runtime": "native", "database": "sqlite", "status": "passed", "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
+    {"os": "windows", "runtime": "native", "database": "sqlite", "status": "passed", "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}
+  ]
+}

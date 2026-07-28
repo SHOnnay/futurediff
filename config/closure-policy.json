@@ -1,0 +1,17 @@
+{
+  "required_completion_kinds": [
+    "canonical-integration-receipt",
+    "historical-archive-catalog",
+    "evidence-freshness-plan",
+    "external-certification-campaign",
+    "independent-security-review",
+    "measured-load-soak-evidence",
+    "disaster-recovery-evidence",
+    "change-freeze-control",
+    "production-credential-readiness",
+    "deployment-smoke-test",
+    "rollback-exercise",
+    "operational-signoff"
+  ],
+  "production_complete_requires_real_external_evidence": true
+}

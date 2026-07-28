@@ -1,0 +1,12 @@
+{
+  "duration_seconds": 300,
+  "request_count": 10000,
+  "concurrency": 50,
+  "throughput_per_second": 25,
+  "p95_latency_ms": 250,
+  "p99_latency_ms": 500,
+  "error_rate": 0.001,
+  "cpu_peak_percent": 85,
+  "memory_peak_percent": 85,
+  "unknown_outcomes": 0
+}

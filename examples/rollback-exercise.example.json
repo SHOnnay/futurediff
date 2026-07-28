@@ -1,0 +1,9 @@
+{
+  "synthetic": true,
+  "triggered": true,
+  "success": true,
+  "duration_minutes": 5,
+  "state_integrity_verified": true,
+  "forward_recovery_verified": true,
+  "evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+}

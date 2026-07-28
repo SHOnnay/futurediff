@@ -1,0 +1,12 @@
+{
+  "release_id": "v1.70.0",
+  "change_list_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "freeze_starts_at": "2026-07-28T00:00:00Z",
+  "freeze_ends_at": "2026-07-29T00:00:00Z",
+  "emergency_override": false,
+  "approvals": [
+    {"role": "release-manager", "approved": true},
+    {"role": "security", "approved": true},
+    {"role": "operations", "approved": true}
+  ]
+}

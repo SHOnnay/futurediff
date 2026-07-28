@@ -1,0 +1,13 @@
+{
+  "allowed_risks": ["low", "medium"],
+  "allowed_scopes": [
+    "non-critical-documentation",
+    "non-production-observability",
+    "temporary-capacity-headroom"
+  ],
+  "disallow_owner_approval": true,
+  "maximum_duration_hours": 24,
+  "minimum_compensating_controls": 2,
+  "minimum_rationale_length": 30,
+  "required_roles": ["security", "operations"]
+}

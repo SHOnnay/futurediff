@@ -1,0 +1,5 @@
+{
+  "required_equal_fields": ["runtime", "database", "queue", "secret_provider", "observability", "backup"],
+  "allowed_different_fields": ["replicas", "region"],
+  "minimum_production_replicas": 2
+}

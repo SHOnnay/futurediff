@@ -1,0 +1,15 @@
+{
+  "evidence_id": "capacity-local-conformance",
+  "source_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "duration_seconds": 600,
+  "request_count": 30000,
+  "concurrency": 100,
+  "throughput_per_second": 50,
+  "p95_latency_ms": 120,
+  "p99_latency_ms": 240,
+  "error_rate": 0.0001,
+  "cpu_peak_percent": 70,
+  "memory_peak_percent": 68,
+  "unknown_outcomes": 0,
+  "scope": "synthetic-local-policy-example"
+}

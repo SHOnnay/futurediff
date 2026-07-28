@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FutureDiff production completion decision",
+  "type": "object",
+  "required": ["format_version", "kind", "passed", "production_complete", "checks", "result_digest"],
+  "properties": {
+    "format_version": {"type": "string"},
+    "kind": {"const": "production-completion-decision"},
+    "passed": {"type": "boolean"},
+    "production_complete": {"type": "boolean"},
+    "checks": {"type": "array"},
+    "result_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "additionalProperties": true
+}

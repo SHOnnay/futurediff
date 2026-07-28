@@ -1,0 +1,11 @@
+{
+  "availability": 1.0,
+  "deployment_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+  "duration_seconds": 0,
+  "error_rate": 0.0,
+  "health_checks": [],
+  "p95_latency_ms": 0,
+  "synthetic": true,
+  "unknown_outcomes": 0,
+  "unreconciled_effects": 0
+}

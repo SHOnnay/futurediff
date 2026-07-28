@@ -1,0 +1,14 @@
+{
+  "allowed_audiences": ["futurediff-production"],
+  "allowed_events": ["workflow_dispatch", "push"],
+  "allowed_refs": ["refs/tags/v*", "refs/heads/main"],
+  "allowed_workflow_refs": [
+    "SHOnnay/futurediff/.github/workflows/release-promotion.yml@refs/heads/main",
+    "SHOnnay/futurediff/.github/workflows/release-promotion.yml@refs/tags/v*"
+  ],
+  "denied_actors": [],
+  "issuer": "https://token.actions.githubusercontent.com",
+  "max_future_skew_seconds": 60,
+  "maximum_token_age_seconds": 900,
+  "repository": "SHOnnay/futurediff"
+}

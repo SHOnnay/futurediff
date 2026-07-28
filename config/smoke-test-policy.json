@@ -1,0 +1,4 @@
+{
+  "environment": "production-like",
+  "required_checks": ["health", "transaction-create", "approval-bind", "effect-idempotency", "audit-chain", "metrics-export"]
+}

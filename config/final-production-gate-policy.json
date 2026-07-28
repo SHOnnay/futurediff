@@ -1,0 +1,18 @@
+{
+  "required_artifact_kinds": [
+    "deployment_contract",
+    "environment_parity",
+    "compatibility_matrix",
+    "upgrade_plan",
+    "rollback_drill",
+    "capacity_test",
+    "soak_test",
+    "observability_contract",
+    "alert_routing",
+    "data_governance",
+    "incident_tabletop",
+    "release_approvals",
+    "evidence_catalog",
+    "certification_bundle"
+  ]
+}

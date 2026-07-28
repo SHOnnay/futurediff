@@ -1,0 +1,185 @@
+== python compile ==
+== unit tests ==
+test_backup_restore_rejects_traversal (tests.test_assurance.AssuranceTests.test_backup_restore_rejects_traversal) ... ok
+test_backup_restore_round_trip (tests.test_assurance.AssuranceTests.test_backup_restore_round_trip) ... ok
+test_canonical_json_is_stable (tests.test_assurance.AssuranceTests.test_canonical_json_is_stable) ... ok
+test_chaos_suite (tests.test_assurance.AssuranceTests.test_chaos_suite) ... ok
+test_deterministic_release_zip (tests.test_assurance.AssuranceTests.test_deterministic_release_zip) ... ok
+test_license_scan_approves_mit (tests.test_assurance.AssuranceTests.test_license_scan_approves_mit) ... ok
+test_license_scan_denies_module_prefix (tests.test_assurance.AssuranceTests.test_license_scan_denies_module_prefix) ... ok
+test_manifest_detects_mutation (tests.test_assurance.AssuranceTests.test_manifest_detects_mutation) ... ok
+test_manifest_rejects_symlink (tests.test_assurance.AssuranceTests.test_manifest_rejects_symlink) ... ok
+test_manifest_round_trip (tests.test_assurance.AssuranceTests.test_manifest_round_trip) ... ok
+test_openssl_signature_round_trip (tests.test_assurance.AssuranceTests.test_openssl_signature_round_trip) ... ok
+test_parse_go_mod (tests.test_assurance.AssuranceTests.test_parse_go_mod) ... ok
+test_provenance_round_trip (tests.test_assurance.AssuranceTests.test_provenance_round_trip) ... ok
+test_readiness_fails_missing_external_evidence (tests.test_assurance.AssuranceTests.test_readiness_fails_missing_external_evidence) ... ok
+test_readiness_passes (tests.test_assurance.AssuranceTests.test_readiness_passes) ... ok
+test_recovery_drill (tests.test_assurance.AssuranceTests.test_recovery_drill) ... ok
+test_release_zip_detects_unexpected_member (tests.test_assurance.AssuranceTests.test_release_zip_detects_unexpected_member) ... ok
+test_sbom_detects_unexpected_file (tests.test_assurance.AssuranceTests.test_sbom_detects_unexpected_file) ... ok
+test_sbom_round_trip (tests.test_assurance.AssuranceTests.test_sbom_round_trip) ... ok
+test_secret_scan_fingerprint_only (tests.test_assurance.AssuranceTests.test_secret_scan_fingerprint_only) ... ok
+test_slo_pass_and_fail (tests.test_assurance.AssuranceTests.test_slo_pass_and_fail) ... ok
+test_alert_routing (tests.test_operations.OperationsTests.test_alert_routing) ... ok
+test_approval_quorum_and_self_approval (tests.test_operations.OperationsTests.test_approval_quorum_and_self_approval) ... ok
+test_bundle_detects_traversal (tests.test_operations.OperationsTests.test_bundle_detects_traversal) ... ok
+test_bundle_is_deterministic_and_verifiable (tests.test_operations.OperationsTests.test_bundle_is_deterministic_and_verifiable) ... ok
+test_capacity_thresholds (tests.test_operations.OperationsTests.test_capacity_thresholds) ... ok
+test_compatibility_requires_evidence (tests.test_operations.OperationsTests.test_compatibility_requires_evidence) ... ok
+test_data_governance_credentials_are_broker_only (tests.test_operations.OperationsTests.test_data_governance_credentials_are_broker_only) ... ok
+test_deployment_contract_passes (tests.test_operations.OperationsTests.test_deployment_contract_passes) ... ok
+test_deployment_contract_rejects_secret_value (tests.test_operations.OperationsTests.test_deployment_contract_rejects_secret_value) ... ok
+test_environment_parity (tests.test_operations.OperationsTests.test_environment_parity) ... ok
+test_evidence_catalog_rejects_symlink (tests.test_operations.OperationsTests.test_evidence_catalog_rejects_symlink) ... ok
+test_final_gate (tests.test_operations.OperationsTests.test_final_gate) ... ok
+test_final_gate_fails_missing (tests.test_operations.OperationsTests.test_final_gate_fails_missing) ... ok
+test_observability_rejects_secret_log_field (tests.test_operations.OperationsTests.test_observability_rejects_secret_log_field) ... ok
+test_soak_thresholds (tests.test_operations.OperationsTests.test_soak_thresholds) ... ok
+test_tabletop (tests.test_operations.OperationsTests.test_tabletop) ... ok
+test_upgrade_and_rollback (tests.test_operations.OperationsTests.test_upgrade_and_rollback) ... ok
+test_upgrade_rejects_missing_rollback (tests.test_operations.OperationsTests.test_upgrade_rejects_missing_rollback) ... ok
+test_exception_rejects_owner_approval (tests.test_promotion.PromotionTests.test_exception_rejects_owner_approval) ... ok
+test_exception_validate (tests.test_promotion.PromotionTests.test_exception_validate) ... ok
+test_external_evidence_intake_passes_real_fresh_files (tests.test_promotion.PromotionTests.test_external_evidence_intake_passes_real_fresh_files) ... ok
+test_external_evidence_rejects_digest_change (tests.test_promotion.PromotionTests.test_external_evidence_rejects_digest_change) ... ok
+test_external_evidence_rejects_stale (tests.test_promotion.PromotionTests.test_external_evidence_rejects_stale) ... ok
+test_external_evidence_rejects_synthetic (tests.test_promotion.PromotionTests.test_external_evidence_rejects_synthetic) ... ok
+test_launch_checklist (tests.test_promotion.PromotionTests.test_launch_checklist) ... ok
+test_oidc_claims_verify (tests.test_promotion.PromotionTests.test_oidc_claims_verify) ... ok
+test_oidc_rejects_unprotected_ref (tests.test_promotion.PromotionTests.test_oidc_rejects_unprotected_ref) ... ok
+test_postdeploy_health (tests.test_promotion.PromotionTests.test_postdeploy_health) ... ok
+test_promotion_bundle_deterministic_and_verifiable (tests.test_promotion.PromotionTests.test_promotion_bundle_deterministic_and_verifiable) ... ok
+test_promotion_bundle_rejects_traversal (tests.test_promotion.PromotionTests.test_promotion_bundle_rejects_traversal) ... ok
+test_promotion_evaluate (tests.test_promotion.PromotionTests.test_promotion_evaluate) ... ok
+test_promotion_rejects_unbound_approval (tests.test_promotion.PromotionTests.test_promotion_rejects_unbound_approval) ... ok
+test_release_metadata (tests.test_promotion.PromotionTests.test_release_metadata) ... ok
+test_rollback_continue_and_trigger (tests.test_promotion.PromotionTests.test_rollback_continue_and_trigger) ... ok
+test_transparency_chain_and_tamper_detection (tests.test_promotion.PromotionTests.test_transparency_chain_and_tamper_detection) ... ok
+test_transparency_rejects_duplicate_record (tests.test_promotion.PromotionTests.test_transparency_rejects_duplicate_record) ... ok
+test_archive_catalog_pass_and_missing (tests.test_closure.ClosureTests.test_archive_catalog_pass_and_missing) ... ok
+test_bundle_deterministic (tests.test_closure.ClosureTests.test_bundle_deterministic) ... ok
+test_bundle_rejects_traversal (tests.test_closure.ClosureTests.test_bundle_rejects_traversal) ... ok
+test_bundle_verifier_detects_digest_mutation (tests.test_closure.ClosureTests.test_bundle_verifier_detects_digest_mutation) ... /usr/lib/python3.13/zipfile/__init__.py:1642: UserWarning: Duplicate name: 'a'
+  return self._open_to_write(zinfo, force_zip64=force_zip64)
+ok
+test_campaign_requires_targets_and_fields (tests.test_closure.ClosureTests.test_campaign_requires_targets_and_fields) ... ok
+test_canonical_json_stable (tests.test_closure.ClosureTests.test_canonical_json_stable) ... ok
+test_change_control (tests.test_closure.ClosureTests.test_change_control) ... ok
+test_completion_rejects_missing (tests.test_closure.ClosureTests.test_completion_rejects_missing) ... ok
+test_completion_requires_all_passed (tests.test_closure.ClosureTests.test_completion_requires_all_passed) ... ok
+test_credentials_expiry (tests.test_closure.ClosureTests.test_credentials_expiry) ... ok
+test_credentials_metadata_only (tests.test_closure.ClosureTests.test_credentials_metadata_only) ... ok
+test_dr_evidence (tests.test_closure.ClosureTests.test_dr_evidence) ... ok
+test_freshness_current_and_expired (tests.test_closure.ClosureTests.test_freshness_current_and_expired) ... ok
+test_integration_receipt_requires_merge_marker (tests.test_closure.ClosureTests.test_integration_receipt_requires_merge_marker) ... ok
+test_load_soak_requires_real_measured_evidence (tests.test_closure.ClosureTests.test_load_soak_requires_real_measured_evidence) ... ok
+test_load_soak_threshold_failure (tests.test_closure.ClosureTests.test_load_soak_threshold_failure) ... ok
+test_result_digest_changes (tests.test_closure.ClosureTests.test_result_digest_changes) ... ok
+test_rollback_exercise (tests.test_closure.ClosureTests.test_rollback_exercise) ... ok
+test_safe_rel (tests.test_closure.ClosureTests.test_safe_rel) ... ok
+test_security_review_independence_and_findings (tests.test_closure.ClosureTests.test_security_review_independence_and_findings) ... ok
+test_signoff_quorum (tests.test_closure.ClosureTests.test_signoff_quorum) ... ok
+test_smoke_requires_real_checks (tests.test_closure.ClosureTests.test_smoke_requires_real_checks) ... ok
+
+----------------------------------------------------------------------
+Ran 79 tests in 0.742s
+
+OK
+== shell syntax ==
+== json parse ==
+config/alert-routing-policy.json
+config/capacity-policy.json
+config/change-control-policy.json
+config/closure-policy.json
+config/compatibility-policy.json
+config/credential-readiness-policy.json
+config/data-governance-policy.json
+config/deployment-contract.json
+config/dr-evidence-policy.json
+config/environment-parity-policy.json
+config/evidence-freshness-policy.json
+config/external-evidence-policy.json
+config/final-production-gate-policy.json
+config/hosted-identity-policy.json
+config/incident-tabletop-policy.json
+config/license-policy.json
+config/load-soak-policy.json
+config/observability-contract.json
+config/observability-policy.json
+config/operational-signoff-policy.json
+config/postdeploy-policy.json
+config/production-launch-policy.json
+config/production-readiness-policy.external.json
+config/production-readiness-policy.json
+config/promotion-policy.json
+config/release-approval-policy.json
+config/risk-exception-policy.json
+config/rollback-decision-policy.json
+config/rollback-exercise-policy.json
+config/security-review-policy.json
+config/slo-policy.json
+config/smoke-test-policy.json
+config/soak-policy.json
+dist/CHAOS.json
+dist/PROVENANCE.intoto.json
+dist/READINESS.json
+dist/RECOVERY_DRILL.json
+dist/RELEASE_CANDIDATE.json
+dist/SBOM.cdx.json
+dist/SOURCE_MANIFEST.json
+dist/operations/alert-routing.json
+dist/operations/capacity-test.json
+dist/operations/certification-bundle-verify.json
+dist/operations/certification-bundle.json
+dist/operations/compatibility-matrix.json
+dist/operations/data-governance.json
+dist/operations/deployment-contract.json
+dist/operations/environment-parity.json
+dist/operations/evidence-catalog.json
+dist/operations/evidence-specification.json
+dist/operations/final-gate-artifacts.json
+dist/operations/incident-tabletop.json
+dist/operations/local-production-gate.json
+dist/operations/observability-contract.json
+dist/operations/release-approvals.json
+dist/operations/rollback-drill.json
+dist/operations/soak-test.json
+dist/operations/upgrade-plan.json
+dist/promotion/EXTERNAL_CERTIFICATION_STATUS.json
+examples/alert-routing.example.json
+examples/archive-expectations.example.json
+examples/capacity-test.example.json
+examples/certification-campaign.example.json
+examples/change-control.example.json
+examples/compatibility-matrix.example.json
+examples/credential-readiness.example.json
+examples/dr-evidence.example.json
+examples/evidence-freshness.example.json
+examples/external-evidence-specification.example.json
+examples/hosted-oidc-claims.example.json
+examples/incident-tabletop.example.json
+examples/load-soak.example.json
+examples/operational-signoff.example.json
+examples/postdeploy-health.example.json
+examples/promotion-bundle-specification.example.json
+examples/release-approvals.example.json
+examples/risk-exception.example.json
+examples/rollback-exercise.example.json
+examples/rollback-readiness.example.json
+examples/security-review.example.json
+examples/slo-metrics.example.json
+examples/smoke-test.example.json
+examples/soak-test.example.json
+examples/upgrade-plan.example.json
+schemas/external-evidence-specification.schema.json
+schemas/production-completion-decision.schema.json
+schemas/production-promotion-decision.schema.json
+schemas/transparency-ledger.schema.json
+== workflow yaml parse ==
+.github/workflows/operational-assurance.yml
+.github/workflows/production-assurance.yml
+.github/workflows/production-closure.yml
+.github/workflows/production-launch.yml
+.github/workflows/release-promotion.yml
+.github/workflows/release.yml

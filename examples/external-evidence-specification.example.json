@@ -1,0 +1,16 @@
+{
+  "evidence": [
+    {
+      "expires_at": "2026-07-29T00:00:00Z",
+      "id": "replace-with-real-docker-podman-evidence",
+      "issued_at": "2026-07-28T00:00:00Z",
+      "environment": "production",
+      "path": "replace/container-runtime.json",
+      "producer": "futurediff-certifier",
+      "sha256": "replace-with-real-sha256",
+      "source": "self-hosted-certifier",
+      "synthetic": true,
+      "type": "container-runtime"
+    }
+  ]
+}

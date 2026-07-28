@@ -1,0 +1,58 @@
+name: operational-assurance
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cross-platform-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Compile operational tooling
+        run: python -m py_compile tools/futurediff_operations.py tests/test_operations.py
+      - name: Run operational unit tests
+        run: python -m unittest discover -s tests -p test_operations.py -v
+      - name: Run PowerShell assurance core
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/Operations-Assurance.ps1 -OutputDirectory dist/operations-windows
+
+  deterministic-evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Build operational evidence
+        run: ./scripts/operations-assurance.sh dist/operations
+      - name: Verify final local gate
+        run: ./scripts/final-production-gate.sh
+      - name: Upload operational evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: operational-assurance
+          path: dist/operations/
+          if-no-files-found: error
+          retention-days: 30

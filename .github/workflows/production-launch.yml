@@ -1,0 +1,52 @@
+name: production-launch
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Workflow run containing production-launch-inputs
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  PYTHON_VERSION: '3.13'
+
+jobs:
+  launch:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Check out protected source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Download launch inputs
+        uses: actions/download-artifact@v7
+        with:
+          name: production-launch-inputs
+          path: incoming
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ github.token }}
+      - name: Evaluate post-deployment launch
+        run: |
+          ./scripts/production-launch.sh \
+            incoming/promotion-decision.json \
+            incoming/postdeploy-health.json \
+            incoming/rollback-readiness.json \
+            incoming/production-launch-policy.json \
+            dist/launch
+      - name: Upload launch decision
+        uses: actions/upload-artifact@v7
+        with:
+          name: production-launch-result
+          path: dist/launch/
+          if-no-files-found: error
+          retention-days: 90

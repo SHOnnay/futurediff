@@ -1,0 +1,9 @@
+{
+  "maximum_drill_age_days": 90,
+  "maximum_rpo_seconds": 300,
+  "maximum_rto_seconds": 600,
+  "trigger_error_rate": 0.02,
+  "trigger_p95_latency_ms": 2000,
+  "trigger_unknown_outcomes": 0,
+  "trigger_unreconciled_effects": 0
+}

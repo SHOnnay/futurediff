@@ -1,0 +1,49 @@
+name: production-assurance
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Compile
+        run: python -m py_compile tools/futurediff_assurance.py tools/futurediff_operations.py tests/test_assurance.py tests/test_operations.py
+      - name: Unit tests
+        run: python -m unittest discover -s tests -p test_*.py -v
+      - name: Secret scan
+        run: python tools/futurediff_assurance.py secret-scan --root . --output assurance-secret-scan.json
+      - name: License policy
+        run: python tools/futurediff_assurance.py license-scan --root . --policy config/license-policy.json --output assurance-license-scan.json
+      - name: Recovery drill
+        run: python tools/futurediff_assurance.py recovery-drill --output assurance-recovery.json
+      - name: Chaos suite
+        run: python tools/futurediff_assurance.py chaos-run --output assurance-chaos.json
+      - name: Readiness gate
+        run: python tools/futurediff_assurance.py readiness --root . --policy config/production-readiness-policy.json --output assurance-readiness.json
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: assurance-${{ matrix.os }}
+          path: assurance-*.json
+          if-no-files-found: warn
+          retention-days: 14

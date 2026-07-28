@@ -1,0 +1,9 @@
+{
+  "synthetic": true,
+  "restore_success": true,
+  "measured_rto_minutes": 10,
+  "measured_rpo_minutes": 1,
+  "integrity_verified": true,
+  "executed_at": "2026-07-28T00:00:00Z",
+  "evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+}

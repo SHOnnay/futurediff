@@ -1,0 +1,12 @@
+{
+  "release_owner": "release-owner",
+  "release_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "on_call_confirmed": true,
+  "communications_ready": true,
+  "approvals": [
+    {"actor": "rm-1", "role": "release-manager", "approved": true},
+    {"actor": "sec-1", "role": "security", "approved": true},
+    {"actor": "ops-1", "role": "operations", "approved": true},
+    {"actor": "oncall-1", "role": "on-call", "approved": true}
+  ]
+}
