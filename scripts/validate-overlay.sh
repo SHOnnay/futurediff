@@ -8,9 +8,13 @@ python3 -m py_compile \
   tools/futurediff_assurance.py \
   tools/futurediff_operations.py \
   tools/futurediff_promotion.py \
+  tools/futurediff_closure.py \
+  tools/futurediff_cli_ui.py \
   tests/test_assurance.py \
   tests/test_operations.py \
-  tests/test_promotion.py
+  tests/test_promotion.py \
+  tests/test_closure.py \
+  tests/test_cli_ui.py
 
 echo "== unit tests =="
 python3 -m unittest discover -s tests -p 'test_*.py' -v
@@ -71,6 +75,24 @@ python3 tools/futurediff_assurance.py readiness --root . --policy config/product
 
 echo "== operational assurance =="
 ./scripts/operations-assurance.sh dist/operations
+
+echo "== clean CLI UI =="
+python3 tools/futurediff_cli_ui.py --json config > /tmp/futurediff-cli-ui-config.json
+python3 tools/futurediff_cli_ui.py completion bash > /tmp/futurediff-ui.bash
+set +e
+python3 tools/futurediff_cli_ui.py --json status --status-dir dist/closure > /tmp/futurediff-cli-ui-status.json
+status_rc=$?
+set -e
+[[ $status_rc -eq 0 || $status_rc -eq 4 ]] || { echo "unexpected CLI status exit: $status_rc" >&2; exit 1; }
+python3 - <<'PYUI'
+import json
+from pathlib import Path
+for path in [Path('/tmp/futurediff-cli-ui-config.json'), Path('/tmp/futurediff-cli-ui-status.json')]:
+    raw=path.read_text(encoding='utf-8')
+    assert '\x1b' not in raw
+    json.loads(raw)
+print('CLI UI JSON clean')
+PYUI
 
 echo "== package manifest =="
 sha256sum -c MANIFEST.sha256

@@ -315,8 +315,6 @@ SECRET_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("generic_bearer", re.compile(r"(?i)bearer\s+[A-Za-z0-9._~+/=-]{24,}")),
 ]
 
-
-
 def should_skip_secret_scan(rel: str) -> bool:
     name = PurePosixPath(rel).name
     if name.endswith("_test.go"):
@@ -324,6 +322,7 @@ def should_skip_secret_scan(rel: str) -> bool:
     if rel.startswith("tests/") and name.startswith("test_") and name.endswith(".py"):
         return True
     return False
+
 
 def secret_scan(root: Path, excludes: set[str] | None = None) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []

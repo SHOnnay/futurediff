@@ -31,7 +31,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Run promotion policy tests
-        run: python -m unittest discover -s tests -p test_promotion.py -v
+        run: python -m unittest tests/test_promotion.py -v
       - name: Download certification inputs
         uses: actions/download-artifact@v7
         with:

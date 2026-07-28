@@ -20,7 +20,7 @@ jobs:
       - name: Compile closure toolkit
         run: python -m py_compile tools/futurediff_closure.py
       - name: Run closure tests
-        run: python -m unittest discover -s tests -p test_closure.py -v
+        run: python -m unittest -v tests/test_closure.py
   external-production-completion:
     if: github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, futurediff-production-certification]

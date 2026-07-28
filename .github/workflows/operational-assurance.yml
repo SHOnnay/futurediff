@@ -28,7 +28,7 @@ jobs:
       - name: Compile operational tooling
         run: python -m py_compile tools/futurediff_operations.py tests/test_operations.py
       - name: Run operational unit tests
-        run: python -m unittest discover -s tests -p test_operations.py -v
+        run: python -m unittest tests/test_operations.py -v
       - name: Run PowerShell assurance core
         if: runner.os == 'Windows'
         shell: pwsh

@@ -1,0 +1,718 @@
+== python compile ==
+== unit tests ==
+test_backup_restore_rejects_traversal (test_assurance.AssuranceTests.test_backup_restore_rejects_traversal) ... ok
+test_backup_restore_round_trip (test_assurance.AssuranceTests.test_backup_restore_round_trip) ... ok
+test_canonical_json_is_stable (test_assurance.AssuranceTests.test_canonical_json_is_stable) ... ok
+test_chaos_suite (test_assurance.AssuranceTests.test_chaos_suite) ... ok
+test_deterministic_release_zip (test_assurance.AssuranceTests.test_deterministic_release_zip) ... ok
+test_license_scan_approves_mit (test_assurance.AssuranceTests.test_license_scan_approves_mit) ... ok
+test_license_scan_denies_module_prefix (test_assurance.AssuranceTests.test_license_scan_denies_module_prefix) ... ok
+test_manifest_detects_mutation (test_assurance.AssuranceTests.test_manifest_detects_mutation) ... ok
+test_manifest_rejects_symlink (test_assurance.AssuranceTests.test_manifest_rejects_symlink) ... ok
+test_manifest_round_trip (test_assurance.AssuranceTests.test_manifest_round_trip) ... ok
+test_openssl_signature_round_trip (test_assurance.AssuranceTests.test_openssl_signature_round_trip) ... ok
+test_parse_go_mod (test_assurance.AssuranceTests.test_parse_go_mod) ... ok
+test_provenance_round_trip (test_assurance.AssuranceTests.test_provenance_round_trip) ... ok
+test_readiness_fails_missing_external_evidence (test_assurance.AssuranceTests.test_readiness_fails_missing_external_evidence) ... ok
+test_readiness_passes (test_assurance.AssuranceTests.test_readiness_passes) ... ok
+test_recovery_drill (test_assurance.AssuranceTests.test_recovery_drill) ... ok
+test_release_zip_detects_unexpected_member (test_assurance.AssuranceTests.test_release_zip_detects_unexpected_member) ... ok
+test_sbom_detects_unexpected_file (test_assurance.AssuranceTests.test_sbom_detects_unexpected_file) ... ok
+test_sbom_round_trip (test_assurance.AssuranceTests.test_sbom_round_trip) ... ok
+test_secret_scan_fingerprint_only (test_assurance.AssuranceTests.test_secret_scan_fingerprint_only) ... ok
+test_slo_pass_and_fail (test_assurance.AssuranceTests.test_slo_pass_and_fail) ... ok
+test_command_payload_is_redacted (test_cli_ui.CLIUITests.test_command_payload_is_redacted) ... ok
+test_completion_generators (test_cli_ui.CLIUITests.test_completion_generators) ... ok
+test_doctor_accepts_explicit_binary (test_cli_ui.CLIUITests.test_doctor_accepts_explicit_binary) ... ok
+test_main_direct_passthrough (test_cli_ui.CLIUITests.test_main_direct_passthrough) ... FutureDiff
+Command: /tmp/tmpcficxot5/fake-futurediff transaction-list
+✗ Command failed with exit code 6
+ok
+test_main_json_config_has_no_ansi (test_cli_ui.CLIUITests.test_main_json_config_has_no_ansi) ... ok
+test_main_noninteractive_risky_json_error (test_cli_ui.CLIUITests.test_main_noninteractive_risky_json_error) ... ok
+test_no_color_environment (test_cli_ui.CLIUITests.test_no_color_environment) ... ok
+test_noninteractive_risky_requires_yes (test_cli_ui.CLIUITests.test_noninteractive_risky_requires_yes) ... ok
+test_redacts_split_and_inline_secrets (test_cli_ui.CLIUITests.test_redacts_split_and_inline_secrets) ... ok
+test_renderer_without_color_contains_no_ansi (test_cli_ui.CLIUITests.test_renderer_without_color_contains_no_ansi) ... ok
+test_risky_detection (test_cli_ui.CLIUITests.test_risky_detection) ... ok
+test_run_command_preserves_exit_code (test_cli_ui.CLIUITests.test_run_command_preserves_exit_code) ... ok
+test_status_report_missing_files_is_safe (test_cli_ui.CLIUITests.test_status_report_missing_files_is_safe) ... ok
+test_status_report_reads_closure_files (test_cli_ui.CLIUITests.test_status_report_reads_closure_files) ... ok
+test_version_constant (test_cli_ui.CLIUITests.test_version_constant) ... ok
+test_archive_catalog_pass_and_missing (test_closure.ClosureTests.test_archive_catalog_pass_and_missing) ... ok
+test_bundle_deterministic (test_closure.ClosureTests.test_bundle_deterministic) ... ok
+test_bundle_rejects_traversal (test_closure.ClosureTests.test_bundle_rejects_traversal) ... ok
+test_bundle_verifier_detects_digest_mutation (test_closure.ClosureTests.test_bundle_verifier_detects_digest_mutation) ... /usr/lib/python3.13/zipfile/__init__.py:1642: UserWarning: Duplicate name: 'a'
+  return self._open_to_write(zinfo, force_zip64=force_zip64)
+ok
+test_campaign_requires_targets_and_fields (test_closure.ClosureTests.test_campaign_requires_targets_and_fields) ... ok
+test_canonical_json_stable (test_closure.ClosureTests.test_canonical_json_stable) ... ok
+test_change_control (test_closure.ClosureTests.test_change_control) ... ok
+test_completion_rejects_missing (test_closure.ClosureTests.test_completion_rejects_missing) ... ok
+test_completion_requires_all_passed (test_closure.ClosureTests.test_completion_requires_all_passed) ... ok
+test_credentials_expiry (test_closure.ClosureTests.test_credentials_expiry) ... ok
+test_credentials_metadata_only (test_closure.ClosureTests.test_credentials_metadata_only) ... ok
+test_dr_evidence (test_closure.ClosureTests.test_dr_evidence) ... ok
+test_freshness_current_and_expired (test_closure.ClosureTests.test_freshness_current_and_expired) ... ok
+test_integration_receipt_requires_merge_marker (test_closure.ClosureTests.test_integration_receipt_requires_merge_marker) ... ok
+test_load_soak_requires_real_measured_evidence (test_closure.ClosureTests.test_load_soak_requires_real_measured_evidence) ... ok
+test_load_soak_threshold_failure (test_closure.ClosureTests.test_load_soak_threshold_failure) ... ok
+test_result_digest_changes (test_closure.ClosureTests.test_result_digest_changes) ... ok
+test_rollback_exercise (test_closure.ClosureTests.test_rollback_exercise) ... ok
+test_safe_rel (test_closure.ClosureTests.test_safe_rel) ... ok
+test_security_review_independence_and_findings (test_closure.ClosureTests.test_security_review_independence_and_findings) ... ok
+test_signoff_quorum (test_closure.ClosureTests.test_signoff_quorum) ... ok
+test_smoke_requires_real_checks (test_closure.ClosureTests.test_smoke_requires_real_checks) ... ok
+test_alert_routing (test_operations.OperationsTests.test_alert_routing) ... ok
+test_approval_quorum_and_self_approval (test_operations.OperationsTests.test_approval_quorum_and_self_approval) ... ok
+test_bundle_detects_traversal (test_operations.OperationsTests.test_bundle_detects_traversal) ... ok
+test_bundle_is_deterministic_and_verifiable (test_operations.OperationsTests.test_bundle_is_deterministic_and_verifiable) ... ok
+test_capacity_thresholds (test_operations.OperationsTests.test_capacity_thresholds) ... ok
+test_compatibility_requires_evidence (test_operations.OperationsTests.test_compatibility_requires_evidence) ... ok
+test_data_governance_credentials_are_broker_only (test_operations.OperationsTests.test_data_governance_credentials_are_broker_only) ... ok
+test_deployment_contract_passes (test_operations.OperationsTests.test_deployment_contract_passes) ... ok
+test_deployment_contract_rejects_secret_value (test_operations.OperationsTests.test_deployment_contract_rejects_secret_value) ... ok
+test_environment_parity (test_operations.OperationsTests.test_environment_parity) ... ok
+test_evidence_catalog_rejects_symlink (test_operations.OperationsTests.test_evidence_catalog_rejects_symlink) ... ok
+test_final_gate (test_operations.OperationsTests.test_final_gate) ... ok
+test_final_gate_fails_missing (test_operations.OperationsTests.test_final_gate_fails_missing) ... ok
+test_observability_rejects_secret_log_field (test_operations.OperationsTests.test_observability_rejects_secret_log_field) ... ok
+test_soak_thresholds (test_operations.OperationsTests.test_soak_thresholds) ... ok
+test_tabletop (test_operations.OperationsTests.test_tabletop) ... ok
+test_upgrade_and_rollback (test_operations.OperationsTests.test_upgrade_and_rollback) ... ok
+test_upgrade_rejects_missing_rollback (test_operations.OperationsTests.test_upgrade_rejects_missing_rollback) ... ok
+test_exception_rejects_owner_approval (test_promotion.PromotionTests.test_exception_rejects_owner_approval) ... ok
+test_exception_validate (test_promotion.PromotionTests.test_exception_validate) ... ok
+test_external_evidence_intake_passes_real_fresh_files (test_promotion.PromotionTests.test_external_evidence_intake_passes_real_fresh_files) ... ok
+test_external_evidence_rejects_digest_change (test_promotion.PromotionTests.test_external_evidence_rejects_digest_change) ... ok
+test_external_evidence_rejects_stale (test_promotion.PromotionTests.test_external_evidence_rejects_stale) ... ok
+test_external_evidence_rejects_synthetic (test_promotion.PromotionTests.test_external_evidence_rejects_synthetic) ... ok
+test_launch_checklist (test_promotion.PromotionTests.test_launch_checklist) ... ok
+test_oidc_claims_verify (test_promotion.PromotionTests.test_oidc_claims_verify) ... ok
+test_oidc_rejects_unprotected_ref (test_promotion.PromotionTests.test_oidc_rejects_unprotected_ref) ... ok
+test_postdeploy_health (test_promotion.PromotionTests.test_postdeploy_health) ... ok
+test_promotion_bundle_deterministic_and_verifiable (test_promotion.PromotionTests.test_promotion_bundle_deterministic_and_verifiable) ... ok
+test_promotion_bundle_rejects_traversal (test_promotion.PromotionTests.test_promotion_bundle_rejects_traversal) ... ok
+test_promotion_evaluate (test_promotion.PromotionTests.test_promotion_evaluate) ... ok
+test_promotion_rejects_unbound_approval (test_promotion.PromotionTests.test_promotion_rejects_unbound_approval) ... ok
+test_release_metadata (test_promotion.PromotionTests.test_release_metadata) ... ok
+test_rollback_continue_and_trigger (test_promotion.PromotionTests.test_rollback_continue_and_trigger) ... ok
+test_transparency_chain_and_tamper_detection (test_promotion.PromotionTests.test_transparency_chain_and_tamper_detection) ... ok
+test_transparency_rejects_duplicate_record (test_promotion.PromotionTests.test_transparency_rejects_duplicate_record) ... ok
+
+----------------------------------------------------------------------
+Ran 94 tests in 0.780s
+
+OK
+== shell syntax ==
+== JSON parse ==
+config/alert-routing-policy.json
+config/capacity-policy.json
+config/change-control-policy.json
+config/cli-ui-policy.json
+config/closure-policy.json
+config/compatibility-policy.json
+config/credential-readiness-policy.json
+config/data-governance-policy.json
+config/deployment-contract.json
+config/dr-evidence-policy.json
+config/environment-parity-policy.json
+config/evidence-freshness-policy.json
+config/external-evidence-policy.json
+config/final-production-gate-policy.json
+config/hosted-identity-policy.json
+config/incident-tabletop-policy.json
+config/license-policy.json
+config/load-soak-policy.json
+config/observability-contract.json
+config/observability-policy.json
+config/operational-signoff-policy.json
+config/postdeploy-policy.json
+config/production-launch-policy.json
+config/production-readiness-policy.external.json
+config/production-readiness-policy.json
+config/promotion-policy.json
+config/release-approval-policy.json
+config/risk-exception-policy.json
+config/rollback-decision-policy.json
+config/rollback-exercise-policy.json
+config/security-review-policy.json
+config/slo-policy.json
+config/smoke-test-policy.json
+config/soak-policy.json
+examples/alert-routing.example.json
+examples/archive-expectations.example.json
+examples/capacity-test.example.json
+examples/certification-campaign.example.json
+examples/change-control.example.json
+examples/compatibility-matrix.example.json
+examples/credential-readiness.example.json
+examples/dr-evidence.example.json
+examples/evidence-freshness.example.json
+examples/external-evidence-specification.example.json
+examples/hosted-oidc-claims.example.json
+examples/incident-tabletop.example.json
+examples/load-soak.example.json
+examples/operational-signoff.example.json
+examples/postdeploy-health.example.json
+examples/promotion-bundle-specification.example.json
+examples/release-approvals.example.json
+examples/risk-exception.example.json
+examples/rollback-exercise.example.json
+examples/rollback-readiness.example.json
+examples/security-review.example.json
+examples/slo-metrics.example.json
+examples/smoke-test.example.json
+examples/soak-test.example.json
+examples/upgrade-plan.example.json
+schemas/external-evidence-specification.schema.json
+schemas/production-completion-decision.schema.json
+schemas/production-promotion-decision.schema.json
+schemas/transparency-ledger.schema.json
+== workflow YAML parse ==
+.github/workflows/operational-assurance.yml
+.github/workflows/production-assurance.yml
+.github/workflows/production-closure.yml
+.github/workflows/production-launch.yml
+.github/workflows/release-promotion.yml
+.github/workflows/release.yml
+== strict production policy rejects example evidence ==
+expected blocked result
+== secret scan ==
+{
+  "clean": true,
+  "finding_count": 0,
+  "findings": [],
+  "scanned_text_files": 224
+}
+== license policy ==
+{
+  "approved": true,
+  "checks": {
+    "module_denylist_clear": true,
+    "repository_license_allowed": true,
+    "repository_license_present": true
+  },
+  "denied_modules": [],
+  "dependencies": [],
+  "dependency_count": 0,
+  "license_file": "LICENSE",
+  "repository_license": "MIT"
+}
+== SLO policy ==
+{
+  "approved": true,
+  "checks": [
+    {
+      "actual": 0.9995,
+      "metric": "availability",
+      "operator": ">=",
+      "passed": true,
+      "threshold": 0.999
+    },
+    {
+      "actual": 175.0,
+      "metric": "p95_latency_ms",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 250.0
+    },
+    {
+      "actual": 0.0004,
+      "metric": "error_rate",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.001
+    },
+    {
+      "actual": 0.0,
+      "metric": "unknown_outcomes",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.0
+    },
+    {
+      "actual": 120.0,
+      "metric": "restore_rpo_seconds",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 300.0
+    },
+    {
+      "actual": 480.0,
+      "metric": "restore_rto_seconds",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 900.0
+    }
+  ]
+}
+== recovery drill ==
+{
+  "archive_sha256": "6458dc008f5cae820eed64ae30f5ba5393baa9c7ed23d2f6b85f98e87f285f5e",
+  "manifest_digest": "7567685493989cce41e5a7e73e827ce8bb9ad3efa099dabd5d3adde5f414ce5d",
+  "passed": true,
+  "restored_file_count": 2
+}
+== chaos checks ==
+{
+  "checks": [
+    {
+      "id": "interrupted_atomic_write",
+      "passed": true
+    },
+    {
+      "id": "post_manifest_mutation",
+      "passed": true
+    },
+    {
+      "id": "symlink_source_rejection",
+      "passed": true
+    },
+    {
+      "id": "archive_traversal_rejection",
+      "passed": true
+    },
+    {
+      "id": "corrupt_backup_rejection",
+      "passed": true
+    }
+  ],
+  "passed": true
+}
+== readiness ==
+{
+  "approved": true,
+  "check_count": 31,
+  "checks": [
+    {
+      "detail": "LICENSE",
+      "id": "required_file:LICENSE",
+      "passed": true
+    },
+    {
+      "detail": "README.md",
+      "id": "required_file:README.md",
+      "passed": true
+    },
+    {
+      "detail": "SECURITY.md",
+      "id": "required_file:SECURITY.md",
+      "passed": true
+    },
+    {
+      "detail": "config/deployment-contract.json",
+      "id": "required_file:config/deployment-contract.json",
+      "passed": true
+    },
+    {
+      "detail": "config/external-evidence-policy.json",
+      "id": "required_file:config/external-evidence-policy.json",
+      "passed": true
+    },
+    {
+      "detail": "config/final-production-gate-policy.json",
+      "id": "required_file:config/final-production-gate-policy.json",
+      "passed": true
+    },
+    {
+      "detail": "config/hosted-identity-policy.json",
+      "id": "required_file:config/hosted-identity-policy.json",
+      "passed": true
+    },
+    {
+      "detail": "config/postdeploy-policy.json",
+      "id": "required_file:config/postdeploy-policy.json",
+      "passed": true
+    },
+    {
+      "detail": "config/promotion-policy.json",
+      "id": "required_file:config/promotion-policy.json",
+      "passed": true
+    },
+    {
+      "detail": "config/rollback-decision-policy.json",
+      "id": "required_file:config/rollback-decision-policy.json",
+      "passed": true
+    },
+    {
+      "detail": "docs/EXTERNAL_CERTIFICATION_INTAKE.md",
+      "id": "required_file:docs/EXTERNAL_CERTIFICATION_INTAKE.md",
+      "passed": true
+    },
+    {
+      "detail": "docs/OPERATIONAL_EVIDENCE.md",
+      "id": "required_file:docs/OPERATIONAL_EVIDENCE.md",
+      "passed": true
+    },
+    {
+      "detail": "docs/POST_DEPLOYMENT_AND_ROLLBACK.md",
+      "id": "required_file:docs/POST_DEPLOYMENT_AND_ROLLBACK.md",
+      "passed": true
+    },
+    {
+      "detail": "docs/PRODUCTION_LAUNCH.md",
+      "id": "required_file:docs/PRODUCTION_LAUNCH.md",
+      "passed": true
+    },
+    {
+      "detail": "docs/PRODUCTION_RUNBOOK.md",
+      "id": "required_file:docs/PRODUCTION_RUNBOOK.md",
+      "passed": true
+    },
+    {
+      "detail": "docs/RELEASE_PROMOTION.md",
+      "id": "required_file:docs/RELEASE_PROMOTION.md",
+      "passed": true
+    },
+    {
+      "detail": "docs/THREAT_MODEL.md",
+      "id": "required_file:docs/THREAT_MODEL.md",
+      "passed": true
+    },
+    {
+      "detail": "scripts/operations-assurance.sh",
+      "id": "required_file:scripts/operations-assurance.sh",
+      "passed": true
+    },
+    {
+      "detail": "scripts/production-launch.sh",
+      "id": "required_file:scripts/production-launch.sh",
+      "passed": true
+    },
+    {
+      "detail": "scripts/release-promotion.sh",
+      "id": "required_file:scripts/release-promotion.sh",
+      "passed": true
+    },
+    {
+      "detail": "tools/futurediff_assurance.py",
+      "id": "required_file:tools/futurediff_assurance.py",
+      "passed": true
+    },
+    {
+      "detail": "tools/futurediff_operations.py",
+      "id": "required_file:tools/futurediff_operations.py",
+      "passed": true
+    },
+    {
+      "detail": "tools/futurediff_promotion.py",
+      "id": "required_file:tools/futurediff_promotion.py",
+      "passed": true
+    },
+    {
+      "detail": "docs",
+      "id": "required_directory:docs",
+      "passed": true
+    },
+    {
+      "detail": "schemas",
+      "id": "required_directory:schemas",
+      "passed": true
+    },
+    {
+      "detail": "scripts",
+      "id": "required_directory:scripts",
+      "passed": true
+    },
+    {
+      "detail": "tests",
+      "id": "required_directory:tests",
+      "passed": true
+    },
+    {
+      "detail": "tools",
+      "id": "required_directory:tools",
+      "passed": true
+    },
+    {
+      "detail": "findings=0",
+      "id": "secret_scan",
+      "passed": true
+    },
+    {
+      "detail": "license=MIT dependencies=0",
+      "id": "license_policy",
+      "passed": true
+    },
+    {
+      "detail": "exit=0 duration_ms=1434",
+      "id": "command:python3 -m unittest discover -s tests -p test_*.py",
+      "passed": true
+    }
+  ],
+  "command_results": [
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_*.py"
+      ],
+      "duration_ms": 1434,
+      "exit_code": 0,
+      "passed": true,
+      "stderr_sha256": "5145305d6f155c27ca4fabbd4e469351d8405440f1882daa2217fba189a3a4e3",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "evaluated_at": "2026-07-28T09:06:43Z",
+  "external_evidence": {
+    "missing": [],
+    "required": [],
+    "satisfied": []
+  },
+  "failed_count": 0,
+  "format_version": "1.0",
+  "license_scan": {
+    "approved": true,
+    "checks": {
+      "module_denylist_clear": true,
+      "repository_license_allowed": true,
+      "repository_license_present": true
+    },
+    "denied_modules": [],
+    "dependencies": [],
+    "dependency_count": 0,
+    "license_file": "LICENSE",
+    "repository_license": "MIT"
+  },
+  "passed_count": 31,
+  "secret_scan": {
+    "clean": true,
+    "finding_count": 0,
+    "findings": [],
+    "scanned_text_files": 224
+  }
+}
+== operational assurance ==
+OPERATIONAL ASSURANCE PASS
+== clean CLI UI ==
+CLI UI JSON clean
+== package manifest ==
+.github/workflows/operational-assurance.yml: OK
+.github/workflows/production-assurance.yml: OK
+.github/workflows/production-closure.yml: OK
+.github/workflows/production-launch.yml: OK
+.github/workflows/release-promotion.yml: OK
+.github/workflows/release.yml: OK
+CONTRIBUTING.md: OK
+FutureDiff_Architecture_v12.5_Overlay.md: OK
+FutureDiff_Architecture_v14.0_Overlay.md: OK
+FutureDiff_Architecture_v15.5_Overlay.md: OK
+FutureDiff_Architecture_v17.0_Overlay.md: OK
+FutureDiff_Architecture_v18.0_Overlay.md: OK
+FutureDiff_Master_Status_v1.25.0_Overlay.md: OK
+FutureDiff_Master_Status_v1.40.0_Overlay.md: OK
+FutureDiff_Master_Status_v1.55.0_Overlay.md: OK
+FutureDiff_Master_Status_v1.70.0_Overlay.md: OK
+FutureDiff_Master_Status_v1.80.0_Overlay.md: OK
+FutureDiff_Progress_Audit_Task_125.md: OK
+FutureDiff_Progress_Audit_Task_140.md: OK
+FutureDiff_Progress_Audit_Task_155.md: OK
+FutureDiff_Progress_Audit_Task_170.md: OK
+FutureDiff_Progress_Audit_Task_180.md: OK
+FutureDiff_Tasks_111_125_Validation.md: OK
+FutureDiff_Tasks_111_140_Validation.md: OK
+FutureDiff_Tasks_111_155_Validation.md: OK
+FutureDiff_Tasks_111_170_Closure_Run.txt: OK
+FutureDiff_Tasks_111_170_Installer_Validation.txt: OK
+FutureDiff_Tasks_111_170_Release_Candidate.txt: OK
+FutureDiff_Tasks_111_170_Validation.md: OK
+FutureDiff_Tasks_111_170_Validation.txt: OK
+LICENSE: OK
+README.md: OK
+SECURITY.md: OK
+completions/_futurediff-ui: OK
+completions/futurediff-ui.bash: OK
+completions/futurediff-ui.fish: OK
+config/alert-routing-policy.json: OK
+config/capacity-policy.json: OK
+config/change-control-policy.json: OK
+config/cli-ui-policy.json: OK
+config/closure-policy.json: OK
+config/compatibility-policy.json: OK
+config/credential-readiness-policy.json: OK
+config/data-governance-policy.json: OK
+config/deployment-contract.json: OK
+config/dr-evidence-policy.json: OK
+config/environment-parity-policy.json: OK
+config/evidence-freshness-policy.json: OK
+config/external-evidence-policy.json: OK
+config/final-production-gate-policy.json: OK
+config/hosted-identity-policy.json: OK
+config/incident-tabletop-policy.json: OK
+config/license-policy.json: OK
+config/load-soak-policy.json: OK
+config/observability-contract.json: OK
+config/observability-policy.json: OK
+config/operational-signoff-policy.json: OK
+config/postdeploy-policy.json: OK
+config/production-launch-policy.json: OK
+config/production-readiness-policy.external.json: OK
+config/production-readiness-policy.json: OK
+config/promotion-policy.json: OK
+config/release-approval-policy.json: OK
+config/risk-exception-policy.json: OK
+config/rollback-decision-policy.json: OK
+config/rollback-exercise-policy.json: OK
+config/security-review-policy.json: OK
+config/slo-policy.json: OK
+config/smoke-test-policy.json: OK
+config/soak-policy.json: OK
+docs/CAPACITY_AND_SOAK.md: OK
+docs/CLI_TERMINAL_UI.md: OK
+docs/DATA_GOVERNANCE.md: OK
+docs/DEPLOYMENT_CONTRACT.md: OK
+docs/DISASTER_RECOVERY.md: OK
+docs/EXTERNAL_CERTIFICATION_INTAKE.md: OK
+docs/GITHUB_PUSH_GUIDE.md: OK
+docs/INCIDENT_AND_RELEASE_GOVERNANCE.md: OK
+docs/OBSERVABILITY_AND_ALERTING.md: OK
+docs/OPERATIONAL_EVIDENCE.md: OK
+docs/POST_DEPLOYMENT_AND_ROLLBACK.md: OK
+docs/PRODUCTION_CLOSURE.md: OK
+docs/PRODUCTION_LAUNCH.md: OK
+docs/PRODUCTION_RUNBOOK.md: OK
+docs/RELEASE_PROMOTION.md: OK
+docs/SLO.md: OK
+docs/THREAT_MODEL.md: OK
+docs/TRANSPARENCY_AND_EXCEPTIONS.md: OK
+docs/UPGRADE_AND_ROLLBACK.md: OK
+docs/WHAT_REMAINS_BEFORE_PRODUCTION.md: OK
+docs/tasks/FutureDiff_Task_111_Documentation.md: OK
+docs/tasks/FutureDiff_Task_112_Documentation.md: OK
+docs/tasks/FutureDiff_Task_113_Documentation.md: OK
+docs/tasks/FutureDiff_Task_114_Documentation.md: OK
+docs/tasks/FutureDiff_Task_115_Documentation.md: OK
+docs/tasks/FutureDiff_Task_116_Documentation.md: OK
+docs/tasks/FutureDiff_Task_117_Documentation.md: OK
+docs/tasks/FutureDiff_Task_118_Documentation.md: OK
+docs/tasks/FutureDiff_Task_119_Documentation.md: OK
+docs/tasks/FutureDiff_Task_120_Documentation.md: OK
+docs/tasks/FutureDiff_Task_121_Documentation.md: OK
+docs/tasks/FutureDiff_Task_122_Documentation.md: OK
+docs/tasks/FutureDiff_Task_123_Documentation.md: OK
+docs/tasks/FutureDiff_Task_124_Documentation.md: OK
+docs/tasks/FutureDiff_Task_125_Documentation.md: OK
+docs/tasks/FutureDiff_Task_126_Documentation.md: OK
+docs/tasks/FutureDiff_Task_127_Documentation.md: OK
+docs/tasks/FutureDiff_Task_128_Documentation.md: OK
+docs/tasks/FutureDiff_Task_129_Documentation.md: OK
+docs/tasks/FutureDiff_Task_130_Documentation.md: OK
+docs/tasks/FutureDiff_Task_131_Documentation.md: OK
+docs/tasks/FutureDiff_Task_132_Documentation.md: OK
+docs/tasks/FutureDiff_Task_133_Documentation.md: OK
+docs/tasks/FutureDiff_Task_134_Documentation.md: OK
+docs/tasks/FutureDiff_Task_135_Documentation.md: OK
+docs/tasks/FutureDiff_Task_136_Documentation.md: OK
+docs/tasks/FutureDiff_Task_137_Documentation.md: OK
+docs/tasks/FutureDiff_Task_138_Documentation.md: OK
+docs/tasks/FutureDiff_Task_139_Documentation.md: OK
+docs/tasks/FutureDiff_Task_140_Documentation.md: OK
+docs/tasks/FutureDiff_Task_141_Documentation.md: OK
+docs/tasks/FutureDiff_Task_142_Documentation.md: OK
+docs/tasks/FutureDiff_Task_143_Documentation.md: OK
+docs/tasks/FutureDiff_Task_144_Documentation.md: OK
+docs/tasks/FutureDiff_Task_145_Documentation.md: OK
+docs/tasks/FutureDiff_Task_146_Documentation.md: OK
+docs/tasks/FutureDiff_Task_147_Documentation.md: OK
+docs/tasks/FutureDiff_Task_148_Documentation.md: OK
+docs/tasks/FutureDiff_Task_149_Documentation.md: OK
+docs/tasks/FutureDiff_Task_150_Documentation.md: OK
+docs/tasks/FutureDiff_Task_151_Documentation.md: OK
+docs/tasks/FutureDiff_Task_152_Documentation.md: OK
+docs/tasks/FutureDiff_Task_153_Documentation.md: OK
+docs/tasks/FutureDiff_Task_154_Documentation.md: OK
+docs/tasks/FutureDiff_Task_155_Documentation.md: OK
+docs/tasks/FutureDiff_Task_156_Documentation.md: OK
+docs/tasks/FutureDiff_Task_157_Documentation.md: OK
+docs/tasks/FutureDiff_Task_158_Documentation.md: OK
+docs/tasks/FutureDiff_Task_159_Documentation.md: OK
+docs/tasks/FutureDiff_Task_160_Documentation.md: OK
+docs/tasks/FutureDiff_Task_161_Documentation.md: OK
+docs/tasks/FutureDiff_Task_162_Documentation.md: OK
+docs/tasks/FutureDiff_Task_163_Documentation.md: OK
+docs/tasks/FutureDiff_Task_164_Documentation.md: OK
+docs/tasks/FutureDiff_Task_165_Documentation.md: OK
+docs/tasks/FutureDiff_Task_166_Documentation.md: OK
+docs/tasks/FutureDiff_Task_167_Documentation.md: OK
+docs/tasks/FutureDiff_Task_168_Documentation.md: OK
+docs/tasks/FutureDiff_Task_169_Documentation.md: OK
+docs/tasks/FutureDiff_Task_170_Documentation.md: OK
+docs/tasks/FutureDiff_Task_171_Documentation.md: OK
+docs/tasks/FutureDiff_Task_172_Documentation.md: OK
+docs/tasks/FutureDiff_Task_173_Documentation.md: OK
+docs/tasks/FutureDiff_Task_174_Documentation.md: OK
+docs/tasks/FutureDiff_Task_175_Documentation.md: OK
+docs/tasks/FutureDiff_Task_176_Documentation.md: OK
+docs/tasks/FutureDiff_Task_177_Documentation.md: OK
+docs/tasks/FutureDiff_Task_178_Documentation.md: OK
+docs/tasks/FutureDiff_Task_179_Documentation.md: OK
+docs/tasks/FutureDiff_Task_180_Documentation.md: OK
+examples/alert-routing.example.json: OK
+examples/archive-expectations.example.json: OK
+examples/capacity-test.example.json: OK
+examples/certification-campaign.example.json: OK
+examples/change-control.example.json: OK
+examples/compatibility-matrix.example.json: OK
+examples/credential-readiness.example.json: OK
+examples/dr-evidence.example.json: OK
+examples/evidence-freshness.example.json: OK
+examples/external-evidence-specification.example.json: OK
+examples/hosted-oidc-claims.example.json: OK
+examples/incident-tabletop.example.json: OK
+examples/load-soak.example.json: OK
+examples/operational-signoff.example.json: OK
+examples/postdeploy-health.example.json: OK
+examples/promotion-bundle-specification.example.json: OK
+examples/release-approvals.example.json: OK
+examples/risk-exception.example.json: OK
+examples/rollback-exercise.example.json: OK
+examples/rollback-readiness.example.json: OK
+examples/security-review.example.json: OK
+examples/slo-metrics.example.json: OK
+examples/smoke-test.example.json: OK
+examples/soak-test.example.json: OK
+examples/upgrade-plan.example.json: OK
+schemas/external-evidence-specification.schema.json: OK
+schemas/production-completion-decision.schema.json: OK
+schemas/production-promotion-decision.schema.json: OK
+schemas/transparency-ledger.schema.json: OK
+scripts/Assurance.ps1: OK
+scripts/FutureDiff-UI.ps1: OK
+scripts/Operations-Assurance.ps1: OK
+scripts/Production-Closure.ps1: OK
+scripts/Promotion-Assurance.ps1: OK
+scripts/Validate-Overlay.ps1: OK
+scripts/apply-overlay.sh: OK
+scripts/assurance.sh: OK
+scripts/chaos-check.sh: OK
+scripts/final-production-gate.sh: OK
+scripts/futurediff-ui: OK
+scripts/github-attestation-verify.sh: OK
+scripts/operations-assurance.sh: OK
+scripts/production-closure.sh: OK
+scripts/production-launch.sh: OK
+scripts/recovery-drill.sh: OK
+scripts/release-candidate.sh: OK
+scripts/release-promotion.sh: OK
+scripts/sign-release.sh: OK
+scripts/slo-check.sh: OK
+scripts/validate-overlay.sh: OK
+scripts/verify-signature.sh: OK
+tests/test_assurance.py: OK
+tests/test_cli_ui.py: OK
+tests/test_closure.py: OK
+tests/test_operations.py: OK
+tests/test_promotion.py: OK
+tools/futurediff_assurance.py: OK
+tools/futurediff_cli_ui.py: OK
+tools/futurediff_closure.py: OK
+tools/futurediff_operations.py: OK
+tools/futurediff_promotion.py: OK
+VALIDATION PASS

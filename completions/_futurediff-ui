@@ -1,0 +1,2 @@
+#compdef futurediff-ui
+_arguments '1:command:(doctor status config completion help)' '*::arguments:->args'

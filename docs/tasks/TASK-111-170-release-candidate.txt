@@ -1,0 +1,13 @@
+{
+  "approved": true,
+  "archive": "FutureDiff-v1.70.0-source.zip",
+  "archive_sha256": "abafdada75f9b37e7c523cd1fea4618372239114c3917bc38ce2bc60950da950",
+  "chaos_sha256": "5b467ab67ba53f79e617843ac256851eda9c0d34836e3ff650a5a09450ca522f",
+  "name": "FutureDiff",
+  "provenance_sha256": "1067f7ed7ef326f7001a9155e2845519686938ae8041f53f09961b6efedf1e8f",
+  "readiness_sha256": "61db4a95acf2a5fc01a8320f92e1ebb24dc028abe167b6e498bdeec8bf087f8e",
+  "recovery_sha256": "a943aeab50ddb03b6a379ea75a8ba94d2cdcd05de46160eae08e1dc5746d4c46",
+  "sbom_sha256": "f7f575c6398c0c23eef9cbfaa8c5ac0f349d0459305630da7f450943c9c736a7",
+  "source_manifest_digest": "6107e5445d5b8011c66a8a0babbe18dee0487719c5db9a110afe27d1dd1eb775",
+  "version": "v1.70.0"
+}

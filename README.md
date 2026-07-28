@@ -5,10 +5,10 @@ FutureDiff is a transaction and safety layer for AI agents. It stages repository
 ## Current state
 
 - Core transaction baseline: **v0.95.0**
-- Imported assurance/promotion/closure overlay: **through task 170**
+- Imported assurance, closure, and clean CLI UI overlay: **through task 180 / v1.80.0**
 - Local API contract: **v1.1**
 - Commands: **70 Go binaries**
-- Position: **strong local product baseline with production-assurance tooling present**
+- Position: **local product and assurance implementation complete**
 - External production completion: **not yet proven**
 
 ## What it guarantees
@@ -18,9 +18,9 @@ FutureDiff is a transaction and safety layer for AI agents. It stages repository
 - rootless OCI preparation for enforced execution
 - durable GitHub branch, draft PR, and Slack effect release flows
 - idempotent receipts, reconciliation, and crash recovery
-- kernel-authenticated local ownership, sharing, RBAC, and access audit chains
-- tamper-evident evidence, audit, integrity, and retention controls
-- imported promotion, launch, and production-closure assurance workflows
+- kernel-authenticated local ownership, sharing, RBAC, quota, and audit chains
+- tamper-evident evidence, integrity, retention, promotion, launch, and closure controls
+- optional clean terminal wrapper with JSON-safe output, redaction, confirmations, and shell completions
 
 ## Requirements
 
@@ -39,12 +39,8 @@ Enforced mode additionally requires:
 ```bash
 make build
 go test ./...
+go test -race ./...
 bash ./scripts/release.sh
-```
-
-Imported assurance tooling:
-
-```bash
 bash ./scripts/validate-overlay.sh
 python3 -m unittest discover -s tests -p 'test_*.py' -v
 ```
@@ -71,6 +67,15 @@ export FUTUREDIFF_SLACK_TOKEN='test-or-production-token'
 ./bin/futurediff commit <transaction-id> <transaction-digest>
 ```
 
+## Clean terminal UI
+
+```bash
+./scripts/futurediff-ui doctor
+./scripts/futurediff-ui status --status-dir dist/closure
+./scripts/futurediff-ui completion bash
+./scripts/futurediff-ui --json config
+```
+
 ## Production-assurance and closure tooling
 
 ```bash
@@ -89,8 +94,11 @@ These tools are present and locally validated. They do **not** turn placeholder,
 
 ## Key docs
 
-- `docs/progress/MASTER-STATUS-v1.70.0.md`
-- `docs/progress/PROGRESS-AUDIT-TASK-170.md`
+- `docs/progress/MASTER-STATUS-v1.80.0.md`
+- `docs/progress/PROGRESS-AUDIT-TASK-180.md`
+- `docs/CLI_TERMINAL_UI.md`
+- `docs/GITHUB_PUSH_GUIDE.md`
+- `docs/WHAT_REMAINS_BEFORE_PRODUCTION.md`
 - `docs/PRODUCTION_RUNBOOK.md`
 - `docs/RELEASE_PROMOTION.md`
 - `docs/PRODUCTION_LAUNCH.md`
@@ -99,4 +107,4 @@ These tools are present and locally validated. They do **not** turn placeholder,
 
 ## Claims boundary
 
-FutureDiff is a serious local product baseline with imported assurance and closure machinery. It is **not yet externally production-complete** until real provider, runtime, hosted-platform, security-review, load/soak, disaster-recovery, deployment-smoke, rollback, and sign-off evidence all pass.
+FutureDiff is a serious local product baseline with imported assurance, closure, and CLI UI machinery. It is **not yet externally production-complete** until real provider, runtime, hosted-platform, security-review, load/soak, disaster-recovery, deployment-smoke, rollback, and sign-off evidence all pass.

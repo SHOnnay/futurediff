@@ -1,0 +1,22 @@
+{
+  "format_version": "1.0",
+  "kind": "futurediff-cli-ui-policy",
+  "default_color": "auto",
+  "default_unicode": "auto",
+  "json_is_decoration_free": true,
+  "quiet_is_decoration_free": true,
+  "ci_is_non_interactive": true,
+  "respect_no_color": true,
+  "risky_commands_require_confirmation": true,
+  "non_interactive_risky_commands_require_yes": true,
+  "redacted_argument_markers": [
+    "token",
+    "secret",
+    "password",
+    "passwd",
+    "api-key",
+    "api_key",
+    "authorization",
+    "credential"
+  ]
+}

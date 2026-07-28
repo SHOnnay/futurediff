@@ -2,7 +2,7 @@
 
 ## Scope
 
-FutureDiff is a local-first control plane for agent-authored changes. Agents can propose work. FutureDiff stages it, verifies it, binds approval to exact material, and releases persistent effects through trusted paths only.
+FutureDiff is a local-first control plane for agent-authored changes. Agents can propose work. FutureDiff stages it, verifies it, binds approval to exact material, and releases persistent effects through trusted paths only. The clean terminal UI is an optional wrapper over the canonical CLI/API, not a separate authority.
 
 ## Trusted flow
 
@@ -40,31 +40,37 @@ agent intent
 ### Ledger and evidence
 - SQLite-backed durable ledger
 - approvals, attempts, receipts, and audit chains
-- evidence export, integrity checkpoints, retention, and restore tooling
+- evidence export, integrity checkpoints, retention, restore, and closure tooling
 
 ### Local authorization
 - kernel-derived local principal identity
-- transaction ownership, scoped sharing, RBAC, and auditability
+- transaction ownership, scoped sharing, RBAC, quota, and auditability
 - no delegated approval or commit authority through normal agent interfaces
+
+### Interface layer
+- canonical Go daemon and CLI commands
+- optional clean terminal wrapper with JSON-safe passthrough
+- shell completion assets for Bash, Zsh, and Fish
 
 ### Assurance layer
 - supply-chain checks
 - readiness, operations, promotion, launch, and closure policies
-- deterministic Python-based assurance, promotion, and closure toolchains
+- deterministic Python-based assurance, promotion, closure, and CLI UI toolchains
 - machine-readable evidence contracts and workflows
 
 ## Repository shape
 
 ```text
-cmd/        Go daemon and CLI commands
-internal/   transaction, ledger, runtime, policy, and adapter packages
-config/     operational, promotion, and closure policies
-docs/       tasks, runbooks, threat model, progress, and audits
-examples/   non-authoritative policy-conformance examples
-schemas/    machine-readable contracts
-scripts/    build, release, assurance, promotion, and closure entrypoints
-tools/      Python assurance, operations, promotion, and closure tools
-tests/      Python assurance and closure test suites
+cmd/          Go daemon and CLI commands
+internal/     transaction, ledger, runtime, policy, and adapter packages
+config/       operational, promotion, closure, and CLI UI policies
+docs/         tasks, runbooks, threat model, progress, and audits
+examples/     non-authoritative policy-conformance examples
+schemas/      machine-readable contracts
+scripts/      build, release, assurance, promotion, closure, and CLI UI entrypoints
+tools/        Python assurance, operations, promotion, closure, and CLI UI tools
+tests/        Python assurance, closure, and CLI UI test suites
+completions/  shell completion assets for the wrapper
 ```
 
 ## Non-claims
