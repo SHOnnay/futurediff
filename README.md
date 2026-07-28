@@ -108,3 +108,21 @@ These tools are present and locally validated. They do **not** turn placeholder,
 ## Claims boundary
 
 FutureDiff is a serious local product baseline with imported assurance, closure, and CLI UI machinery. It is **not yet externally production-complete** until real provider, runtime, hosted-platform, security-review, load/soak, disaster-recovery, deployment-smoke, rollback, and sign-off evidence all pass.
+
+<!-- FDIF-GUIDED-CLI:START -->
+## Guided CLI: `fdif`
+
+`futurediff` remains the exact scriptable client. `fdif` is the normal human-facing entry point:
+
+```bash
+fdif demo
+cd /path/to/repository
+fdif start
+# edit the displayed isolated workspace
+fdif finish
+```
+
+`fdif` remembers the current transaction, resolves approval material automatically, and guides review, seal, verification, approval, and safe publication. Publication creates `futurediff/<transaction-id>`; it does not silently modify the current source branch.
+
+See `docs/FDIF_GUIDED_CLI.md` and `docs/FDIF_COMMAND_REFERENCE.md`.
+<!-- FDIF-GUIDED-CLI:END -->
