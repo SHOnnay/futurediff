@@ -1,0 +1,31 @@
+FutureDiff Tasks 096-100 validation
+
+gofmt: PASS
+go vet ./...: PASS
+go test ./...: PASS
+go test -race ./...: PASS
+go test -cover ./...: PASS
+Go commands built: 74
+JSON artifacts parsed: 87
+Command inventories: 74/74/74
+Transaction demo: PASS
+Live checkout unchanged: PASS
+Expiring grant HTTP: 200
+Quota rejection HTTP: 409
+Post-expiry grant HTTP: 200
+Expired cleanup candidates: 1
+Expired cleanup deleted: 1
+Apply-disabled cleanup: REJECTED
+Wrong confirmation: REJECTED
+Access chain: PASS
+Tenant inventory redacted: PASS
+Tenant governance: 15 PASS / 0 FAIL
+Release packaged binaries: 74
+Release SHA256SUMS entries: 76
+Release verification: 79 PASS / 0 FAIL / 1 SKIP
+SPDX 2.3 SBOM: PASS
+SLSA/in-toto provenance: PASS
+Release archive SHA-256: PASS
+Source ZIP integrity: PASS
+Full bundle ZIP integrity: PASS
+Bundle internal SHA-256 manifest: PASS
