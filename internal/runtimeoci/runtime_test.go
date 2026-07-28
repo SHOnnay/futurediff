@@ -30,6 +30,9 @@ func TestBuildPlanContainsEnforcedControls(t *testing.T) {
 			t.Fatalf("missing %q in %s", expected, joined)
 		}
 	}
+	if strings.Contains(joined, ",dst=/workspace,rw") {
+		t.Fatalf("docker mount syntax still uses invalid rw flag: %s", joined)
+	}
 }
 
 func TestPolicyRejectsWeakenedBoundary(t *testing.T) {

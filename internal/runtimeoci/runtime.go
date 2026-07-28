@@ -242,7 +242,7 @@ func BuildPlan(backend Backend, workspace string, command []string, policy Polic
 	if strings.ContainsAny(workspace, ",\n\r") {
 		return Plan{}, errors.New("workspace path is not safe for OCI mount syntax")
 	}
-	args := []string{"run", "--rm", "--init", "--pull=never", "--read-only", "--network", "none", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--pids-limit", strconv.Itoa(policy.PIDs), "--memory", policy.Memory, "--cpus", policy.CPUs, "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=" + policy.TmpfsSize, "--mount", "type=bind,src=" + workspace + ",dst=/workspace,rw", "--workdir", "/workspace"}
+	args := []string{"run", "--rm", "--init", "--pull=never", "--read-only", "--network", "none", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--pids-limit", strconv.Itoa(policy.PIDs), "--memory", policy.Memory, "--cpus", policy.CPUs, "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=" + policy.TmpfsSize, "--mount", "type=bind,src=" + workspace + ",dst=/workspace", "--workdir", "/workspace"}
 	if backend.Kind == Podman {
 		args = append(args, "--userns", "keep-id", "--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()))
 	} else {
