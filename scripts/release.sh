@@ -12,9 +12,7 @@ OUT="${OUT:-dist/futurediff-${VERSION}-linux-amd64}"
 rm -rf "$OUT"
 mkdir -p "$OUT"
 LDFLAGS="-s -w -X github.com/SHOnnay/futurediff/internal/buildinfo.Version=${VERSION} -X github.com/SHOnnay/futurediff/internal/buildinfo.Commit=${COMMIT} -X github.com/SHOnnay/futurediff/internal/buildinfo.Date=${DATE} -X github.com/SHOnnay/futurediff/internal/buildinfo.Dirty=${DIRTY}"
-for cmd in futurediff futurediffd futurediff-mcp futurediff-certify futurediff-bench futurediff-sbom futurediff-admin futurediff-demo futurediff-integrate futurediff-provenance futurediff-cert-suite futurediff-install futurediff-platform futurediff-agent-bench futurediff-verify-release futurediff-provider-cert futurediff-audit futurediff-prune futurediff-doctor futurediff-api-contract futurediff-export futurediff-restore futurediff-replay futurediff-config-lint futurediff-api-diff futurediff-effectspec futurediff-policy-explain futurediff-recovery-drill futurediff-metrics futurediff-support-bundle futurediff-approval futurediff-policy-bundle futurediff-diff futurediff-upgrade-rehearsal futurediff-compat futurediff-maintenance futurediff-evidence futurediff-timeline futurediff-threat-test futurediff-config-snapshot futurediff-approval-quorum futurediff-incident futurediff-drain futurediff-operator-receipt futurediff-retention-policy futurediff-effect-graph futurediff-slo futurediff-readiness futurediff-secret-scan futurediff-quota futurediff-api-audit futurediff-daemon-lock futurediff-rate-policy futurediff-config-sign futurediff-root-audit futurediff-ledger-maintain futurediff-integrity-checkpoint futurediff-lease-cleanup futurediff-repository-policy futurediff-expire futurediff-idempotency-gc futurediff-storage-check futurediff-openapi futurediff-backup-catalog; do
-  go build -trimpath -ldflags "$LDFLAGS" -o "$OUT/$cmd" "./cmd/$cmd"
-done
+go build -trimpath -ldflags "$LDFLAGS" -o "$OUT/" ./cmd/...
 cp README.md ARCHITECTURE.md "$OUT/"
 "$OUT/futurediff-sbom" --root . --output "$OUT/futurediff.spdx.json" --files=true
 PROV_ARGS=()

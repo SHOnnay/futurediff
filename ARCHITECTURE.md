@@ -1,9 +1,8 @@
-# FutureDiff System Architecture v6.0
+# FutureDiff Architecture
 
-**Status:** Canonical Go architecture after Tasks 056–060
-**Date:** 2026-07-27  
-**Scope:** Transactional effects, multi-operator approvals, rotating encrypted evidence, incident reconstruction, and bounded daemon lifecycle
-**UI:** Intentionally deferred; future visual direction remains black, matte black, graphite, and gray
+**Status:** Canonical repository architecture
+**Scope:** Transaction staging, authorization, verification, controlled effect release, and operational assurance
+**UI:** Deferred; not part of the current production claim
 
 ## 1. Mission
 

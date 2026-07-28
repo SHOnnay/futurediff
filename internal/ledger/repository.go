@@ -125,13 +125,16 @@ func (r *Repository) Create(input CreateInput) (domain.Transaction, error) {
 	t := input.Transaction
 	t.CreatedAt = now
 	t.UpdatedAt = now
+	if t.OwnerPrincipalID == "" {
+		t.OwnerPrincipalID = "local:operator"
+	}
 	t.ProtocolVersion = "0.1"
 	t.Status = domain.StateActive
 	t.Revision = 1
 	w := input.Workspace
 	w.CreatedAt = now
 	err := r.db.WithTx(func(tx *Tx) error {
-		_, err := tx.Exec(`INSERT INTO transactions(transaction_id,protocol_version,mode,agent_adapter,agent_session_id,workspace_identity,base_revision,status,policy_version,revision,material_revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`, t.ID, t.ProtocolVersion, t.Mode, nullString(t.AgentAdapter), nullString(t.AgentSessionID), w.WorkspacePath, w.BaseOID, string(t.Status), t.PolicyVersion, t.Revision, t.MaterialRevision, ts(now), ts(now))
+		_, err := tx.Exec(`INSERT INTO transactions(transaction_id,owner_principal_id,protocol_version,mode,agent_adapter,agent_session_id,workspace_identity,base_revision,status,policy_version,revision,material_revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, t.ID, t.OwnerPrincipalID, t.ProtocolVersion, t.Mode, nullString(t.AgentAdapter), nullString(t.AgentSessionID), w.WorkspacePath, w.BaseOID, string(t.Status), t.PolicyVersion, t.Revision, t.MaterialRevision, ts(now), ts(now))
 		if err != nil {
 			return err
 		}
@@ -139,7 +142,10 @@ func (r *Repository) Create(input CreateInput) (domain.Transaction, error) {
 		if err != nil {
 			return err
 		}
-		if err := appendEvent(tx, t.ID, "transaction.created", map[string]any{"state": "created", "mode": t.Mode}, now); err != nil {
+		if err := appendEvent(tx, t.ID, "transaction.created", map[string]any{"state": "created", "mode": t.Mode, "owner_principal_id": t.OwnerPrincipalID}, now); err != nil {
+			return err
+		}
+		if err := appendTransactionAccessEvent(tx, t.ID, t.OwnerPrincipalID, t.OwnerPrincipalID, "created", AccessAdmin, "", now); err != nil {
 			return err
 		}
 		return appendEvent(tx, t.ID, "transaction.activated", map[string]any{"from": "created", "to": "active", "revision": 1}, now)
@@ -509,7 +515,7 @@ func transactionFromRow(row Row) (domain.Transaction, error) {
 		}
 		sealed = &v
 	}
-	return domain.Transaction{ID: String(row, "transaction_id"), ProtocolVersion: String(row, "protocol_version"), Mode: String(row, "mode"), AgentAdapter: String(row, "agent_adapter"), AgentSessionID: String(row, "agent_session_id"), WorkspaceIdentity: String(row, "workspace_identity"), BaseRevision: String(row, "base_revision"), Status: domain.TransactionState(String(row, "status")), PolicyVersion: String(row, "policy_version"), Revision: Int64(row, "revision"), MaterialRevision: Int64(row, "material_revision"), ApprovalDigest: String(row, "approval_digest"), CreatedAt: created, SealedAt: sealed, UpdatedAt: updated}, nil
+	return domain.Transaction{ID: String(row, "transaction_id"), OwnerPrincipalID: String(row, "owner_principal_id"), ProtocolVersion: String(row, "protocol_version"), Mode: String(row, "mode"), AgentAdapter: String(row, "agent_adapter"), AgentSessionID: String(row, "agent_session_id"), WorkspaceIdentity: String(row, "workspace_identity"), BaseRevision: String(row, "base_revision"), Status: domain.TransactionState(String(row, "status")), PolicyVersion: String(row, "policy_version"), Revision: Int64(row, "revision"), MaterialRevision: Int64(row, "material_revision"), ApprovalDigest: String(row, "approval_digest"), CreatedAt: created, SealedAt: sealed, UpdatedAt: updated}, nil
 }
 func workspaceFromRow(row Row) (domain.Workspace, error) {
 	created, err := parseTime(String(row, "created_at"))

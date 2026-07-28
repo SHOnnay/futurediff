@@ -3,22 +3,54 @@
   "$id": "https://futurediff.dev/schemas/api/local-api-contract.schema.json",
   "title": "FutureDiff Local API Contract",
   "type": "object",
-  "required": ["version", "transport", "endpoints", "digest"],
+  "required": [
+    "version",
+    "transport",
+    "endpoints",
+    "digest"
+  ],
   "properties": {
-    "version": {"const": "1.0"},
-    "transport": {"const": "unix-http"},
-    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "version": {
+      "const": "1.1"
+    },
+    "transport": {
+      "const": "unix-http"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
     "endpoints": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["method", "path", "operation_id", "agent_safe"],
+        "required": [
+          "method",
+          "path",
+          "operation_id",
+          "agent_safe"
+        ],
         "properties": {
-          "method": {"enum": ["GET", "POST"]},
-          "path": {"type": "string", "pattern": "^/v1/"},
-          "operation_id": {"type": "string", "minLength": 1},
-          "agent_safe": {"type": "boolean"}
+          "method": {
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "DELETE"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^/v1/"
+          },
+          "operation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "agent_safe": {
+            "type": "boolean"
+          }
         },
         "additionalProperties": false
       }

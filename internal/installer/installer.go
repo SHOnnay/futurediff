@@ -37,6 +37,8 @@ var DefaultBinaries = []string{
 	"futurediff-daemon-lock", "futurediff-rate-policy", "futurediff-config-sign", "futurediff-root-audit",
 	"futurediff-ledger-maintain", "futurediff-integrity-checkpoint", "futurediff-lease-cleanup", "futurediff-repository-policy",
 	"futurediff-expire", "futurediff-idempotency-gc", "futurediff-storage-check", "futurediff-openapi", "futurediff-backup-catalog",
+	"futurediff-authz", "futurediff-capability", "futurediff-authz-audit", "futurediff-authz-conformance",
+	"futurediff-access-audit", "futurediff-tenant-conformance",
 }
 
 type Options struct {
@@ -57,6 +59,8 @@ type Options struct {
 	RatePolicy             string      `json:"rate_policy,omitempty"`
 	RepositoryPolicy       string      `json:"repository_policy,omitempty"`
 	StoragePolicy          string      `json:"storage_policy,omitempty"`
+	AuthorizationPolicy    string      `json:"authorization_policy,omitempty"`
+	CapabilityKeyring      string      `json:"capability_keyring,omitempty"`
 	ConfigSigningKeyring   string      `json:"config_signing_keyring,omitempty"`
 	RequireSignedConfigs   bool        `json:"require_signed_configs,omitempty"`
 	AllowedPeerUIDs        string      `json:"allowed_peer_uids,omitempty"`
@@ -144,6 +148,15 @@ func (o Options) Normalize() (Options, error) {
 	}
 	if o.StoragePolicy != "" && !filepath.IsAbs(o.StoragePolicy) {
 		return o, errors.New("storage policy must be an absolute path")
+	}
+	if o.AuthorizationPolicy != "" && !filepath.IsAbs(o.AuthorizationPolicy) {
+		return o, errors.New("authorization policy must be an absolute path")
+	}
+	if o.CapabilityKeyring != "" && !filepath.IsAbs(o.CapabilityKeyring) {
+		return o, errors.New("capability keyring must be an absolute path")
+	}
+	if o.CapabilityKeyring != "" && o.AuthorizationPolicy == "" {
+		return o, errors.New("capability keyring requires an authorization policy")
 	}
 	if o.ConfigSigningKeyring != "" && !filepath.IsAbs(o.ConfigSigningKeyring) {
 		return o, errors.New("configuration signing keyring must be an absolute path")
@@ -313,6 +326,12 @@ func daemonArgs(o Options) []string {
 	}
 	if o.StoragePolicy != "" {
 		args = append(args, "--storage-policy", o.StoragePolicy)
+	}
+	if o.AuthorizationPolicy != "" {
+		args = append(args, "--authorization-policy", o.AuthorizationPolicy)
+	}
+	if o.CapabilityKeyring != "" {
+		args = append(args, "--capability-keyring", o.CapabilityKeyring)
 	}
 	if o.ConfigSigningKeyring != "" {
 		args = append(args, "--config-signing-keyring", o.ConfigSigningKeyring)

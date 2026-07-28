@@ -24,17 +24,21 @@ func NewClient(socket string) *Client {
 	return &Client{SocketPath: socket, HTTP: &http.Client{Transport: tr, Timeout: 30 * time.Second}}
 }
 func (c *Client) Do(method, path string, body any) (json.RawMessage, error) {
-	return c.do(method, path, body, "")
+	return c.do(method, path, body, "", nil)
+}
+
+func (c *Client) DoWithHeaders(method, path string, body any, headers map[string]string) (json.RawMessage, error) {
+	return c.do(method, path, body, "", headers)
 }
 
 func (c *Client) DoIdempotent(method, path string, body any, idempotencyKey string) (json.RawMessage, error) {
 	if idempotencyKey == "" {
 		return nil, fmt.Errorf("idempotency key is required")
 	}
-	return c.do(method, path, body, idempotencyKey)
+	return c.do(method, path, body, idempotencyKey, nil)
 }
 
-func (c *Client) do(method, path string, body any, idempotencyKey string) (json.RawMessage, error) {
+func (c *Client) do(method, path string, body any, idempotencyKey string, headers map[string]string) (json.RawMessage, error) {
 	var reader io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
@@ -52,6 +56,11 @@ func (c *Client) do(method, path string, body any, idempotencyKey string) (json.
 	}
 	if idempotencyKey != "" {
 		req.Header.Set("Idempotency-Key", idempotencyKey)
+	}
+	for key, value := range headers {
+		if key != "" && value != "" {
+			req.Header.Set(key, value)
+		}
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {

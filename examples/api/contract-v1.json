@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "transport": "unix-http",
   "endpoints": [
     {
@@ -12,6 +12,18 @@
       "method": "GET",
       "path": "/v1/health",
       "operation_id": "health",
+      "agent_safe": true
+    },
+    {
+      "method": "GET",
+      "path": "/v1/openapi",
+      "operation_id": "openapi",
+      "agent_safe": true
+    },
+    {
+      "method": "GET",
+      "path": "/v1/transactions",
+      "operation_id": "transaction_list",
       "agent_safe": true
     },
     {
@@ -30,6 +42,24 @@
       "method": "POST",
       "path": "/v1/transactions/{id}/abort",
       "operation_id": "transaction_abort",
+      "agent_safe": false
+    },
+    {
+      "method": "GET",
+      "path": "/v1/transactions/{id}/access",
+      "operation_id": "transaction_access_list",
+      "agent_safe": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/transactions/{id}/access/{principalID}",
+      "operation_id": "transaction_access_revoke",
+      "agent_safe": false
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/transactions/{id}/access/{principalID}",
+      "operation_id": "transaction_access_grant",
       "agent_safe": false
     },
     {
@@ -111,5 +141,5 @@
       "agent_safe": true
     }
   ],
-  "digest": "aeb5b6a53e1e20ff25921a01bcd19768ac2c49e5d3dd2a61c531544e47d98b3b"
+  "digest": "cf8fb83c66d12c90b0d0f6a9853a749b85ab314c5a0440d3aeda2d9bb662567a"
 }

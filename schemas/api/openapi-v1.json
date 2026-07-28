@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "FutureDiff Local API",
-    "version": "1.0",
+    "version": "1.1",
     "description": "Private Unix-socket HTTP API. Agent-safe authority is declared per operation."
   },
   "paths": {
@@ -61,6 +61,22 @@
       }
     },
     "/v1/transactions": {
+      "get": {
+        "operationId": "transaction_list",
+        "summary": "transaction list",
+        "x-futurediff-agent-safe": true,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        }
+      },
       "post": {
         "operationId": "transaction_create",
         "summary": "transaction create",
@@ -110,6 +126,78 @@
       "post": {
         "operationId": "transaction_abort",
         "summary": "transaction abort",
+        "x-futurediff-agent-safe": false,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/v1/transactions/{id}/access": {
+      "get": {
+        "operationId": "transaction_access_list",
+        "summary": "transaction access list",
+        "x-futurediff-agent-safe": false,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        }
+      }
+    },
+    "/v1/transactions/{id}/access/{principalID}": {
+      "delete": {
+        "operationId": "transaction_access_revoke",
+        "summary": "transaction access revoke",
+        "x-futurediff-agent-safe": false,
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "4XX": {
+            "description": "Request rejected"
+          },
+          "5XX": {
+            "description": "Server or policy failure"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        }
+      },
+      "put": {
+        "operationId": "transaction_access_grant",
+        "summary": "transaction access grant",
         "x-futurediff-agent-safe": false,
         "responses": {
           "200": {
@@ -469,7 +557,7 @@
       }
     }
   },
-  "x-futurediff-contract-digest": "7ae2089c14e5e8f3fb92cd5578771e36926c01ec1ea7e8ae79d3a662bf61ed78",
+  "x-futurediff-contract-digest": "cf8fb83c66d12c90b0d0f6a9853a749b85ab314c5a0440d3aeda2d9bb662567a",
   "x-futurediff-spec-version": "0.1",
-  "x-futurediff-spec-digest": "98d32beb8919e503357fa95e90c45019950a0110b851c3b12e32d91e9cb365cc"
+  "x-futurediff-spec-digest": "f6fa68abf31f6d3ac18a9dab7563776e89ddc22c19f20e3d31cbea7009d22d45"
 }

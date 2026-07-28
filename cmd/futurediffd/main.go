@@ -18,6 +18,7 @@ import (
 	"github.com/SHOnnay/futurediff/internal/adapters/slackoutbox"
 	"github.com/SHOnnay/futurediff/internal/api"
 	"github.com/SHOnnay/futurediff/internal/app"
+	"github.com/SHOnnay/futurediff/internal/authorization"
 	"github.com/SHOnnay/futurediff/internal/buildinfo"
 	"github.com/SHOnnay/futurediff/internal/configattest"
 	"github.com/SHOnnay/futurediff/internal/credentials"
@@ -58,6 +59,8 @@ func main() {
 	ratePolicyPath := flag.String("rate-policy", "", "optional per-principal request rate policy JSON")
 	repositoryPolicyPath := flag.String("repository-policy", "", "optional repository admission policy JSON")
 	storagePolicyPath := flag.String("storage-policy", "", "optional storage-pressure policy JSON")
+	authorizationPolicyPath := flag.String("authorization-policy", "", "optional UID-to-operation authorization policy JSON")
+	capabilityKeyringPath := flag.String("capability-keyring", "", "trusted Ed25519 keyring for one-time delegated capabilities")
 	configSigningKeyring := flag.String("config-signing-keyring", "", "trusted Ed25519 keyring for configuration attestations")
 	requireSignedConfigs := flag.Bool("require-signed-configs", false, "require valid sidecar attestations for every configured security file")
 	requireSecureRoot := flag.Bool("require-secure-root", true, "fail startup when the FutureDiff data root has unsafe ownership, permissions, symlinks, or special files")
@@ -178,7 +181,32 @@ func main() {
 	verifyConfig("rate_policy", *ratePolicyPath)
 	verifyConfig("repository_policy", *repositoryPolicyPath)
 	verifyConfig("storage_policy", *storagePolicyPath)
+	verifyConfig("authorization_policy", *authorizationPolicyPath)
+	verifyConfig("capability_keyring", *capabilityKeyringPath)
 
+	var authorizer *authorization.Authorizer
+	if *authorizationPolicyPath != "" {
+		policy, err := authorization.Load(*authorizationPolicyPath)
+		if err != nil {
+			log.Fatalf("authorization policy: %v", err)
+		}
+		authorizer, err = authorization.Compile(policy)
+		if err != nil {
+			log.Fatalf("authorization policy: %v", err)
+		}
+		log.Printf("authorization policy configured: digest=%s bindings=%d", authorizer.Digest(), len(policy.Bindings))
+	}
+	var capabilityKeys *operatorapproval.Keyring
+	if *capabilityKeyringPath != "" {
+		ring, err := operatorapproval.LoadKeyring(*capabilityKeyringPath)
+		if err != nil {
+			log.Fatalf("capability keyring: %v", err)
+		}
+		capabilityKeys = &ring
+		if authorizer == nil {
+			log.Fatal("--capability-keyring requires --authorization-policy")
+		}
+	}
 	var approvalKeys *operatorapproval.Keyring
 	if *approvalKeyring != "" {
 		ring, err := operatorapproval.LoadKeyring(*approvalKeyring)
@@ -309,7 +337,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("allowed peer UIDs: %v", err)
 	}
-	server := &api.Server{Service: svc, SocketPath: *socket, Maintenance: &maintenance.Manager{Path: filepath.Join(*root, "maintenance.json")}, Drain: drain.New(), RequirePeerCredentials: !*disablePeerAuth, AllowedPeerUIDs: peerUIDs, RateLimiter: rateLimiter, StorageGuard: storageGuard}
+	server := &api.Server{Service: svc, SocketPath: *socket, Maintenance: &maintenance.Manager{Path: filepath.Join(*root, "maintenance.json")}, Drain: drain.New(), RequirePeerCredentials: !*disablePeerAuth, AllowedPeerUIDs: peerUIDs, RateLimiter: rateLimiter, StorageGuard: storageGuard, Authorizer: authorizer, CapabilityKeyring: capabilityKeys}
 	errCh := make(chan error, 1)
 	go func() { errCh <- server.Serve() }()
 	fmt.Printf("FutureDiff Go daemon listening on %s\n", *socket)

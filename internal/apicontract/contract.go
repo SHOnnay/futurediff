@@ -6,7 +6,7 @@ import (
 	"github.com/SHOnnay/futurediff/internal/domain"
 )
 
-const Version = "1.0"
+const Version = "1.1"
 
 type Endpoint struct {
 	Method      string `json:"method"`
@@ -28,6 +28,7 @@ func Current() Contract {
 		{"GET", "/v1/contract", "contract", true},
 		{"GET", "/v1/openapi", "openapi", true},
 		{"POST", "/v1/transactions", "transaction_create", true},
+		{"GET", "/v1/transactions", "transaction_list", true},
 		{"GET", "/v1/transactions/{id}", "transaction_get", true},
 		{"POST", "/v1/transactions/{id}/execute", "transaction_execute", true},
 		{"POST", "/v1/transactions/{id}/effects/github/branch", "github_branch_prepare", true},
@@ -43,6 +44,9 @@ func Current() Contract {
 		{"POST", "/v1/transactions/{id}/recover", "transaction_recover", false},
 		{"POST", "/v1/transactions/{id}/abort", "transaction_abort", false},
 		{"GET", "/v1/transactions/{id}/events", "events_list", true},
+		{"GET", "/v1/transactions/{id}/access", "transaction_access_list", false},
+		{"PUT", "/v1/transactions/{id}/access/{principalID}", "transaction_access_grant", false},
+		{"DELETE", "/v1/transactions/{id}/access/{principalID}", "transaction_access_revoke", false},
 	}
 	sort.Slice(endpoints, func(i, j int) bool {
 		if endpoints[i].Path != endpoints[j].Path {

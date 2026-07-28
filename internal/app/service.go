@@ -61,6 +61,10 @@ type TransactionView struct {
 }
 
 func (s *Service) Create(req CreateRequest) (TransactionView, error) {
+	return s.CreateForPrincipal(req, "local:operator")
+}
+
+func (s *Service) CreateForPrincipal(req CreateRequest, principalID string) (TransactionView, error) {
 	if req.Repository == "" {
 		return TransactionView{}, errors.New("repository is required")
 	}
@@ -105,7 +109,10 @@ func (s *Service) Create(req CreateRequest) (TransactionView, error) {
 	if err != nil {
 		return TransactionView{}, err
 	}
-	tx := domain.Transaction{ID: id, Mode: req.Mode, AgentAdapter: req.AgentAdapter, AgentSessionID: req.AgentSessionID, PolicyVersion: req.PolicyVersion, CreatedAt: time.Now().UTC()}
+	if principalID == "" {
+		return TransactionView{}, errors.New("transaction owner principal is required")
+	}
+	tx := domain.Transaction{ID: id, OwnerPrincipalID: principalID, Mode: req.Mode, AgentAdapter: req.AgentAdapter, AgentSessionID: req.AgentSessionID, PolicyVersion: req.PolicyVersion, CreatedAt: time.Now().UTC()}
 	created, err := s.Ledger.Create(ledger.CreateInput{Transaction: tx, Workspace: workspace})
 	if err != nil {
 		_ = s.Staging.Abort(workspace)

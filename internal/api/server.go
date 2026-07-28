@@ -17,8 +17,10 @@ import (
 
 	"github.com/SHOnnay/futurediff/internal/apicontract"
 	"github.com/SHOnnay/futurediff/internal/app"
+	"github.com/SHOnnay/futurediff/internal/authorization"
 	"github.com/SHOnnay/futurediff/internal/buildinfo"
 	"github.com/SHOnnay/futurediff/internal/drain"
+	"github.com/SHOnnay/futurediff/internal/ledger"
 	"github.com/SHOnnay/futurediff/internal/maintenance"
 	"github.com/SHOnnay/futurediff/internal/openapispec"
 	"github.com/SHOnnay/futurediff/internal/operatorapproval"
@@ -39,6 +41,8 @@ type Server struct {
 	AllowedPeerUIDs        map[uint32]struct{}
 	RateLimiter            *ratelimit.Limiter
 	StorageGuard           *storageguard.Guard
+	Authorizer             *authorization.Authorizer
+	CapabilityKeyring      *operatorapproval.Keyring
 	idempotencyMu          sync.Mutex
 }
 
@@ -68,13 +72,14 @@ func (s *Server) Handler() http.Handler {
 				return
 			}
 		}
-		writeJSON(w, 200, map[string]any{"status": "ok", "implementation": "go", "build": buildinfo.Current(), "time": time.Now().UTC(), "oci": s.Service.RuntimeStatus(r.Context()), "credentials": s.Service.CredentialStatus(), "approvals": s.Service.ApprovalStatus(), "quotas": s.Service.QuotaStatus(), "secret_scan": s.Service.SecretScanStatus(), "peer_auth": map[string]any{"required": s.RequirePeerCredentials, "allowed_uid_count": len(s.AllowedPeerUIDs)}, "rate_limit": s.rateStatus(), "storage": s.storageStatus(), "maintenance": status, "drain": s.drainStatus()})
+		writeJSON(w, 200, map[string]any{"status": "ok", "implementation": "go", "build": buildinfo.Current(), "time": time.Now().UTC(), "oci": s.Service.RuntimeStatus(r.Context()), "credentials": s.Service.CredentialStatus(), "approvals": s.Service.ApprovalStatus(), "quotas": s.Service.QuotaStatus(), "secret_scan": s.Service.SecretScanStatus(), "peer_auth": map[string]any{"required": s.RequirePeerCredentials, "allowed_uid_count": len(s.AllowedPeerUIDs)}, "authorization": s.authorizationStatus(), "rate_limit": s.rateStatus(), "storage": s.storageStatus(), "maintenance": status, "drain": s.drainStatus()})
 	})
 	mux.HandleFunc("GET /v1/contract", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, apicontract.Current()) })
 	mux.HandleFunc("GET /v1/openapi", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, openapispec.Generate(apicontract.Current()))
 	})
 	mux.HandleFunc("POST /v1/transactions", s.create)
+	mux.HandleFunc("GET /v1/transactions", s.listTransactions)
 	mux.HandleFunc("GET /v1/transactions/{id}", s.get)
 	mux.HandleFunc("POST /v1/transactions/{id}/execute", s.execute)
 	mux.HandleFunc("POST /v1/transactions/{id}/effects/github/branch", s.prepareGitHubBranch)
@@ -90,7 +95,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/transactions/{id}/recover", s.recover)
 	mux.HandleFunc("POST /v1/transactions/{id}/abort", s.abort)
 	mux.HandleFunc("GET /v1/transactions/{id}/events", s.events)
-	return s.requestIDGuard(logging(s.peerGuard(s.rateGuard(s.drainGuard(s.maintenanceGuard(s.storageGuard(s.idempotencyGuard(mux))))))))
+	mux.HandleFunc("GET /v1/transactions/{id}/access", s.listTransactionAccess)
+	mux.HandleFunc("PUT /v1/transactions/{id}/access/{principalID}", s.grantTransactionAccess)
+	mux.HandleFunc("DELETE /v1/transactions/{id}/access/{principalID}", s.revokeTransactionAccess)
+	return s.requestIDGuard(logging(s.peerGuard(s.authorizationGuard(s.rateGuard(s.drainGuard(s.maintenanceGuard(s.storageGuard(s.idempotencyGuard(mux)))))))))
 }
 
 func (s *Server) storageStatus() any {
@@ -303,13 +311,61 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "invalid_request", err)
 		return
 	}
-	v, err := s.Service.Create(req)
+	v, err := s.Service.CreateForPrincipal(req, peerauth.Principal(r.Context()))
 	if err != nil {
 		writeErr(w, 409, "create_failed", err)
 		return
 	}
 	writeJSON(w, 201, v)
 }
+func (s *Server) listTransactions(w http.ResponseWriter, r *http.Request) {
+	decision, _ := authorizationDecisionFromContext(r.Context())
+	all := decision.ResourceScope == "all"
+	v, err := s.Service.Ledger.ListTransactionsForPrincipal(peerauth.Principal(r.Context()), all)
+	if err != nil {
+		writeErr(w, 500, "transaction_list_failed", err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"transactions": v, "resource_scope": decision.ResourceScope})
+}
+
+func (s *Server) listTransactionAccess(w http.ResponseWriter, r *http.Request) {
+	v, err := s.Service.Ledger.ListTransactionGrants(r.PathValue("id"))
+	if err != nil {
+		writeErr(w, 404, "transaction_access_failed", err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"transaction_id": r.PathValue("id"), "grants": v})
+}
+
+func (s *Server) grantTransactionAccess(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Permission string `json:"permission"`
+	}
+	if err := decode(r, &req); err != nil {
+		writeErr(w, 400, "invalid_request", err)
+		return
+	}
+	decision, _ := authorizationDecisionFromContext(r.Context())
+	err := s.Service.Ledger.GrantTransactionAccess(r.PathValue("id"), peerauth.Principal(r.Context()), r.PathValue("principalID"), ledger.TransactionAccess(req.Permission), decision.ResourceScope == "all", requestid.From(r.Context()))
+	if err != nil {
+		writeErr(w, 409, "transaction_access_grant_failed", err)
+		return
+	}
+	v, _ := s.Service.Ledger.ListTransactionGrants(r.PathValue("id"))
+	writeJSON(w, 200, map[string]any{"transaction_id": r.PathValue("id"), "grants": v})
+}
+
+func (s *Server) revokeTransactionAccess(w http.ResponseWriter, r *http.Request) {
+	decision, _ := authorizationDecisionFromContext(r.Context())
+	err := s.Service.Ledger.RevokeTransactionAccess(r.PathValue("id"), peerauth.Principal(r.Context()), r.PathValue("principalID"), decision.ResourceScope == "all", requestid.From(r.Context()))
+	if err != nil {
+		writeErr(w, 409, "transaction_access_revoke_failed", err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"transaction_id": r.PathValue("id"), "revoked_principal_id": r.PathValue("principalID")})
+}
+
 func (s *Server) execute(w http.ResponseWriter, r *http.Request) {
 	var req app.ExecuteRequest
 	if err := decode(r, &req); err != nil {

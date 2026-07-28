@@ -1,0 +1,51 @@
+{
+  "version": "1",
+  "default": "deny",
+  "agent_roles": [
+    "agent"
+  ],
+  "roles": [
+    {
+      "name": "agent",
+      "operations": [
+        "health",
+        "contract",
+        "openapi",
+        "transaction_create",
+        "transaction_list",
+        "transaction_get",
+        "transaction_execute",
+        "github_branch_prepare",
+        "github_pr_prepare",
+        "slack_message_prepare",
+        "effects_list",
+        "effect_refresh",
+        "transaction_seal",
+        "transaction_verify",
+        "events_list"
+      ],
+      "resource_scope": "owned"
+    },
+    {
+      "name": "operator",
+      "operations": [
+        "*"
+      ],
+      "resource_scope": "all"
+    }
+  ],
+  "bindings": [
+    {
+      "uid": 1000,
+      "roles": [
+        "agent"
+      ]
+    },
+    {
+      "uid": 2000,
+      "roles": [
+        "operator"
+      ]
+    }
+  ]
+}

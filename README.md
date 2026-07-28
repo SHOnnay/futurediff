@@ -1,101 +1,49 @@
 # FutureDiff
 
-FutureDiff is a transactional effect layer for autonomous AI agents.
+FutureDiff is a local-first transaction and safety layer for AI agents. It stages repository and provider changes in isolation, verifies exact material, binds approval to cryptographic digests, and releases effects only through controlled, recoverable adapters.
 
-> Existing agents decide what to do. FutureDiff controls whether and how those decisions become persistent reality.
+## Status
 
-## Current milestone: Task 085
+- Baseline: **v0.95.0**
+- Local API contract: **v1.1**
+- Commands: **70 Go binaries**
+- Position: **feature-complete local MVP**
+- Still pending: external Docker/Podman, GitHub, Slack, OpenCode, Hermes, macOS, and hosted-attestation certification
 
-The canonical implementation is Go and supports the staged transaction chain below, plus a unified real-environment certification command:
+## Core guarantees
 
-```text
-exact local repository change
-        ↓
-create-only GitHub futurediff/* branch
-        ↓
-dependent GitHub draft pull request
-        ↓
-dependent Slack outbox message
-```
-
-A generic MCP stdio bridge lets MCP-capable agents stage and verify this future without exposing approval or commit authority.
-
-Implemented capabilities:
-
-- private Unix-socket daemon and trusted CLI;
-- durable SQLite transaction ledger;
-- detached Git staging and deterministic commit identities;
-- rootless OCI source implementation;
-- deterministic verification;
-- credential broker with exact operation/destination scopes;
-- durable effect dependency graph;
-- create-only GitHub branch publication;
-- dependent GitHub draft pull requests;
-- Slack durable outbox with ambiguous-result recovery;
-- coordinator leases and fencing tokens;
-- write-ahead provider attempts and durable receipts;
-- generic MCP stdio integration;
-- content-addressed FuturePack evidence export.
-- tamper-evident per-transaction event chains;
-- read-only ledger invariant auditing;
-- confirmation-gated terminal artifact retention;
-- operator diagnostics and API-contract compatibility checks;
-- verified transaction `.futurepack` forensic export;
-- confirmation-gated offline ledger restoration;
-- event-log projection replay;
-- configuration linting;
-- semantic API contract diffing;
-- EffectSpec lifecycle conformance testing;
-- verification-policy explanation and simulation;
-- no-blind-retry recovery drills;
-- privacy-preserving JSON/Prometheus metrics;
-- verified redacted support bundles;
-- digest-protected daemon maintenance mode;
-- AES-256-GCM runtime evidence encryption;
-- approval-key rotation and revocation;
-- transaction timeline export;
-- executable local threat-model regression testing;
-- controlled offline SQLite maintenance and signed integrity checkpoints;
-- expired coordinator lease cleanup;
-- request correlation protected by the API audit chain;
-- canonical-root repository admission policy.
-
-## Repository provenance
-
-This repository contains the canonical runnable Go core plus useful specifications and research imported from the supplied `futurediff-design` branch. The original experimental branch is preserved under `research/original-design-branch/` and is not silently mixed into the trusted runtime. See `docs/MERGE-REPORT.md`.
-
+- exact Git-tree staging without mutating the live checkout
+- digest-bound approval and deterministic verification
+- rootless OCI execution for enforced preparation
+- durable effect orchestration for GitHub branch, draft PR, and Slack release flows
+- idempotent receipts, reconciliation, and crash recovery
+- kernel-authenticated local ownership, sharing, RBAC, and access audit chains
+- tamper-evident evidence, audit, and integrity checkpoints
 
 ## Requirements
 
 Cooperative mode:
-
 - Go 1.23+
 - Git
 - C compiler
 - SQLite development library
 
 Enforced mode additionally requires:
+- rootless Docker or rootless Podman
+- digest-pinned OCI image: `name@sha256:<digest>`
 
-- rootless Docker or rootless Podman;
-- a digest-pinned OCI image (`name@sha256:<digest>`).
-
-## Build and validate
+## Build and test
 
 ```bash
-make check
 make build
+go test ./...
 ```
 
-Equivalent commands:
+Release archive:
 
 ```bash
-gofmt -w .
-go vet ./...
-go test -race ./...
-go build ./cmd/...
+bash ./scripts/release.sh
 ```
-
-The build produces 39 commands, including the daemon, trusted CLI, MCP bridge, certification, audit, export, restore, replay, configuration-lint, and API-diff tools. Run `ls bin/` after `make build` for the complete inventory.
 
 ## Start the daemon
 
@@ -108,497 +56,28 @@ export FUTUREDIFF_SLACK_TOKEN='test-or-production-token'
   --credential-config examples/credentials/providers.example.json
 ```
 
-Provider secrets are not exposed through the public API and are not stored in SQLite.
-
-## Repository + GitHub branch + PR + Slack transaction
+## Minimal transaction flow
 
 ```bash
-# Create a cooperative transaction.
 ./bin/futurediff create /path/to/repository cooperative
-
-# Edit the returned detached transaction workspace, then seal it.
 ./bin/futurediff seal <transaction-id>
-
-# Prepare publication of the deterministic approved commit.
-./bin/futurediff prepare-github-branch <transaction-id> \
-  github-main acme app futurediff/<transaction-id> \
-  https://github.com/acme/app.git
-
-# The returned effect ID becomes the PR dependency.
-./bin/futurediff prepare-github-pr <transaction-id> \
-  github-main acme app futurediff/<transaction-id> main \
-  'FutureDiff change' 'Prepared transaction' <branch-effect-id>
-
-# Slack may depend on the PR effect.
-./bin/futurediff prepare-slack-message <transaction-id> \
-  slack-main C0123456789 'FutureDiff transaction released' <pr-effect-id>
-
 ./bin/futurediff verify <transaction-id> examples/verification/basic.verify.json
 ./bin/futurediff approval-material <transaction-id>
 ./bin/futurediff approve <transaction-id> <transaction-digest>
 ./bin/futurediff commit <transaction-id> <transaction-digest>
 ```
 
-If a provider mutation has an ambiguous transport result, run:
-
-```bash
-./bin/futurediff recover <transaction-id>
-```
-
-Recovery queries provider status using exact effect identities rather than blindly issuing the mutation again.
-
-## MCP bridge
-
-Start the daemon first, then configure an MCP client to launch:
-
-```bash
-/path/to/futurediff-mcp --socket ~/.futurediff/futurediff.sock
-```
-
-A generic example is in `examples/mcp/generic-client.example.json`.
-
-The MCP bridge exposes staging, inspection, deterministic verification, and effect preparation. It deliberately does **not** expose approval or commit tools. Release remains a trusted local action.
-
-
-## Certification suite
-
-Generate a machine-readable local certification report:
-
-```bash
-./bin/futurediff-cert-suite \
-  --target local \
-  --mcp-binary "$PWD/bin/futurediff-mcp" \
-  --socket "$HOME/.futurediff/futurediff.sock" \
-  --output certification.json
-```
-
-External targets include `oci`, `github`, `slack`, `opencode`, `hermes`, and
-`attestation`. Missing prerequisites are reported as `blocked`, never as passed.
-See `examples/certification/README.md`.
-
-## Operating modes
-
-### Cooperative
-
-Provides durable staging and provider-effect orchestration, but does not claim every host-side bypass path is prevented.
-
-### Enforced
-
-Requires a rootless OCI runtime and digest-pinned image. Agent-authored commands run without provider credentials, with network disabled by default, and without mounting the live checkout or Git metadata.
-
-Real rootless-host certification remains pending.
-
-
-## Installation
-
-Review and apply a local installation plan:
-
-```bash
-futurediff-install --source-dir /path/to/release \
-  --prefix "$HOME/.local" \
-  --root "$HOME/.futurediff" \
-  --service systemd-user
-```
-
-Use `--dry-run` to print the exact file plan without writing. Linux systemd-user and macOS launchd-user service definitions are supported. The installer never enables provider credentials automatically.
-
-## Platform support
-
-```bash
-futurediff-platform --output platform.json
-```
-
-Linux amd64 is supported. Linux arm64 and macOS are experimental native targets. Windows is explicitly unsupported until named-pipe transport and Windows credential isolation are implemented.
-
-## Measured agent benchmark
-
-```bash
-futurediff-agent-bench \
-  --input direct-run.json \
-  --input futurediff-run.json \
-  --baseline direct \
-  --json report.json \
-  --markdown report.md
-```
-
-The command aggregates only supplied measurements. It does not infer token or latency values.
-
-## Offline release verification
-
-```bash
-futurediff-verify-release \
-  --source futurediff-v0.29.0-linux-amd64.tar.gz \
-  --output verification.json
-```
-
-This checks archive safety, SHA-256 entries, SPDX structure, and in-toto/SLSA subject digests. Add `--require-signed-attestation` for GitHub attestation verification.
-
-## Disposable provider mutation certification
-
-This command performs real, visible test mutations and requires a dedicated repository/channel plus the exact confirmation phrase:
-
-```bash
-futurediff-provider-cert \
-  --target github --target slack \
-  --confirm-provider-mutations I_UNDERSTAND_FUTUREDIFF_WILL_CREATE_AND_CLEAN_UP_TEST_RESOURCES \
-  --github-owner OWNER --github-repo DISPOSABLE_REPO \
-  --github-token-env FUTUREDIFF_GITHUB_TEST_TOKEN \
-  --slack-channel TEST_CHANNEL_ID \
-  --slack-token-env FUTUREDIFF_SLACK_TEST_TOKEN
-```
-
-GitHub resources are closed/deleted and the Slack message is deleted. Use only disposable test resources.
+Provider effects are prepared before commit through the GitHub branch, GitHub draft PR, and Slack commands.
 
 ## Documentation
 
 - `ARCHITECTURE.md`
-- `docs/tasks/TASK-011-controlled-github-branch-publication.md`
-- `docs/tasks/TASK-012-slack-durable-outbox.md`
-- `docs/tasks/TASK-013-generic-mcp-bridge.md`
-- `docs/progress/PROGRESS-AUDIT-TASK-013.md`
-- `docs/daemon/api-v0.5.md`
-- `docs/tasks/TASK-041-effectspec-conformance-kit.md`
-- `docs/tasks/TASK-042-policy-explanation-and-simulation.md`
-- `docs/tasks/TASK-043-recovery-planner-drill.md`
-- `docs/tasks/TASK-044-privacy-preserving-metrics.md`
-- `docs/tasks/TASK-045-redacted-support-bundle.md`
-- `docs/tasks/TASK-051-maintenance-mode-coordination.md`
-- `docs/tasks/TASK-052-encrypted-runtime-evidence.md`
-- `docs/tasks/TASK-053-approval-key-rotation.md`
-- `docs/tasks/TASK-054-transaction-timeline.md`
-- `docs/tasks/TASK-055-threat-model-self-test.md`
-
-## Current progress estimate
-
-- architecture and research: **99%**;
-- public open-source MVP: **99.2%**;
-- production-grade platform: **75%**.
-
-These are weighted acceptance-criteria estimates, not line-count estimates.
-
-## One-command demonstration
-
-```bash
-./scripts/demo.sh
-```
-
-This requires Git, Go, and SQLite development libraries, but no model, API key, container runtime, or provider account. It proves that the approved FutureDiff ref changes while the live checkout remains unchanged.
-
-## Host-specific rootless certification
-
-```bash
-futurediff-certify \
-  --runtime docker \
-  --image alpine@sha256:<64-hex-digest> \
-  --output certification.json
-```
-
-Certification is specific to the host, runtime, and image digest. Source-level support alone is not treated as enforced-mode certification.
-
-## Deterministic effect-safety benchmark
-
-```bash
-make benchmark
-```
-
-The initial benchmark models release, duplication, approval, and recovery semantics. It is deliberately labelled synthetic and does not claim to measure model quality or real provider latency.
-
-## Ledger maintenance
-
-```bash
-futurediff-admin --root ~/.futurediff
-futurediff-admin --root ~/.futurediff --backup ~/backups/futurediff-ledger.db
-```
-
-## Release artifacts
-
-Tagged releases contain all command binaries, embedded build metadata, SPDX 2.3 SBOM, SHA-256 checksums, architecture documentation, and provenance notes.
-
-## Agent integration profiles
-
-Generate an OpenCode profile:
-
-```bash
-futurediff-integrate --target opencode \
-  --mcp-binary /absolute/path/futurediff-mcp \
-  --socket "$HOME/.futurediff/futurediff.sock" \
-  --output ./opencode.futurediff.json
-```
-
-Generate a Hermes Agent MCP entry:
-
-```bash
-futurediff-integrate --target hermes \
-  --mcp-binary /absolute/path/futurediff-mcp \
-  --socket "$HOME/.futurediff/futurediff.sock" \
-  --output ./hermes-futurediff.yaml
-```
-
-The generated profiles expose staging and verification tools only. Approval, commit, and credentials remain outside the agent tool surface.
-
-## Ledger fault self-test
-
-```bash
-futurediff-admin --root /tmp/fd-admin \
-  --fault-self-test /tmp/fd-faults
-```
-
-Use only a disposable fault-test directory.
-
-## Release provenance
-
-`futurediff-provenance` emits an in-toto/SLSA provenance statement for local artifacts. Tagged GitHub releases also use GitHub artifact attestations; local provenance files are not signatures.
-
-
-## Operations and integrity
-
-```bash
-# Verify SQLite and semantic ledger invariants.
-futurediff-audit --root ~/.futurediff
-
-# Inspect a pruning plan; no files are deleted.
-futurediff-prune --root ~/.futurediff --older-than 720h
-
-# Check local readiness without exposing secret values.
-futurediff-doctor --root ~/.futurediff
-
-# Compare this client with a running daemon API contract.
-futurediff-api-contract --socket ~/.futurediff/futurediff.sock
-```
-
-
-## Forensic export and recovery
-
-```bash
-# Export one durable transaction and its exact patch when available.
-futurediff-export --root ~/.futurediff \
-  --transaction <transaction-id> \
-  --output transaction.futurepack
-
-# Verify without extracting.
-futurediff-export --verify transaction.futurepack
-
-# Replay the event log against current projections.
-futurediff-replay --root ~/.futurediff --transaction <transaction-id>
-
-# Validate a ledger backup without applying it.
-futurediff-restore --root ~/.futurediff \
-  --backup ~/backups/futurediff-ledger.db \
-  --expected-sha256 <digest>
-
-# Apply only while the daemon is stopped.
-futurediff-restore --root ~/.futurediff \
-  --backup ~/backups/futurediff-ledger.db \
-  --expected-sha256 <digest> \
-  --apply --confirm RESTORE_FUTUREDIFF_LEDGER
-```
-
-## Configuration and API compatibility
-
-```bash
-futurediff-config-lint --kind verification examples/verification/basic.verify.json
-futurediff-config-lint --kind opencode ./opencode.futurediff.json
-futurediff-api-diff --baseline examples/api/contract-v1.json
-```
-
-API authority changes are treated as incompatible, including any change to an endpoint's `agent_safe` classification.
-
-
-## Adapter conformance and policy explanation
-
-```bash
-futurediff-effectspec --self-test
-futurediff-policy-explain --contract examples/verification/basic.verify.json --assume-pass
-```
-
-## Recovery drill
-
-```bash
-futurediff-recovery-drill
-```
-
-The built-in scenarios prove that ambiguous provider outcomes never authorize a blind retry.
-
-## Aggregate metrics and support bundle
-
-```bash
-futurediff-metrics --root ~/.futurediff --format prometheus
-futurediff-support-bundle --root ~/.futurediff --output support.zip
-futurediff-support-bundle --verify support.zip
-```
-
-Metrics are aggregate-only. Support bundles exclude ledger bytes, transaction patches, and credential configuration contents.
-
-
-## Maintenance mode
-
-```bash
-futurediff-maintenance --root "$HOME/.futurediff"   --action enable --reason "offline maintenance" --ttl 30m
-```
-
-While enabled, daemon GET operations remain available but all HTTP mutations fail with `503 maintenance_mode`.
-
-## Runtime evidence encryption
-
-```bash
-futurediff-evidence generate-key   --output "$HOME/.futurediff/evidence-key.json"
-
-futurediffd --root "$HOME/.futurediff"   --evidence-key "$HOME/.futurediff/evidence-key.json"
-```
-
-## Transaction timeline and threat checks
-
-```bash
-futurediff-timeline --root "$HOME/.futurediff"   --transaction <transaction-id> --format markdown
-
-futurediff-threat-test --output threat-model-report.json
-```
-
-## Configuration attestation
-
-```bash
-futurediff-config-snapshot build \
-  --file credentials=$HOME/.futurediff/credentials.json \
-  --file approval-keyring=$HOME/.futurediff/operator-keyring.json \
-  --output $HOME/.futurediff/config.snapshot.json
-
-futurediff-config-snapshot verify \
-  --manifest $HOME/.futurediff/config.snapshot.json
-```
-
-## Multi-operator approvals
-
-Start the daemon with a trusted keyring and quorum policy:
-
-```bash
-futurediffd \
-  --approval-keyring $HOME/.futurediff/operator-keyring.json \
-  --approval-quorum-policy $HOME/.futurediff/quorum-policy.json
-```
-
-Assemble independently signed envelopes:
-
-```bash
-futurediff-approval-quorum assemble \
-  --envelope alice.approval.json \
-  --envelope bob.approval.json \
-  --output approval.bundle.json
-
-futurediff approve-quorum <transaction-id> approval.bundle.json
-```
-
-## Evidence-key rotation
-
-```bash
-futurediff-evidence init-keyring \
-  --keyring $HOME/.futurediff/evidence-keyring.json \
-  --key $HOME/.futurediff/evidence-key-001.json
-
-futurediff-evidence rotate-keyring \
-  --keyring $HOME/.futurediff/evidence-keyring.json \
-  --new-key $HOME/.futurediff/evidence-key-002.json
-```
-
-## Incident reconstruction and daemon drain
-
-```bash
-futurediff-incident --root $HOME/.futurediff \
-  --transaction <transaction-id> --format markdown
-
-futurediff-drain \
-  --pid-file $HOME/.futurediff/futurediff.pid \
-  --confirm DRAIN_FUTUREDIFF_DAEMON
-```
-
-## Operator receipts, dependency graphs, SLOs, and readiness
-
-```bash
-futurediff-operator-receipt --mode record \
-  --private operator-private.json \
-  --action release.approve --actor operator@example.com \
-  --subject futurediff-v0.65.0 --reason "local release gate passed"
-
-futurediff-effect-graph --root "$HOME/.futurediff" \
-  --transaction <transaction-id> --format mermaid
-
-futurediff-slo --root "$HOME/.futurediff" \
-  --policy examples/slo/local.example.json
-
-futurediff-readiness --root "$HOME/.futurediff" \
-  --manifest examples/readiness/local.example.json
-```
-
-## Local API hardening (v0.70.0)
-
-The Linux daemon now authenticates Unix-socket clients with kernel `SO_PEERCRED` data in addition to the `0600` socket mode. Mutation requests can use durable idempotency keys:
-
-```bash
-curl --unix-socket "$HOME/.futurediff/futurediff.sock" \
-  -H 'Idempotency-Key: create-request-0001' \
-  -H 'Content-Type: application/json' \
-  -d '{"repository":"/absolute/repository","mode":"cooperative","policy_version":"p"}' \
-  http://localhost/v1/transactions
-```
-
-Security and operations commands:
-
-```bash
-futurediff-secret-scan --patch change.patch
-futurediff-quota --root "$HOME/.futurediff"
-futurediff-api-audit --root "$HOME/.futurediff" --limit 100
-```
-
-The verification engine automatically runs the high-confidence secret scan before configured checks. Resource quotas bound open transactions, effects, executions, patch size, changed paths, and verification-check count.
-
-## Daemon and configuration hardening (v0.75.0)
-
-Inspect the exclusive daemon lock:
-
-```bash
-futurediff-daemon-lock --root "$HOME/.futurediff"
-```
-
-Validate a request-rate policy:
-
-```bash
-futurediff-rate-policy --policy examples/security/rate-policy.example.json
-```
-
-Sign and verify a security configuration:
-
-```bash
-futurediff-config-sign sign \
-  --private operator-private.json \
-  --file "$HOME/.futurediff/quota-policy.json" \
-  --kind quota_policy
-
-futurediff-config-sign verify \
-  --keyring operator-keyring.json \
-  --file "$HOME/.futurediff/quota-policy.json" \
-  --kind quota_policy
-```
-
-Require signed configurations at daemon startup:
-
-```bash
-futurediffd \
-  --config-signing-keyring operator-keyring.json \
-  --require-signed-configs \
-  --quota-policy "$HOME/.futurediff/quota-policy.json" \
-  --rate-policy "$HOME/.futurediff/rate-policy.json"
-```
-
-Verify the API access hash chain and the local filesystem boundary:
-
-```bash
-futurediff-api-audit --root "$HOME/.futurediff" --verify
-futurediff-root-audit --root "$HOME/.futurediff"
-```
-
-## Current milestone: Task 085 additions
-
-- safe abandoned-transaction expiry;
-- explicit durable-idempotency retention;
-- storage-pressure mutation circuit breaker;
-- deterministic OpenAPI 3.1 endpoint and verifier;
-- verified backup catalog and bounded retention.
+- `docs/progress/MASTER-STATUS-v0.95.0.md`
+- `docs/progress/PROGRESS-AUDIT-TASK-095.md`
+- `docs/tasks/TASK-091-095-validation.md`
+- `docs/tasks/`
+- `docs/adr/`
+
+## Claims boundary
+
+FutureDiff is ready as a serious local product baseline. It is **not** yet claiming external production certification, distributed HA, enterprise IAM, Windows support, or a production UI.

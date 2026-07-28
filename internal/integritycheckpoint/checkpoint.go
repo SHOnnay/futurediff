@@ -22,36 +22,40 @@ import (
 const Version = "0.1"
 
 type Checkpoint struct {
-	Version              string                 `json:"version"`
-	CheckpointID         string                 `json:"checkpoint_id"`
-	CreatedAt            time.Time              `json:"created_at"`
-	LedgerFile           string                 `json:"ledger_file"`
-	LedgerSHA256         string                 `json:"ledger_sha256"`
-	LedgerSizeBytes      int64                  `json:"ledger_size_bytes"`
-	Health               ledger.Health          `json:"health"`
-	EventChains          ledger.EventChainHeads `json:"event_chains"`
-	APIAccessHead        string                 `json:"api_access_head,omitempty"`
-	OperatorReceiptHead  string                 `json:"operator_receipt_head,omitempty"`
-	OperatorReceiptCount int                    `json:"operator_receipt_count,omitempty"`
-	MaterialDigest       string                 `json:"material_digest"`
-	KeyID                string                 `json:"key_id"`
-	Approver             string                 `json:"approver"`
-	Signature            string                 `json:"signature"`
+	Version               string                 `json:"version"`
+	CheckpointID          string                 `json:"checkpoint_id"`
+	CreatedAt             time.Time              `json:"created_at"`
+	LedgerFile            string                 `json:"ledger_file"`
+	LedgerSHA256          string                 `json:"ledger_sha256"`
+	LedgerSizeBytes       int64                  `json:"ledger_size_bytes"`
+	Health                ledger.Health          `json:"health"`
+	EventChains           ledger.EventChainHeads `json:"event_chains"`
+	APIAccessHead         string                 `json:"api_access_head,omitempty"`
+	AuthorizationHead     string                 `json:"authorization_head,omitempty"`
+	TransactionAccessHead string                 `json:"transaction_access_head,omitempty"`
+	OperatorReceiptHead   string                 `json:"operator_receipt_head,omitempty"`
+	OperatorReceiptCount  int                    `json:"operator_receipt_count,omitempty"`
+	MaterialDigest        string                 `json:"material_digest"`
+	KeyID                 string                 `json:"key_id"`
+	Approver              string                 `json:"approver"`
+	Signature             string                 `json:"signature"`
 }
 type unsigned struct {
-	Version              string                 `json:"version"`
-	CheckpointID         string                 `json:"checkpoint_id"`
-	CreatedAt            time.Time              `json:"created_at"`
-	LedgerFile           string                 `json:"ledger_file"`
-	LedgerSHA256         string                 `json:"ledger_sha256"`
-	LedgerSizeBytes      int64                  `json:"ledger_size_bytes"`
-	Health               ledger.Health          `json:"health"`
-	EventChains          ledger.EventChainHeads `json:"event_chains"`
-	APIAccessHead        string                 `json:"api_access_head,omitempty"`
-	OperatorReceiptHead  string                 `json:"operator_receipt_head,omitempty"`
-	OperatorReceiptCount int                    `json:"operator_receipt_count,omitempty"`
-	KeyID                string                 `json:"key_id"`
-	Approver             string                 `json:"approver"`
+	Version               string                 `json:"version"`
+	CheckpointID          string                 `json:"checkpoint_id"`
+	CreatedAt             time.Time              `json:"created_at"`
+	LedgerFile            string                 `json:"ledger_file"`
+	LedgerSHA256          string                 `json:"ledger_sha256"`
+	LedgerSizeBytes       int64                  `json:"ledger_size_bytes"`
+	Health                ledger.Health          `json:"health"`
+	EventChains           ledger.EventChainHeads `json:"event_chains"`
+	APIAccessHead         string                 `json:"api_access_head,omitempty"`
+	AuthorizationHead     string                 `json:"authorization_head,omitempty"`
+	TransactionAccessHead string                 `json:"transaction_access_head,omitempty"`
+	OperatorReceiptHead   string                 `json:"operator_receipt_head,omitempty"`
+	OperatorReceiptCount  int                    `json:"operator_receipt_count,omitempty"`
+	KeyID                 string                 `json:"key_id"`
+	Approver              string                 `json:"approver"`
 }
 type Verification struct {
 	Valid      bool       `json:"valid"`
@@ -119,6 +123,14 @@ func Create(root, output, privatePath, keyringPath, receiptDir string, now time.
 	if err != nil {
 		return Checkpoint{}, err
 	}
+	authorizationHead, err := repo.VerifyAuthorizationDecisionChain()
+	if err != nil {
+		return Checkpoint{}, err
+	}
+	transactionAccessHead, err := repo.VerifyTransactionAccessChain()
+	if err != nil {
+		return Checkpoint{}, err
+	}
 	receiptHead := ""
 	receiptCount := 0
 	if receiptDir != "" {
@@ -136,13 +148,13 @@ func Create(root, output, privatePath, keyringPath, receiptDir string, now time.
 		receiptHead = v.HeadDigest
 		receiptCount = v.Count
 	}
-	u := unsigned{Version: Version, CheckpointID: domain.NewID("checkpoint"), CreatedAt: now.UTC().Truncate(time.Second), LedgerFile: filepath.Base(backup.Path), LedgerSHA256: backup.SHA256, LedgerSizeBytes: backup.SizeBytes, Health: audit.Health, EventChains: heads, APIAccessHead: apiHead, OperatorReceiptHead: receiptHead, OperatorReceiptCount: receiptCount, KeyID: key.KeyID, Approver: key.Approver}
+	u := unsigned{Version: Version, CheckpointID: domain.NewID("checkpoint"), CreatedAt: now.UTC().Truncate(time.Second), LedgerFile: filepath.Base(backup.Path), LedgerSHA256: backup.SHA256, LedgerSizeBytes: backup.SizeBytes, Health: audit.Health, EventChains: heads, APIAccessHead: apiHead, AuthorizationHead: authorizationHead, TransactionAccessHead: transactionAccessHead, OperatorReceiptHead: receiptHead, OperatorReceiptCount: receiptCount, KeyID: key.KeyID, Approver: key.Approver}
 	dig := digestUnsigned(u)
 	sig, err := operatorapproval.SignDetached(key, []byte(dig))
 	if err != nil {
 		return Checkpoint{}, err
 	}
-	cp := Checkpoint{Version: u.Version, CheckpointID: u.CheckpointID, CreatedAt: u.CreatedAt, LedgerFile: u.LedgerFile, LedgerSHA256: u.LedgerSHA256, LedgerSizeBytes: u.LedgerSizeBytes, Health: u.Health, EventChains: u.EventChains, APIAccessHead: u.APIAccessHead, OperatorReceiptHead: u.OperatorReceiptHead, OperatorReceiptCount: u.OperatorReceiptCount, MaterialDigest: dig, KeyID: u.KeyID, Approver: u.Approver, Signature: sig}
+	cp := Checkpoint{Version: u.Version, CheckpointID: u.CheckpointID, CreatedAt: u.CreatedAt, LedgerFile: u.LedgerFile, LedgerSHA256: u.LedgerSHA256, LedgerSizeBytes: u.LedgerSizeBytes, Health: u.Health, EventChains: u.EventChains, APIAccessHead: u.APIAccessHead, AuthorizationHead: u.AuthorizationHead, TransactionAccessHead: u.TransactionAccessHead, OperatorReceiptHead: u.OperatorReceiptHead, OperatorReceiptCount: u.OperatorReceiptCount, MaterialDigest: dig, KeyID: u.KeyID, Approver: u.Approver, Signature: sig}
 	b, _ := json.MarshalIndent(cp, "", "  ")
 	if err := os.MkdirAll(filepath.Dir(output), 0o700); err != nil {
 		return Checkpoint{}, err
@@ -182,7 +194,7 @@ func Verify(checkpointPath, keyringPath, ledgerPath, receiptDir string, now time
 	if cp.Version != Version {
 		v.Findings = append(v.Findings, "unsupported checkpoint version")
 	}
-	u := unsigned{Version: cp.Version, CheckpointID: cp.CheckpointID, CreatedAt: cp.CreatedAt, LedgerFile: cp.LedgerFile, LedgerSHA256: cp.LedgerSHA256, LedgerSizeBytes: cp.LedgerSizeBytes, Health: cp.Health, EventChains: cp.EventChains, APIAccessHead: cp.APIAccessHead, OperatorReceiptHead: cp.OperatorReceiptHead, OperatorReceiptCount: cp.OperatorReceiptCount, KeyID: cp.KeyID, Approver: cp.Approver}
+	u := unsigned{Version: cp.Version, CheckpointID: cp.CheckpointID, CreatedAt: cp.CreatedAt, LedgerFile: cp.LedgerFile, LedgerSHA256: cp.LedgerSHA256, LedgerSizeBytes: cp.LedgerSizeBytes, Health: cp.Health, EventChains: cp.EventChains, APIAccessHead: cp.APIAccessHead, AuthorizationHead: cp.AuthorizationHead, TransactionAccessHead: cp.TransactionAccessHead, OperatorReceiptHead: cp.OperatorReceiptHead, OperatorReceiptCount: cp.OperatorReceiptCount, KeyID: cp.KeyID, Approver: cp.Approver}
 	dig := digestUnsigned(u)
 	if dig != cp.MaterialDigest {
 		v.Findings = append(v.Findings, "checkpoint material digest mismatch")
@@ -228,6 +240,12 @@ func Verify(checkpointPath, keyringPath, ledgerPath, receiptDir string, now time
 		v.Findings = append(v.Findings, "API access chain: "+err.Error())
 	} else if api != cp.APIAccessHead {
 		v.Findings = append(v.Findings, "API access head mismatch")
+	}
+	authorization, err := repo.VerifyAuthorizationDecisionChain()
+	if err != nil {
+		v.Findings = append(v.Findings, "authorization decision chain: "+err.Error())
+	} else if authorization != cp.AuthorizationHead {
+		v.Findings = append(v.Findings, "authorization decision head mismatch")
 	}
 	if cp.OperatorReceiptCount > 0 {
 		rv, err := operatorreceipt.Verify(receiptDir, ring, now)

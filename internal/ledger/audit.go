@@ -22,13 +22,15 @@ type AuditFinding struct {
 }
 
 type AuditReport struct {
-	GeneratedAt  time.Time        `json:"generated_at"`
-	Healthy      bool             `json:"healthy"`
-	Health       Health           `json:"health"`
-	EventChain   EventChainReport `json:"event_chain"`
-	ErrorCount   int              `json:"error_count"`
-	WarningCount int              `json:"warning_count"`
-	Findings     []AuditFinding   `json:"findings,omitempty"`
+	GeneratedAt                time.Time        `json:"generated_at"`
+	Healthy                    bool             `json:"healthy"`
+	Health                     Health           `json:"health"`
+	EventChain                 EventChainReport `json:"event_chain"`
+	AuthorizationChainHead     string           `json:"authorization_chain_head,omitempty"`
+	TransactionAccessChainHead string           `json:"transaction_access_chain_head,omitempty"`
+	ErrorCount                 int              `json:"error_count"`
+	WarningCount               int              `json:"warning_count"`
+	Findings                   []AuditFinding   `json:"findings,omitempty"`
 }
 
 func (r *Repository) Audit() (AuditReport, error) {
@@ -49,12 +51,36 @@ func (r *Repository) Audit() (AuditReport, error) {
 		}
 	}
 
+	authorizationHead, authorizationErr := r.VerifyAuthorizationDecisionChain()
+	report.AuthorizationChainHead = authorizationHead
+	if authorizationErr != nil {
+		report.Healthy = false
+		report.Findings = append(report.Findings, AuditFinding{Code: "authorization_chain", Severity: AuditError, Message: authorizationErr.Error()})
+	}
+
+	accessHead, accessErr := r.VerifyTransactionAccessChain()
+	report.TransactionAccessChainHead = accessHead
+	if accessErr != nil {
+		report.Healthy = false
+		report.Findings = append(report.Findings, AuditFinding{Code: "transaction_access_chain", Severity: AuditError, Message: accessErr.Error()})
+	}
+
 	checks := []struct {
 		query    string
 		code     string
 		severity AuditSeverity
 		message  func(Row) string
 	}{
+		{
+			query: `SELECT transaction_id FROM transactions WHERE owner_principal_id IS NULL OR owner_principal_id=''`,
+			code:  "missing_transaction_owner", severity: AuditError,
+			message: func(Row) string { return "transaction has no durable owner principal" },
+		},
+		{
+			query: `SELECT g.transaction_id FROM transaction_access_grants g JOIN transactions t ON t.transaction_id=g.transaction_id WHERE g.principal_id=t.owner_principal_id`,
+			code:  "owner_redundant_grant", severity: AuditError,
+			message: func(Row) string { return "transaction owner must not also have an explicit grant" },
+		},
 		{
 			query: `SELECT t.transaction_id FROM transactions t WHERE t.approval_digest IS NOT NULL AND NOT EXISTS (SELECT 1 FROM approvals a WHERE a.transaction_id=t.transaction_id AND a.transaction_digest=t.approval_digest AND a.material_revision=t.material_revision AND a.decision='approved')`,
 			code:  "approval_binding", severity: AuditError,

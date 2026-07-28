@@ -4,6 +4,7 @@ import "time"
 
 type Transaction struct {
 	ID                string           `json:"transaction_id"`
+	OwnerPrincipalID  string           `json:"owner_principal_id"`
 	ProtocolVersion   string           `json:"protocol_version"`
 	Mode              string           `json:"mode"`
 	AgentAdapter      string           `json:"agent_adapter,omitempty"`

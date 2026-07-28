@@ -4,10 +4,13 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/SHOnnay/futurediff/internal/buildinfo"
+	"github.com/SHOnnay/futurediff/internal/capability"
 
 	"github.com/SHOnnay/futurediff/internal/adapters/githubdraft"
 	"github.com/SHOnnay/futurediff/internal/adapters/slackoutbox"
@@ -16,12 +19,13 @@ import (
 )
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: futurediff [--socket path] <version|health|create|execute|get|prepare-github-branch|prepare-github-pr|prepare-slack-message|effects|refresh-effect|seal|verify|approval-material|approve|approve-signed|approve-quorum|commit|recover|abort|events> ...")
+	fmt.Fprintln(os.Stderr, "usage: futurediff [--socket path] <version|health|create|list|get|access-list|access-grant|access-revoke|execute|prepare-github-branch|prepare-github-pr|prepare-slack-message|effects|refresh-effect|seal|verify|approval-material|approve|approve-signed|approve-quorum|commit|recover|abort|events> ...")
 	os.Exit(2)
 }
 func main() {
 	home, _ := os.UserHomeDir()
 	socket := flag.String("socket", filepath.Join(home, ".futurediff", "futurediff.sock"), "daemon Unix socket")
+	capabilityFile := flag.String("capability-file", "", "optional signed capability JSON/compact file")
 	flag.Parse()
 	args := flag.Args()
 	if len(args) == 0 {
@@ -37,6 +41,8 @@ func main() {
 		return
 	case "health":
 		method, path = "GET", "/v1/health"
+	case "list":
+		method, path = "GET", "/v1/transactions"
 	case "create":
 		if len(args) < 2 {
 			usage()
@@ -83,6 +89,22 @@ func main() {
 		}
 		method, path = "POST", "/v1/transactions/"+args[1]+"/effects/slack/message"
 		body = app.PrepareSlackMessageRequest{CredentialID: args[2], Input: input}
+	case "access-list":
+		if len(args) < 2 {
+			usage()
+		}
+		method, path = "GET", "/v1/transactions/"+args[1]+"/access"
+	case "access-grant":
+		if len(args) < 4 {
+			usage()
+		}
+		method, path = "PUT", "/v1/transactions/"+args[1]+"/access/"+url.PathEscape(args[2])
+		body = map[string]string{"permission": args[3]}
+	case "access-revoke":
+		if len(args) < 3 {
+			usage()
+		}
+		method, path = "DELETE", "/v1/transactions/"+args[1]+"/access/"+url.PathEscape(args[2])
 	case "effects":
 		if len(args) < 2 {
 			usage()
@@ -156,7 +178,31 @@ func main() {
 	default:
 		usage()
 	}
-	out, err := client.Do(method, path, body)
+	var out json.RawMessage
+	var err error
+	if *capabilityFile != "" {
+		b, readErr := os.ReadFile(*capabilityFile)
+		if readErr != nil {
+			fatal(readErr)
+		}
+		compact := strings.TrimSpace(string(b))
+		var wrapper struct {
+			Token   capability.Token `json:"token"`
+			Compact string           `json:"compact"`
+		}
+		if json.Unmarshal(b, &wrapper) == nil && wrapper.Compact != "" {
+			compact = wrapper.Compact
+		}
+		if wrapper.Compact == "" && wrapper.Token.CapabilityID != "" {
+			compact, err = capability.EncodeCompact(wrapper.Token)
+			if err != nil {
+				fatal(err)
+			}
+		}
+		out, err = client.DoWithHeaders(method, path, body, map[string]string{"X-FutureDiff-Capability": compact})
+	} else {
+		out, err = client.Do(method, path, body)
+	}
 	if err != nil {
 		fatal(err)
 	}

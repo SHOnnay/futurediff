@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/SHOnnay/futurediff/internal/agentbench"
+	"github.com/SHOnnay/futurediff/internal/authorization"
 	"github.com/SHOnnay/futurediff/internal/backupcatalog"
 	"github.com/SHOnnay/futurediff/internal/configattest"
 	"github.com/SHOnnay/futurediff/internal/credentials"
@@ -98,6 +99,10 @@ func Lint(path, kind string) Report {
 		if _, err := idempotencygc.Load(path); err != nil {
 			fail("invalid_idempotency_retention_policy", err)
 		}
+	case "authorization-policy":
+		if _, err := authorization.Load(path); err != nil {
+			fail("invalid_authorization_policy", err)
+		}
 	case "backup-retention-policy":
 		if _, err := backupcatalog.Load(path); err != nil {
 			fail("invalid_backup_retention_policy", err)
@@ -162,6 +167,11 @@ func detect(data []byte) string {
 	}
 	if _, ok := m["completed_after_hours"]; ok {
 		return "idempotency-retention-policy"
+	}
+	if _, ok := m["roles"]; ok {
+		if _, ok := m["bindings"]; ok {
+			return "authorization-policy"
+		}
 	}
 	if _, ok := m["backup_root"]; ok {
 		return "backup-retention-policy"

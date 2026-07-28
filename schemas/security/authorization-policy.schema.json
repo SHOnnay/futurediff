@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://futurediff.dev/schemas/security/authorization-policy.schema.json",
+  "title": "FutureDiff authorization policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "default",
+    "roles",
+    "bindings"
+  ],
+  "properties": {
+    "version": {
+      "const": "1"
+    },
+    "default": {
+      "const": "deny"
+    },
+    "agent_roles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "roles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "operations"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "operations": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "resource_scope": {
+            "enum": [
+              "owned",
+              "all"
+            ]
+          }
+        }
+      }
+    },
+    "bindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "uid",
+          "roles"
+        ],
+        "properties": {
+          "uid": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "roles": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          }
+        }
+      }
+    }
+  }
+}

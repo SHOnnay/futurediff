@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://futurediff.dev/schemas/security/authorization-capability.schema.json",
+  "title": "FutureDiff one-time authorization capability",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "capability_id", "subject_uid", "operation_id", "approver", "key_id", "issued_at", "expires_at", "nonce", "signature"],
+  "properties": {
+    "version": {"const": "1"},
+    "capability_id": {"type": "string", "pattern": "^cap-[0-9a-f]{32}$"},
+    "subject_uid": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+    "operation_id": {"type": "string", "minLength": 1},
+    "resource_id": {"type": "string"},
+    "approver": {"type": "string", "minLength": 1},
+    "key_id": {"type": "string", "minLength": 1},
+    "issued_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "nonce": {"type": "string", "minLength": 16},
+    "signature": {"type": "string", "minLength": 32}
+  }
+}

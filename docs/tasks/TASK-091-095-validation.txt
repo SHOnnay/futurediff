@@ -1,0 +1,17 @@
+FutureDiff Tasks 091-095 validation
+===================================
+gofmt: PASS
+go vet ./...: PASS
+go test ./...: PASS
+go test -race ./...: PASS
+go test -cover ./...: PASS
+Go commands built: 70
+JSON files validated: 60
+Tenant live validation: PASS
+Tenant conformance: 13 PASS / 0 FAIL
+Transaction demo: COMMITTED
+Live checkout unchanged: PASS
+Release verification: 75 PASS / 0 FAIL / 1 SKIP
+SPDX SBOM: PASS
+SLSA/in-toto provenance: PASS
+Hosted GitHub attestation: SKIPPED (local release)
