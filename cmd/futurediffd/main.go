@@ -29,6 +29,7 @@ import (
 	"github.com/SHOnnay/futurediff/internal/ledger"
 	"github.com/SHOnnay/futurediff/internal/maintenance"
 	"github.com/SHOnnay/futurediff/internal/operatorapproval"
+	"github.com/SHOnnay/futurediff/internal/peerauth"
 	"github.com/SHOnnay/futurediff/internal/quota"
 	"github.com/SHOnnay/futurediff/internal/ratelimit"
 	"github.com/SHOnnay/futurediff/internal/repoadmission"
@@ -70,12 +71,17 @@ func main() {
 	lockFile := flag.String("lock-file", "", "exclusive daemon lock file")
 	shutdownTimeout := flag.Duration("shutdown-timeout", 30*time.Second, "maximum graceful drain duration")
 	allowedPeerUIDs := flag.String("allowed-peer-uids", strconv.Itoa(os.Geteuid()), "comma-separated Unix UIDs allowed to access the daemon socket")
-	disablePeerAuth := flag.Bool("disable-peer-auth", false, "disable Linux SO_PEERCRED authorization (not recommended)")
+	disablePeerAuth := flag.Bool("disable-peer-auth", false, "disable kernel-authenticated local peer authorization (unsafe; not recommended)")
 	version := flag.Bool("version", false, "print build information")
 	flag.Parse()
 	if *version {
 		fmt.Printf("%+v\n", buildinfo.Current())
 		return
+	}
+	if !*disablePeerAuth {
+		if err := peerauth.CheckSupport(); err != nil {
+			log.Fatalf("peer authentication: %v", err)
+		}
 	}
 	if *socket == "" {
 		*socket = filepath.Join(*root, "futurediff.sock")
