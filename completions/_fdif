@@ -1,0 +1,14 @@
+#compdef fdif
+_fdif() {
+  local -a commands
+  commands=(start create status workspace shell review seal verify approve publish apply commit finish transactions list use events abort daemon doctor config demo completion version help)
+  if (( CURRENT == 2 )); then
+    _describe 'command' commands
+    return
+  fi
+  case "$words[2]" in
+    daemon) _values 'action' status start stop restart logs ;;
+    completion) _values 'shell' bash zsh fish powershell ;;
+  esac
+}
+compdef _fdif fdif

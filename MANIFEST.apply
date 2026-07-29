@@ -8,9 +8,16 @@
 .github/workflows/release.yml
 ARCHITECTURE.md
 LICENSE
+Makefile
 README.md
 SECURITY.md
+cmd/fdif/main.go
+cmd/fdif/main_test.go
+completions/_fdif
 completions/_futurediff-ui
+completions/fdif.bash
+completions/fdif.fish
+completions/fdif.ps1
 completions/futurediff-ui.bash
 completions/futurediff-ui.fish
 config/alert-routing-policy.json
@@ -53,6 +60,9 @@ docs/DATA_GOVERNANCE.md
 docs/DEPLOYMENT_CONTRACT.md
 docs/DISASTER_RECOVERY.md
 docs/EXTERNAL_CERTIFICATION_INTAKE.md
+docs/FDIF_COMMAND_REFERENCE.md
+docs/FDIF_GUIDED_CLI.md
+docs/FDIF_INSTALLATION.md
 docs/GITHUB_PUSH_GUIDE.md
 docs/INCIDENT_AND_RELEASE_GOVERNANCE.md
 docs/MERGE-REPORT.md
@@ -146,6 +156,7 @@ docs/adr/ADR-092-sharing-never-delegates-administration.md
 docs/adr/ADR-093-listing-is-resource-scoped-at-query-time.md
 docs/adr/ADR-094-access-changes-have-an-independent-hash-chain.md
 docs/adr/ADR-095-tenant-isolation-is-release-conformance-evidence.md
+docs/adr/ADR-096-fdif-guided-cli.md
 docs/benchmarks/task-016-report.json
 docs/benchmarks/task-016-report.md
 docs/benchmarks/task-027-agent-report.json
@@ -316,6 +327,7 @@ docs/tasks/FutureDiff_Task_177_Documentation.md
 docs/tasks/FutureDiff_Task_178_Documentation.md
 docs/tasks/FutureDiff_Task_179_Documentation.md
 docs/tasks/FutureDiff_Task_180_Documentation.md
+docs/tasks/FutureDiff_Task_181_Documentation.md
 docs/tasks/TASK-007-go-migration.md
 docs/tasks/TASK-007-validation.txt
 docs/tasks/TASK-008-rootless-oci-composition.md
@@ -500,6 +512,16 @@ examples/smoke-test.example.json
 examples/soak-test.example.json
 examples/upgrade-plan.example.json
 examples/verification/basic.verify.json
+internal/guidedcli/app.go
+internal/guidedcli/app_test.go
+internal/guidedcli/completion.go
+internal/guidedcli/daemon.go
+internal/guidedcli/engine.go
+internal/guidedcli/engine_test.go
+internal/guidedcli/render.go
+internal/guidedcli/state.go
+internal/guidedcli/state_test.go
+internal/guidedcli/types.go
 schemas/api/local-api-contract.schema.json
 schemas/api/openapi-v1.json
 schemas/approval/envelope.schema.json
@@ -539,6 +561,7 @@ schemas/transparency-ledger.schema.json
 schemas/verification/contract.schema.json
 scripts/Assurance.ps1
 scripts/FutureDiff-UI.ps1
+scripts/Install-Fdif.ps1
 scripts/Operations-Assurance.ps1
 scripts/Production-Closure.ps1
 scripts/Promotion-Assurance.ps1
@@ -551,6 +574,7 @@ scripts/demo.sh
 scripts/final-production-gate.sh
 scripts/futurediff-ui
 scripts/github-attestation-verify.sh
+scripts/install-fdif.sh
 scripts/operations-assurance.sh
 scripts/production-closure.sh
 scripts/production-launch.sh

@@ -86,7 +86,7 @@ class CLIUITests(unittest.TestCase):
         self.assertEqual(report["remaining_percentage"], 0)
 
     def test_doctor_accepts_explicit_binary(self):
-        binary = "/bin/true" if Path("/bin/true").is_file() else str(Path(os.__file__).resolve())
+        binary = sys.executable
         with mock.patch.dict(os.environ, {"TERM": "xterm"}, clear=False):
             report = cli.doctor(binary)
         names = {x["name"]: x for x in report["checks"]}
@@ -99,9 +99,17 @@ class CLIUITests(unittest.TestCase):
         self.assertTrue(payload["passed"])
 
     def test_run_command_preserves_exit_code(self):
-        renderer = cli.Renderer(cli.Capabilities(False, False, False), quiet=True)
-        binary = "/bin/sh"
-        code = cli.run_command(binary, ["-c", "exit 7"], renderer, json_mode=False, yes=True)
+        renderer = cli.Renderer(
+            cli.Capabilities(False, False, False),
+            quiet=True,
+        )
+        code = cli.run_command(
+            sys.executable,
+            ["-c", "import sys; sys.exit(7)"],
+            renderer,
+            json_mode=False,
+            yes=True,
+        )
         self.assertEqual(code, 7)
 
     def test_main_json_config_has_no_ansi(self):
@@ -114,16 +122,32 @@ class CLIUITests(unittest.TestCase):
 
     def test_main_direct_passthrough(self):
         with tempfile.TemporaryDirectory() as d:
-            executable = Path(d) / "fake-futurediff"
-            executable.write_text("#!/bin/sh\nexit 6\n", encoding="utf-8")
-            executable.chmod(0o755)
-            code = cli.main(["--binary", str(executable), "transaction-list"])
+            script = Path(d) / "exit_six.py"
+            script.write_text(
+                "raise SystemExit(6)\n",
+                encoding="utf-8",
+            )
+            code = cli.main(
+                [
+                    "--binary",
+                    sys.executable,
+                    str(script),
+                ]
+            )
         self.assertEqual(code, 6)
 
     def test_main_noninteractive_risky_json_error(self):
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
-            code = cli.main(["--json", "--binary", "/bin/true", "delete", "x"])
+            code = cli.main(
+                [
+                    "--json",
+                    "--binary",
+                    sys.executable,
+                    "delete",
+                    "x",
+                ]
+            )
         self.assertEqual(code, 2)
         result = json.loads(output.getvalue())
         self.assertFalse(result["passed"])
