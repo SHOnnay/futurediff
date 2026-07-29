@@ -13,6 +13,7 @@ README.md
 SECURITY.md
 cmd/fdif/main.go
 cmd/fdif/main_test.go
+cmd/futurediffd/main.go
 completions/_fdif
 completions/_futurediff-ui
 completions/fdif.bash
@@ -65,6 +66,7 @@ docs/FDIF_GUIDED_CLI.md
 docs/FDIF_INSTALLATION.md
 docs/GITHUB_PUSH_GUIDE.md
 docs/INCIDENT_AND_RELEASE_GOVERNANCE.md
+docs/MACOS_PEER_AUTH.md
 docs/MERGE-REPORT.md
 docs/OBSERVABILITY_AND_ALERTING.md
 docs/OPERATIONAL_EVIDENCE.md
@@ -522,6 +524,13 @@ internal/guidedcli/render.go
 internal/guidedcli/state.go
 internal/guidedcli/state_test.go
 internal/guidedcli/types.go
+internal/peerauth/peer_darwin.go
+internal/peerauth/peer_darwin_nocgo.go
+internal/peerauth/peer_darwin_nocgo_test.go
+internal/peerauth/peer_linux.go
+internal/peerauth/peer_other.go
+internal/peerauth/peer_unix_test.go
+internal/peerauth/support_unix_test.go
 schemas/api/local-api-contract.schema.json
 schemas/api/openapi-v1.json
 schemas/approval/envelope.schema.json
@@ -584,6 +593,7 @@ scripts/release-promotion.sh
 scripts/release.sh
 scripts/sign-release.sh
 scripts/slo-check.sh
+scripts/validate-macos-peer-auth.sh
 scripts/validate-overlay.sh
 scripts/verify-signature.sh
 tests/test_assurance.py

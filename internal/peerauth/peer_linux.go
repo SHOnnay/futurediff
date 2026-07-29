@@ -8,6 +8,9 @@ import (
 	"syscall"
 )
 
+// CheckSupport reports whether secure kernel-authenticated peer identity is available.
+func CheckSupport() error { return nil }
+
 func FromConn(conn net.Conn) (Identity, error) {
 	unixConn, ok := conn.(*net.UnixConn)
 	if !ok {
