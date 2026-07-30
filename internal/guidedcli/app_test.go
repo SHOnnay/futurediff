@@ -43,6 +43,14 @@ func (f *fakeEngine) Run(_ context.Context, args ...string) ([]byte, error) {
 	switch args[0] {
 	case "health":
 		return []byte(`{"status":"ok"}`), nil
+	case "create":
+		if len(args) >= 2 {
+			f.repo = args[1]
+		}
+		if f.state == "" {
+			f.state = "active"
+		}
+		return response(), nil
 	case "list":
 		data, _ := json.Marshal(Response{Transactions: []Transaction{{TransactionID: id, Status: f.state, WorkspaceIdentity: f.workspace}}})
 		return data, nil
@@ -354,7 +362,7 @@ func TestPublishClearsCurrentPointerAndExplainsBranch(t *testing.T) {
 	if _, err := app.Store.Load(); !os.IsNotExist(err) {
 		t.Fatalf("current pointer was not cleared: %v", err)
 	}
-	if !strings.Contains(out.String(), "futurediff/tx_test") || !strings.Contains(out.String(), "unchanged by FutureDiff") {
+	if !strings.Contains(out.String(), "futurediff/tx_test") || !strings.Contains(out.String(), "Current branch") || !strings.Contains(out.String(), "unchanged") {
 		t.Fatalf("publish output did not explain safe branch behavior:\n%s", out.String())
 	}
 }
@@ -384,5 +392,88 @@ func TestResolveExecutableRejectsNonExecutableFile(t *testing.T) {
 	}
 	if _, err := resolveExecutable(path); err == nil {
 		t.Fatal("non-executable file was accepted")
+	}
+}
+
+func TestNewAliasCreatesSafeWorkingCopy(t *testing.T) {
+	repo, workspace := makeRepoAndWorkspace(t)
+	engine := &fakeEngine{state: "active", repo: repo, workspace: workspace}
+	app, out, _ := newTestApp(t, engine, repo, workspace)
+	if code := app.Run(context.Background(), []string{"new", repo}); code != 0 {
+		t.Fatalf("new exit code %d", code)
+	}
+	if len(engine.calls) == 0 || engine.calls[len(engine.calls)-1][0] != "create" {
+		t.Fatalf("new did not dispatch create: %v", engine.calls)
+	}
+	for _, phrase := range []string{"Safe working copy created", "Work only in the safe working copy", "editor or coding agent"} {
+		if !strings.Contains(out.String(), phrase) {
+			t.Fatalf("start output missing %q:\n%s", phrase, out.String())
+		}
+	}
+}
+
+func TestDiscardAliasAbortsWithFriendlyOutput(t *testing.T) {
+	repo, workspace := makeRepoAndWorkspace(t)
+	engine := &fakeEngine{state: "active", repo: repo, workspace: workspace}
+	app, out, _ := newTestApp(t, engine, repo, workspace)
+	if code := app.Run(context.Background(), []string{"discard", "tx_test"}); code != 0 {
+		t.Fatalf("discard exit code %d", code)
+	}
+	if engine.state != "aborted" {
+		t.Fatalf("discard state = %s", engine.state)
+	}
+	if !strings.Contains(out.String(), "Change discarded") {
+		t.Fatalf("discard output was not friendly:\n%s", out.String())
+	}
+}
+
+func TestHelpSeparatesEverydayAndAdvancedWorkflow(t *testing.T) {
+	repo, workspace := makeRepoAndWorkspace(t)
+	engine := &fakeEngine{state: "active", repo: repo, workspace: workspace}
+	app, out, _ := newTestApp(t, engine, repo, workspace)
+	if code := app.Run(context.Background(), []string{"help"}); code != 0 {
+		t.Fatalf("help exit code %d", code)
+	}
+	for _, phrase := range []string{"Everyday workflow", "Advanced workflow", "cooperative mode is the public-alpha default", "fdif start|new", "fdif abort|discard"} {
+		if !strings.Contains(out.String(), phrase) {
+			t.Fatalf("help missing %q:\n%s", phrase, out.String())
+		}
+	}
+}
+
+func TestCompletionIncludesFriendlyAliases(t *testing.T) {
+	for _, shell := range []string{"bash", "zsh", "fish", "powershell"} {
+		script, err := completionScript(shell)
+		if err != nil {
+			t.Fatalf("%s completion: %v", shell, err)
+		}
+		for _, alias := range []string{"new", "discard"} {
+			if !strings.Contains(script, alias) {
+				t.Fatalf("%s completion missing %s: %s", shell, alias, script)
+			}
+		}
+	}
+}
+
+func TestCommittedCompletionFilesMatchGenerated(t *testing.T) {
+	cases := map[string]string{
+		"bash":       "fdif.bash",
+		"zsh":        "_fdif",
+		"fish":       "fdif.fish",
+		"powershell": "fdif.ps1",
+	}
+	for shell, name := range cases {
+		want, err := completionScript(shell)
+		if err != nil {
+			t.Fatalf("generate %s completion: %v", shell, err)
+		}
+		path := filepath.Join("..", "..", "completions", name)
+		got, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		if string(got) != want {
+			t.Fatalf("%s completion file is stale", shell)
+		}
 	}
 }

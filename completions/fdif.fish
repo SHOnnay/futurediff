@@ -1,5 +1,6 @@
 complete -c fdif -f
 complete -c fdif -n '__fish_use_subcommand' -a start
+complete -c fdif -n '__fish_use_subcommand' -a new
 complete -c fdif -n '__fish_use_subcommand' -a create
 complete -c fdif -n '__fish_use_subcommand' -a status
 complete -c fdif -n '__fish_use_subcommand' -a workspace
@@ -17,6 +18,7 @@ complete -c fdif -n '__fish_use_subcommand' -a list
 complete -c fdif -n '__fish_use_subcommand' -a use
 complete -c fdif -n '__fish_use_subcommand' -a events
 complete -c fdif -n '__fish_use_subcommand' -a abort
+complete -c fdif -n '__fish_use_subcommand' -a discard
 complete -c fdif -n '__fish_use_subcommand' -a daemon
 complete -c fdif -n '__fish_use_subcommand' -a doctor
 complete -c fdif -n '__fish_use_subcommand' -a config

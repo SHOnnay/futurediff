@@ -7,9 +7,9 @@ import (
 )
 
 var fdifCommands = []string{
-	"start", "create", "status", "workspace", "shell", "review", "seal",
+	"start", "new", "create", "status", "workspace", "shell", "review", "seal",
 	"verify", "approve", "publish", "apply", "commit", "finish",
-	"transactions", "list", "use", "events", "abort", "daemon", "doctor",
+	"transactions", "list", "use", "events", "abort", "discard", "daemon", "doctor",
 	"config", "demo", "completion", "version", "help",
 }
 
