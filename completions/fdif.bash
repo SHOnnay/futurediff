@@ -1,6 +1,6 @@
 _fdif_complete() {
   local cur="${COMP_WORDS[COMP_CWORD]}"
-  local commands="start create status workspace shell review seal verify approve publish apply commit finish transactions list use events abort daemon doctor config demo completion version help"
+  local commands="start new create status workspace shell review seal verify approve publish apply commit finish transactions list use events abort discard daemon doctor config demo completion version help"
   if [[ $COMP_CWORD -eq 1 ]]; then
     COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
     return

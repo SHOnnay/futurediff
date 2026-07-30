@@ -111,7 +111,7 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		a.help()
 	case "version", "--version":
 		err = a.version(ctx)
-	case "start", "create":
+	case "start", "create", "new":
 		err = a.start(ctx, args)
 	case "status", "get":
 		err = a.status(ctx, args)
@@ -137,7 +137,7 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		err = a.use(ctx, args)
 	case "events":
 		err = a.passthroughTransaction(ctx, "events", args)
-	case "abort":
+	case "abort", "discard":
 		err = a.abort(ctx, args)
 	case "daemon":
 		err = a.daemon(ctx, args)
@@ -175,37 +175,46 @@ func (a *App) fail(err error) int {
 func (a *App) help() {
 	fmt.Fprintln(a.Out, `FutureDiff guided CLI
 
-Usage:
-  fdif                         open the guided menu
-  fdif start [repo]            create and select a transaction
-  fdif status [tx]             show useful transaction status
-  fdif workspace [tx] --print  print the isolated workspace
-  fdif shell [tx]              open a shell in the workspace
-  fdif review [tx] [--full]    review pending changes
-  fdif seal [tx]               seal the exact patch
-  fdif verify [tx] [--policy file]
-  fdif approve [tx] [--yes]    resolve digest and approve
-  fdif publish [tx] [--yes]    publish the approved change branch
-  fdif apply|commit             aliases for publish
-  fdif finish [tx] [--yes]     state-aware review-to-apply flow
-  fdif transactions            list transactions
-  fdif use [tx]                select the current transaction
-  fdif events [tx]             show audit events
-  fdif abort [tx] [--yes]      abort a transaction
-  fdif daemon <status|start|stop|restart>
-  fdif doctor                  check local requirements
-  fdif config                  show guided CLI configuration
-  fdif demo [--yes]            run a disposable end-to-end demo
-  fdif completion <shell>       print Bash, Zsh, Fish or PowerShell completion
+Review changes in a safe working copy before they reach your current branch.
+
+Everyday workflow:
+  fdif start|new [repo]       create and select a safe working copy
+  fdif status [tx]            show the current change and next step
+  fdif workspace [tx]         print the safe working-copy path
+  fdif shell [tx]             open a shell in the safe working copy
+  fdif review [tx] [--full]   review changed files and the exact diff
+  fdif finish [tx] [--yes]    verify, approve and publish a safe local branch
+  fdif abort|discard [tx]     discard an unfinished change
+  fdif demo [--yes]           run a disposable end-to-end demonstration
+  fdif doctor                 check local requirements
+
+Advanced workflow:
+  fdif seal [tx]              freeze the exact reviewed patch
+  fdif verify [tx]            run the configured verification policy
+  fdif approve [tx]           approve the exact verified version
+  fdif publish [tx]           publish futurediff/<transaction-id> locally
+  fdif transactions           list changes
+  fdif use [tx]               select the current change
+  fdif events [tx]            show audit events
+  fdif daemon <action>        status, start, stop, restart or logs
+  fdif config                 show guided CLI configuration
+  fdif completion <shell>     print Bash, Zsh, Fish or PowerShell completion
+  fdif version                show version information
+
+Notes:
+  - start and new are equivalent.
+  - abort and discard are equivalent.
+  - cooperative mode is the public-alpha default.
+  - open the printed safe working copy in your editor or coding agent.
+  - finish publishes a new local branch; it does not modify your current branch.
 
 Global options are handled by cmd/fdif:
   --binary, --daemon-binary, --socket, --state, --policy,
   --json, --yes, --no-color, --non-interactive`)
 }
-
 func (a *App) menu(ctx context.Context) error {
 	a.Renderer.title("FutureDiff")
-	fmt.Fprintln(a.Out, "Safe changes through isolated transactions")
+	fmt.Fprintln(a.Out, "Review changes safely before they reach your branch")
 	fmt.Fprintln(a.Out)
 	if a.Daemon.Status(ctx) == nil {
 		a.Renderer.success("Daemon running")
@@ -216,14 +225,14 @@ func (a *App) menu(ctx context.Context) error {
 		fmt.Fprintln(a.Out, "Repository:", repo)
 	}
 	if current, err := a.Store.Load(); err == nil {
-		fmt.Fprintln(a.Out, "Current transaction:", current.TransactionID)
+		fmt.Fprintln(a.Out, "Current change:", current.TransactionID)
 	}
 	fmt.Fprintln(a.Out, `
 1  Start a new change
-2  Continue current transaction
-3  Review pending changes
-4  Finish: verify, approve and publish
-5  View transactions
+2  View current change
+3  Review changed files
+4  Finish and publish a safe local branch
+5  View all changes
 6  Start or check daemon
 7  Run system check
 8  Help
@@ -331,13 +340,16 @@ func (a *App) start(ctx context.Context, args []string) error {
 	if a.JSON {
 		return writeRawJSON(a.Out, raw)
 	}
-	a.Renderer.success("Transaction created")
+	a.Renderer.success("Safe working copy created")
 	workspace := ""
 	if response.Workspace != nil {
 		workspace = response.Workspace.WorkspacePath
 	}
-	a.Renderer.fields([2]string{"Transaction", response.Transaction.TransactionID}, [2]string{"Repository", repoRoot}, [2]string{"Workspace", workspace}, [2]string{"Mode", response.Transaction.Mode})
-	a.Renderer.next("edit the workspace, then run: fdif finish")
+	a.Renderer.fields([2]string{"Change ID", response.Transaction.TransactionID}, [2]string{"Repository", repoRoot}, [2]string{"Safe working copy", workspace}, [2]string{"Mode", response.Transaction.Mode})
+	fmt.Fprintln(a.Out)
+	fmt.Fprintln(a.Out, "Work only in the safe working copy shown above.")
+	fmt.Fprintln(a.Out, "Open it in your editor or coding agent, or run: fdif shell")
+	a.Renderer.next("when the change is ready: fdif review, then fdif finish")
 	return nil
 }
 
@@ -353,7 +365,7 @@ func (a *App) status(ctx context.Context, args []string) error {
 	if a.JSON {
 		return writeRawJSON(a.Out, raw)
 	}
-	a.Renderer.title("Transaction")
+	a.Renderer.title("Current change")
 	tx := response.Transaction
 	workspace, repo := "", ""
 	if response.Workspace != nil {
@@ -365,7 +377,7 @@ func (a *App) status(ctx context.Context, args []string) error {
 		changed = strings.Join(response.Patch.ChangedPaths, ", ")
 		patchSize = formatBytes(response.Patch.PatchSizeBytes)
 	}
-	a.Renderer.fields([2]string{"ID", tx.TransactionID}, [2]string{"Status", tx.Status}, [2]string{"Mode", tx.Mode}, [2]string{"Repository", repo}, [2]string{"Workspace", workspace}, [2]string{"Changed", changed}, [2]string{"Patch", patchSize})
+	a.Renderer.fields([2]string{"Change ID", tx.TransactionID}, [2]string{"Status", tx.Status}, [2]string{"Mode", tx.Mode}, [2]string{"Repository", repo}, [2]string{"Safe working copy", workspace}, [2]string{"Changed", changed}, [2]string{"Patch", patchSize})
 	next := nextAction(tx.Status)
 	if tx.Status == "ready" && tx.ApprovalDigest != "" {
 		next = "fdif publish"
@@ -386,7 +398,7 @@ func (a *App) workspace(ctx context.Context, args []string) error {
 		return err
 	}
 	if response.Workspace == nil || response.Workspace.WorkspacePath == "" {
-		return errors.New("transaction has no workspace path")
+		return errors.New("change has no safe working-copy path")
 	}
 	if a.JSON {
 		return writeJSON(a.Out, map[string]string{"transaction_id": id, "workspace_path": response.Workspace.WorkspacePath})
@@ -405,7 +417,7 @@ func (a *App) shell(ctx context.Context, args []string) error {
 		return err
 	}
 	if response.Workspace == nil || response.Workspace.WorkspacePath == "" {
-		return errors.New("transaction has no workspace")
+		return errors.New("change has no safe working copy")
 	}
 	if !a.Interactive {
 		return errors.New("fdif shell requires an interactive terminal")
@@ -440,7 +452,7 @@ func (a *App) review(ctx context.Context, args []string) error {
 		return err
 	}
 	if response.Workspace == nil || response.Workspace.WorkspacePath == "" {
-		return errors.New("transaction has no workspace")
+		return errors.New("change has no safe working copy")
 	}
 	full := contains(args, "--full")
 	status, statusErr := gitOutput(ctx, a.GitBinary, response.Workspace.WorkspacePath, "status", "--short")
@@ -459,9 +471,9 @@ func (a *App) review(ctx context.Context, args []string) error {
 		}
 		return writeJSON(a.Out, result)
 	}
-	a.Renderer.title("Review transaction " + shortID(id))
+	a.Renderer.title("Review change " + shortID(id))
 	if strings.TrimSpace(status) == "" {
-		fmt.Fprintln(a.Out, "No unsealed workspace changes detected.")
+		fmt.Fprintln(a.Out, "No changes detected in the safe working copy.")
 	} else {
 		fmt.Fprintln(a.Out, "\nChanged files")
 		fmt.Fprintln(a.Out, indent(status, "  "))
@@ -511,9 +523,9 @@ func (a *App) seal(ctx context.Context, args []string) error {
 	if a.JSON {
 		return writeRawJSON(a.Out, raw)
 	}
-	a.Renderer.success("Change sealed")
+	a.Renderer.success("Reviewed version frozen")
 	if response.Patch != nil {
-		a.Renderer.fields([2]string{"Transaction", id}, [2]string{"Changed", strings.Join(response.Patch.ChangedPaths, ", ")}, [2]string{"Patch size", formatBytes(response.Patch.PatchSizeBytes)}, [2]string{"Patch SHA", shortHash(response.Patch.PatchSHA256)}, [2]string{"Status", response.Transaction.Status})
+		a.Renderer.fields([2]string{"Change ID", id}, [2]string{"Changed", strings.Join(response.Patch.ChangedPaths, ", ")}, [2]string{"Patch size", formatBytes(response.Patch.PatchSizeBytes)}, [2]string{"Patch SHA", shortHash(response.Patch.PatchSHA256)}, [2]string{"Status", response.Transaction.Status})
 	}
 	a.Renderer.next("fdif verify")
 	return nil
@@ -560,12 +572,12 @@ func (a *App) verify(ctx context.Context, args []string) error {
 	if a.JSON {
 		return writeRawJSON(a.Out, raw)
 	}
-	a.Renderer.success("Verification passed")
+	a.Renderer.success("Checks passed")
 	status := "ready"
 	if response.Transaction != nil {
 		status = response.Transaction.Status
 	}
-	a.Renderer.fields([2]string{"Transaction", id}, [2]string{"Status", status})
+	a.Renderer.fields([2]string{"Change ID", id}, [2]string{"Status", status})
 	a.Renderer.next("fdif approve")
 	return nil
 }
@@ -581,7 +593,7 @@ func (a *App) approve(ctx context.Context, args []string) error {
 	}
 	if response.Transaction != nil && response.Transaction.Status == "ready" && response.Transaction.ApprovalDigest != "" {
 		if !a.JSON {
-			fmt.Fprintln(a.Out, "Transaction is already approved.")
+			fmt.Fprintln(a.Out, "This exact reviewed version is already approved.")
 		}
 		return nil
 	}
@@ -615,7 +627,7 @@ func (a *App) approve(ctx context.Context, args []string) error {
 	if a.JSON {
 		return writeRawJSON(a.Out, raw)
 	}
-	a.Renderer.success("Transaction approved")
+	a.Renderer.success("Exact reviewed version approved")
 	a.Renderer.next("fdif publish")
 	return nil
 }
@@ -631,15 +643,15 @@ func (a *App) apply(ctx context.Context, args []string) error {
 	}
 	if response.Transaction != nil && (response.Transaction.Status == "committed" || response.Transaction.Status == "complete") {
 		if !a.JSON {
-			fmt.Fprintln(a.Out, "Transaction is already committed.")
+			fmt.Fprintln(a.Out, "This change is already published.")
 		}
 		return nil
 	}
 	if response.Transaction == nil || response.Transaction.Status != "ready" {
-		return fmt.Errorf("transaction must be ready before publish; current status is %q", transactionStatus(response.Transaction))
+		return fmt.Errorf("change must pass checks before publish; current status is %q", transactionStatus(response.Transaction))
 	}
 	if response.Transaction.ApprovalDigest == "" {
-		return errors.New("transaction is ready but not approved; run fdif approve")
+		return errors.New("change passed checks but is not approved; run fdif approve")
 	}
 	material, err := a.approvalMaterial(ctx, id)
 	if err != nil {
@@ -650,7 +662,7 @@ func (a *App) apply(ctx context.Context, args []string) error {
 			return errors.New("apply requires an interactive terminal or explicit --yes")
 		}
 		if !a.JSON {
-			a.Renderer.title("Publish approved change")
+			a.Renderer.title("Publish safe local branch")
 			repo := ""
 			if response.Workspace != nil {
 				repo = response.Workspace.RepositoryRoot
@@ -659,9 +671,9 @@ func (a *App) apply(ctx context.Context, args []string) error {
 			if response.Patch != nil {
 				changed = strings.Join(response.Patch.ChangedPaths, ", ")
 			}
-			a.Renderer.fields([2]string{"Repository", repo}, [2]string{"Transaction", id}, [2]string{"Changed", changed}, [2]string{"Digest", shortHash(material.TransactionDigest)})
+			a.Renderer.fields([2]string{"Repository", repo}, [2]string{"Change ID", id}, [2]string{"Reviewed files", changed}, [2]string{"Exact version", shortHash(material.TransactionDigest)})
 		}
-		ok, confirmErr := a.confirm("Publish this exact approved change branch?", "PUBLISH")
+		ok, confirmErr := a.confirm("Publish this exact approved change as a new local branch?", "PUBLISH")
 		if confirmErr != nil {
 			return confirmErr
 		}
@@ -695,7 +707,7 @@ func (a *App) apply(ctx context.Context, args []string) error {
 		}
 		return writeJSON(a.Out, map[string]any{"kind": "fdif-publish", "transaction_id": id, "repository": repo, "published_branch": branch, "commit_oid": commitOID, "current_branch_unchanged": true, "canonical_response": canonical})
 	}
-	a.Renderer.success("Change published safely")
+	a.Renderer.success("Reviewed change published locally")
 	final, decodeErr := decodeResponse(raw)
 	status := "committed"
 	if decodeErr == nil && final.Transaction != nil {
@@ -712,7 +724,7 @@ func (a *App) apply(ctx context.Context, args []string) error {
 			commitOID = strings.TrimSpace(resolved)
 		}
 	}
-	a.Renderer.fields([2]string{"Transaction", id}, [2]string{"Status", status}, [2]string{"Branch", branch}, [2]string{"Commit", shortHash(commitOID)}, [2]string{"Current branch", "unchanged by FutureDiff"})
+	a.Renderer.fields([2]string{"Change ID", id}, [2]string{"Status", status}, [2]string{"Safe branch", branch}, [2]string{"Commit", shortHash(commitOID)}, [2]string{"Current branch", "unchanged"})
 	if repo != "" {
 		a.Renderer.next("review with: git -C " + strconv.Quote(repo) + " diff HEAD.." + branch)
 	}
@@ -761,7 +773,7 @@ func (a *App) finish(ctx context.Context, args []string) error {
 			return a.apply(ctx, append([]string{id}, optionalFlag(a.Yes, "--yes")...))
 		case "committed", "complete":
 			if !a.JSON {
-				a.Renderer.success("Transaction already complete")
+				a.Renderer.success("Change already complete")
 			}
 			return nil
 		case "aborted":
@@ -790,8 +802,8 @@ func (a *App) transactions(ctx context.Context) error {
 		currentID = current.TransactionID
 	}
 	sort.Slice(response.Transactions, func(i, j int) bool { return response.Transactions[i].CreatedAt > response.Transactions[j].CreatedAt })
-	a.Renderer.title("Transactions")
-	fmt.Fprintf(a.Out, "%-8s %-18s %-12s %s\n", "CURRENT", "ID", "STATUS", "WORKSPACE")
+	a.Renderer.title("Changes")
+	fmt.Fprintf(a.Out, "%-8s %-18s %-12s %s\n", "CURRENT", "CHANGE ID", "STATUS", "SAFE WORKING COPY")
 	for _, tx := range response.Transactions {
 		marker := ""
 		if tx.TransactionID == currentID {
@@ -800,7 +812,7 @@ func (a *App) transactions(ctx context.Context) error {
 		fmt.Fprintf(a.Out, "%-8s %-18s %-12s %s\n", marker, shortID(tx.TransactionID), tx.Status, tx.WorkspaceIdentity)
 	}
 	if len(response.Transactions) == 0 {
-		fmt.Fprintln(a.Out, "No transactions.")
+		fmt.Fprintln(a.Out, "No changes.")
 	}
 	return nil
 }
@@ -828,7 +840,7 @@ func (a *App) use(ctx context.Context, args []string) error {
 	if a.JSON {
 		return writeJSON(a.Out, map[string]string{"current_transaction_id": id, "repository_root": repo})
 	}
-	a.Renderer.success("Current transaction set to " + id)
+	a.Renderer.success("Current change selected: " + id)
 	return nil
 }
 
@@ -839,14 +851,14 @@ func (a *App) abort(ctx context.Context, args []string) error {
 	}
 	if !a.Yes {
 		if !a.Interactive || a.JSON {
-			return errors.New("abort requires an interactive terminal or explicit --yes")
+			return errors.New("discard requires an interactive terminal or explicit --yes")
 		}
-		ok, confirmErr := a.confirm("Abort transaction "+id+"?", "ABORT")
+		ok, confirmErr := a.confirm("Discard change "+id+"?", "DISCARD")
 		if confirmErr != nil {
 			return confirmErr
 		}
 		if !ok {
-			return errors.New("abort declined")
+			return errors.New("discard declined")
 		}
 	}
 	raw, err := a.Engine.Run(ctx, "abort", id)
@@ -859,7 +871,7 @@ func (a *App) abort(ctx context.Context, args []string) error {
 	if a.JSON {
 		return writeRawJSON(a.Out, raw)
 	}
-	a.Renderer.success("Transaction aborted")
+	a.Renderer.success("Change discarded")
 	return nil
 }
 
@@ -1223,12 +1235,12 @@ func (a *App) resolveTransaction(ctx context.Context, explicit string, forceSele
 		return eligible[0].TransactionID, nil
 	}
 	if len(eligible) == 0 {
-		return "", errors.New("no active FutureDiff transaction; run fdif start")
+		return "", errors.New("no active FutureDiff change; run fdif start")
 	}
 	if !a.Interactive {
-		return "", errors.New("multiple transactions exist; specify an ID or run fdif use")
+		return "", errors.New("multiple changes exist; specify an ID or run fdif use")
 	}
-	a.Renderer.title("Select transaction")
+	a.Renderer.title("Select change")
 	for i, tx := range eligible {
 		fmt.Fprintf(a.Out, "%d  %-18s %s\n", i+1, shortID(tx.TransactionID), tx.Status)
 	}
@@ -1263,7 +1275,7 @@ func (a *App) approvalMaterial(ctx context.Context, id string) (ApprovalMaterial
 }
 
 func (a *App) approvalSummary(response Response, digest string) {
-	a.Renderer.title("Approval request")
+	a.Renderer.title("Approve exact reviewed version")
 	repo, changed, patch := "", "", ""
 	if response.Workspace != nil {
 		repo = response.Workspace.RepositoryRoot
@@ -1272,7 +1284,7 @@ func (a *App) approvalSummary(response Response, digest string) {
 		changed = strings.Join(response.Patch.ChangedPaths, ", ")
 		patch = shortHash(response.Patch.PatchSHA256)
 	}
-	a.Renderer.fields([2]string{"Repository", repo}, [2]string{"Changed", changed}, [2]string{"Patch SHA", patch}, [2]string{"Transaction digest", shortHash(digest)})
+	a.Renderer.fields([2]string{"Repository", repo}, [2]string{"Changed", changed}, [2]string{"Patch SHA", patch}, [2]string{"Exact version", shortHash(digest)})
 }
 
 func (a *App) prompt(label string) (string, error) {
@@ -1374,11 +1386,11 @@ func indent(value, prefix string) string {
 func nextAction(status string) string {
 	switch status {
 	case "active":
-		return "fdif review, then fdif seal"
+		return "fdif review, then fdif finish"
 	case "sealed":
 		return "fdif verify"
 	case "ready":
-		return "fdif approve or fdif finish"
+		return "fdif finish"
 	default:
 		return ""
 	}

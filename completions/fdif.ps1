@@ -1,6 +1,6 @@
 Register-ArgumentCompleter -Native -CommandName fdif -ScriptBlock {
   param($wordToComplete, $commandAst, $cursorPosition)
-  $commands = @('start','create','status','workspace','shell','review','seal','verify','approve','publish','apply','commit','finish','transactions','list','use','events','abort','daemon','doctor','config','demo','completion','version','help')
+  $commands = @('start','new','create','status','workspace','shell','review','seal','verify','approve','publish','apply','commit','finish','transactions','list','use','events','abort','discard','daemon','doctor','config','demo','completion','version','help')
   $tokens = $commandAst.CommandElements
   if ($tokens.Count -le 2) {
     $commands | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
