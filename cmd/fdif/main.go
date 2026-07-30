@@ -24,6 +24,14 @@ func parseArguments(args []string) (guidedcli.Options, []string, error) {
 	remaining := make([]string, 0, len(args))
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
+		if isFinishValueOption(arg) {
+			if i+1 >= len(args) {
+				return options, nil, fmt.Errorf("%s requires a value", arg)
+			}
+			remaining = append(remaining, arg, args[i+1])
+			i++
+			continue
+		}
 		switch arg {
 		case "--json":
 			options.JSON = true
@@ -33,7 +41,7 @@ func parseArguments(args []string) (guidedcli.Options, []string, error) {
 			options.NoColor = true
 		case "--non-interactive":
 			options.NonInteractive = true
-		case "--binary", "--daemon-binary", "--socket", "--state", "--policy":
+		case "--binary", "--daemon-binary", "--socket", "--state", "--policy", "--credential-config", "--github-credential":
 			if i+1 >= len(args) {
 				return options, nil, fmt.Errorf("%s requires a value", arg)
 			}
@@ -53,9 +61,18 @@ func parseArguments(args []string) (guidedcli.Options, []string, error) {
 	return options, remaining, nil
 }
 
+func isFinishValueOption(arg string) bool {
+	switch arg {
+	case "--remote", "--base", "--title", "--body", "--body-file":
+		return true
+	default:
+		return false
+	}
+}
+
 func isValueOption(key string) bool {
 	switch key {
-	case "--binary", "--daemon-binary", "--socket", "--state", "--policy":
+	case "--binary", "--daemon-binary", "--socket", "--state", "--policy", "--credential-config", "--github-credential":
 		return true
 	default:
 		return false
@@ -74,5 +91,9 @@ func setOption(options *guidedcli.Options, key, value string) {
 		options.StatePath = value
 	case "--policy":
 		options.VerifyPolicy = value
+	case "--credential-config":
+		options.CredentialConfig = value
+	case "--github-credential":
+		options.GitHubCredentialID = value
 	}
 }

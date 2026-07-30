@@ -9,6 +9,7 @@ _fdif() {
   case "$words[2]" in
     daemon) _values 'action' status start stop restart logs ;;
     completion) _values 'shell' bash zsh fish powershell ;;
+    finish) _values 'option' --github --remote --base --title --body --body-file --credential-config --github-credential --full --yes ;;
   esac
 }
 compdef _fdif fdif
