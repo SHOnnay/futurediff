@@ -133,6 +133,7 @@ docs/DEPLOYMENT_CONTRACT.md
 docs/DISASTER_RECOVERY.md
 docs/EXTERNAL_CERTIFICATION_INTAKE.md
 docs/FDIF_COMMAND_REFERENCE.md
+docs/FDIF_GITHUB_PUBLICATION.md
 docs/FDIF_GUIDED_CLI.md
 docs/FDIF_INSTALLATION.md
 docs/GITHUB_PUSH_GUIDE.md
@@ -230,6 +231,7 @@ docs/adr/ADR-093-listing-is-resource-scoped-at-query-time.md
 docs/adr/ADR-094-access-changes-have-an-independent-hash-chain.md
 docs/adr/ADR-095-tenant-isolation-is-release-conformance-evidence.md
 docs/adr/ADR-096-fdif-guided-cli.md
+docs/adr/ADR-097-fdif-optional-github-publication.md
 docs/benchmarks/task-016-report.json
 docs/benchmarks/task-016-report.md
 docs/benchmarks/task-027-agent-report.json
@@ -696,8 +698,10 @@ internal/guidedcli/app.go
 internal/guidedcli/app_test.go
 internal/guidedcli/completion.go
 internal/guidedcli/daemon.go
+internal/guidedcli/daemon_test.go
 internal/guidedcli/engine.go
 internal/guidedcli/engine_test.go
+internal/guidedcli/github.go
 internal/guidedcli/render.go
 internal/guidedcli/state.go
 internal/guidedcli/state_test.go

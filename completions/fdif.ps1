@@ -12,6 +12,7 @@ Register-ArgumentCompleter -Native -CommandName fdif -ScriptBlock {
   $values = switch ($parent) {
     'daemon' { @('status','start','stop','restart','logs') }
     'completion' { @('bash','zsh','fish','powershell') }
+    'finish' { @('--github','--remote','--base','--title','--body','--body-file','--github-credential','--full','--yes') }
     default { @() }
   }
   $values | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {

@@ -133,3 +133,14 @@ func executableName(name string) string {
 	}
 	return name
 }
+
+func decodeExternalEffect(raw []byte) (ExternalEffect, error) {
+	var effect ExternalEffect
+	if err := json.Unmarshal(raw, &effect); err != nil {
+		return ExternalEffect{}, fmt.Errorf("decode external effect: %w", err)
+	}
+	if effect.EffectID == "" {
+		return ExternalEffect{}, errors.New("FutureDiff returned no effect_id")
+	}
+	return effect, nil
+}

@@ -20,6 +20,8 @@ type fakeEngine struct {
 	workspace string
 	repo      string
 	calls     [][]string
+	effects   []ExternalEffect
+	receipts  []EffectReceipt
 }
 
 func (f *fakeEngine) Run(_ context.Context, args ...string) ([]byte, error) {
@@ -31,8 +33,10 @@ func (f *fakeEngine) Run(_ context.Context, args ...string) ([]byte, error) {
 	response := func() []byte {
 		value := Response{
 			Transaction: &Transaction{TransactionID: id, Status: f.state, Mode: "cooperative"},
-			Workspace:   &Workspace{TransactionID: id, RepositoryRoot: f.repo, WorkspacePath: f.workspace},
+			Workspace:   &Workspace{TransactionID: id, RepositoryRoot: f.repo, WorkspacePath: f.workspace, SourceHeadRef: "refs/heads/main"},
 			Patch:       &Patch{TransactionID: id, ChangedPaths: []string{"README.md"}, PatchSHA256: strings.Repeat("a", 64), PatchSizeBytes: 12},
+			Effects:     append([]ExternalEffect(nil), f.effects...),
+			Receipts:    append([]EffectReceipt(nil), f.receipts...),
 		}
 		if f.approved {
 			value.Transaction.ApprovalDigest = strings.Repeat("d", 64)
@@ -69,6 +73,22 @@ func (f *fakeEngine) Run(_ context.Context, args ...string) ([]byte, error) {
 		}
 		f.state = "ready"
 		return response(), nil
+	case "prepare-github-branch":
+		if f.state != "sealed" || len(args) != 7 {
+			return nil, fmt.Errorf("prepare branch args/state: %v %s", args, f.state)
+		}
+		input, _ := json.Marshal(githubBranchInput{Owner: args[3], Repo: args[4], Branch: args[5], RemoteURL: args[6]})
+		effect := ExternalEffect{EffectID: "effect_branch", TransactionID: id, AdapterIdentity: githubBranchAdapterID, CredentialID: args[2], InputJSON: string(input), Status: "verified"}
+		f.effects = append(f.effects, effect)
+		return json.Marshal(effect)
+	case "prepare-github-pr":
+		if f.state != "sealed" || len(args) != 10 || args[9] != "effect_branch" {
+			return nil, fmt.Errorf("prepare PR args/state: %v %s", args, f.state)
+		}
+		input, _ := json.Marshal(githubDraftInput{Owner: args[3], Repo: args[4], Head: args[5], Base: args[6], Title: args[7], Body: args[8], DependsOnEffectID: args[9]})
+		effect := ExternalEffect{EffectID: "effect_pr", TransactionID: id, AdapterIdentity: githubDraftAdapterID, CredentialID: args[2], InputJSON: string(input), Status: "verified", DependsOn: []string{"effect_branch"}}
+		f.effects = append(f.effects, effect)
+		return json.Marshal(effect)
 	case "approval-material":
 		return []byte(`{"transaction_id":"tx_test","transaction_digest":"` + strings.Repeat("d", 64) + `"}`), nil
 	case "approve":
@@ -85,6 +105,12 @@ func (f *fakeEngine) Run(_ context.Context, args ...string) ([]byte, error) {
 			return nil, fmt.Errorf("wrong commit digest: %v", args)
 		}
 		f.state = "committed"
+		if len(f.effects) > 0 {
+			f.receipts = []EffectReceipt{
+				{ReceiptID: "receipt_branch", EffectID: "effect_branch", ProviderResourceID: "github://octo/example/refs/heads/futurediff/tx_test"},
+				{ReceiptID: "receipt_pr", EffectID: "effect_pr", ProviderResourceID: "github://octo/example/pulls/42"},
+			}
+		}
 		return response(), nil
 	case "abort":
 		f.state = "aborted"
@@ -475,5 +501,266 @@ func TestCommittedCompletionFilesMatchGenerated(t *testing.T) {
 		if string(got) != want {
 			t.Fatalf("%s completion file is stale", shell)
 		}
+	}
+}
+
+func TestParseGitHubRemoteSupportsHTTPSAndSSH(t *testing.T) {
+	cases := []string{
+		"https://github.com/octo/example.git",
+		"https://github.com/octo/example.git/",
+		"git@github.com:octo/example.git",
+		"ssh://git@github.com/octo/example.git",
+	}
+	for _, raw := range cases {
+		owner, repo, normalized, err := parseGitHubRemote(raw)
+		if err != nil {
+			t.Fatalf("parse %q: %v", raw, err)
+		}
+		if owner != "octo" || repo != "example" || normalized != "https://github.com/octo/example.git" {
+			t.Fatalf("parse %q = %s/%s %s", raw, owner, repo, normalized)
+		}
+	}
+}
+
+func TestParseGitHubRemoteRejectsUnsupportedHostAndCredentials(t *testing.T) {
+	for _, raw := range []string{
+		"https://gitlab.com/octo/example.git",
+		"https://token@github.com/octo/example.git",
+		"https://github.com/octo/too/many.git",
+	} {
+		if _, _, _, err := parseGitHubRemote(raw); err == nil {
+			t.Fatalf("unsafe remote was accepted: %s", raw)
+		}
+	}
+}
+
+func TestFinishGitHubPreparesEffectsBeforeVerifyAndReturnsPRURL(t *testing.T) {
+	repo, workspace := makeRepoAndWorkspace(t)
+	runGitTest(t, repo, "remote", "add", "origin", "git@github.com:octo/example.git")
+	engine := &fakeEngine{state: "active", repo: repo, workspace: workspace}
+	app, out, _ := newTestApp(t, engine, repo, workspace)
+	app.GitHubCredentialID = "github-main"
+	if code := app.Run(context.Background(), []string{"finish", "tx_test", "--github", "--title", "Add safe publication"}); code != 0 {
+		t.Fatalf("GitHub finish failed: stdout=%s", out.String())
+	}
+	var names []string
+	for _, call := range engine.calls {
+		names = append(names, call[0])
+	}
+	positions := map[string]int{}
+	for i, name := range names {
+		if _, exists := positions[name]; !exists {
+			positions[name] = i
+		}
+	}
+	for _, name := range []string{"seal", "prepare-github-branch", "prepare-github-pr", "verify", "approve", "commit"} {
+		if _, ok := positions[name]; !ok {
+			t.Fatalf("missing %s in %v", name, names)
+		}
+	}
+	if !(positions["seal"] < positions["prepare-github-branch"] && positions["prepare-github-branch"] < positions["prepare-github-pr"] && positions["prepare-github-pr"] < positions["verify"] && positions["verify"] < positions["commit"]) {
+		t.Fatalf("unsafe effect order: %v", names)
+	}
+	for _, phrase := range []string{"sent to GitHub", "https://github.com/octo/example/pull/42", "futurediff/tx_test", "Current branch"} {
+		if !strings.Contains(out.String(), phrase) {
+			t.Fatalf("GitHub output missing %q:\n%s", phrase, out.String())
+		}
+	}
+}
+
+func TestFinishGitHubJSONProducesOneDocument(t *testing.T) {
+	repo, workspace := makeRepoAndWorkspace(t)
+	runGitTest(t, repo, "remote", "add", "origin", "https://github.com/octo/example.git")
+	engine := &fakeEngine{state: "active", repo: repo, workspace: workspace}
+	app, out, _ := newTestApp(t, engine, repo, workspace)
+	app.JSON = true
+	app.GitHubCredentialID = "github-main"
+	if code := app.Run(context.Background(), []string{"finish", "tx_test", "--github"}); code != 0 {
+		t.Fatalf("GitHub JSON finish exit code %d: %s", code, out.String())
+	}
+	var decoded struct {
+		Kind   string              `json:"kind"`
+		GitHub GitHubPublishResult `json:"github"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &decoded); err != nil {
+		t.Fatalf("invalid GitHub JSON: %v\n%s", err, out.String())
+	}
+	if decoded.Kind != "fdif-publish" || decoded.GitHub.PullRequestURL != "https://github.com/octo/example/pull/42" || !decoded.GitHub.Draft {
+		t.Fatalf("unexpected GitHub JSON: %+v", decoded)
+	}
+}
+
+func TestFinishGitHubRequiresCredentialSelection(t *testing.T) {
+	repo, workspace := makeRepoAndWorkspace(t)
+	runGitTest(t, repo, "remote", "add", "origin", "https://github.com/octo/example.git")
+	engine := &fakeEngine{state: "active", repo: repo, workspace: workspace}
+	app, _, errOut := newTestApp(t, engine, repo, workspace)
+	if code := app.Run(context.Background(), []string{"finish", "tx_test", "--github"}); code == 0 {
+		t.Fatal("GitHub finish succeeded without credential selection")
+	}
+	if !strings.Contains(errOut.String(), "FUTUREDIFF_GITHUB_CREDENTIAL_ID") {
+		t.Fatalf("unclear credential error: %s", errOut.String())
+	}
+}
+
+func TestFinishGitHubRejectsReadyTransactionWithoutPreparedEffects(t *testing.T) {
+	repo, workspace := makeRepoAndWorkspace(t)
+	runGitTest(t, repo, "remote", "add", "origin", "https://github.com/octo/example.git")
+	engine := &fakeEngine{state: "ready", repo: repo, workspace: workspace}
+	app, _, errOut := newTestApp(t, engine, repo, workspace)
+	app.GitHubCredentialID = "github-main"
+	if code := app.Run(context.Background(), []string{"finish", "tx_test", "--github"}); code == 0 {
+		t.Fatal("GitHub effects were incorrectly added after verification")
+	}
+	if !strings.Contains(errOut.String(), "prepared while the change is sealed") {
+		t.Fatalf("unexpected late-selection error: %s", errOut.String())
+	}
+}
+
+func TestLocalFinishDoesNotPrepareGitHubEffects(t *testing.T) {
+	repo, workspace := makeRepoAndWorkspace(t)
+	runGitTest(t, repo, "remote", "add", "origin", "https://github.com/octo/example.git")
+	engine := &fakeEngine{state: "active", repo: repo, workspace: workspace}
+	app, _, _ := newTestApp(t, engine, repo, workspace)
+	app.GitHubCredentialID = "github-main"
+	if code := app.Run(context.Background(), []string{"finish", "tx_test"}); code != 0 {
+		t.Fatalf("local finish failed: %d", code)
+	}
+	for _, call := range engine.calls {
+		if strings.HasPrefix(call[0], "prepare-github-") {
+			t.Fatalf("local finish prepared GitHub effect: %v", call)
+		}
+	}
+}
+
+func TestParseFinishOptionsRejectsUnsafeOrAmbiguousInput(t *testing.T) {
+	bodyFile := filepath.Join(t.TempDir(), "body.md")
+	if err := os.WriteFile(bodyFile, []byte("body"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(t.TempDir(), "body-link.md")
+	if err := os.Symlink(bodyFile, link); err != nil {
+		t.Fatal(err)
+	}
+	cases := [][]string{
+		{"--remote", "origin"},
+		{"--github", "--unknown"},
+		{"--github", "--remote", "-unsafe"},
+		{"--github", "--body", "one", "--body-file", bodyFile},
+		{"--github", "--body-file", link},
+		{"tx_one", "tx_two"},
+	}
+	for _, args := range cases {
+		if _, err := parseFinishOptions(args, "github-main"); err == nil {
+			t.Fatalf("unsafe finish options were accepted: %v", args)
+		}
+	}
+}
+
+func TestParseFinishOptionsSupportsInlineValues(t *testing.T) {
+	options, err := parseFinishOptions([]string{"tx_one", "--github", "--remote=upstream", "--base=main", "--title=Safe change"}, "github-main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !options.Enabled || options.Remote != "upstream" || options.Base != "main" || options.Title != "Safe change" {
+		t.Fatalf("unexpected options: %+v", options)
+	}
+}
+
+func TestParseGitHubRemoteRejectsUnsafeForms(t *testing.T) {
+	for _, raw := range []string{
+		"http://github.com/octo/example.git",
+		"ftp://github.com/octo/example.git",
+		"https://github.com:444/octo/example.git",
+		"ssh://git@github.com:2222/octo/example.git",
+		"https://github.com/octo/%65xample.git",
+		"ssh://user@github.com/octo/example.git",
+		"github.com:octo/example.git",
+	} {
+		if _, _, _, err := parseGitHubRemote(raw); err == nil {
+			t.Fatalf("unsafe remote was accepted: %s", raw)
+		}
+	}
+}
+
+func TestMatchingGitHubEffectsRejectsDuplicatesAndBrokenDependency(t *testing.T) {
+	target := githubTarget{Owner: "octo", Repo: "example", RemoteURL: "https://github.com/octo/example.git", Head: "futurediff/tx_test", Base: "main", Title: "Title", Body: "Body", Credential: "github-main"}
+	branchInput, _ := json.Marshal(githubBranchInput{Owner: target.Owner, Repo: target.Repo, Branch: target.Head, RemoteURL: target.RemoteURL})
+	draftInput, _ := json.Marshal(githubDraftInput{Owner: target.Owner, Repo: target.Repo, Head: target.Head, Base: target.Base, Title: target.Title, Body: target.Body, DependsOnEffectID: "wrong"})
+	branch := ExternalEffect{EffectID: "branch", AdapterIdentity: githubBranchAdapterID, CredentialID: target.Credential, InputJSON: string(branchInput)}
+	draft := ExternalEffect{EffectID: "draft", AdapterIdentity: githubDraftAdapterID, CredentialID: target.Credential, InputJSON: string(draftInput), DependsOn: []string{"wrong"}}
+	if _, _, err := matchingGitHubEffects([]ExternalEffect{branch, draft}, target); err == nil || !strings.Contains(err.Error(), "not bound") {
+		t.Fatalf("broken dependency was accepted: %v", err)
+	}
+	if _, _, err := matchingGitHubEffects([]ExternalEffect{branch, branch}, target); err == nil || !strings.Contains(err.Error(), "multiple GitHub branch") {
+		t.Fatalf("duplicate branch effects were accepted: %v", err)
+	}
+}
+
+func TestMatchingGitHubEffectsRejectsChangedBody(t *testing.T) {
+	target := githubTarget{Owner: "octo", Repo: "example", RemoteURL: "https://github.com/octo/example.git", Head: "futurediff/tx_test", Base: "main", Title: "Title", Body: "Expected", Credential: "github-main"}
+	branchInput, _ := json.Marshal(githubBranchInput{Owner: target.Owner, Repo: target.Repo, Branch: target.Head, RemoteURL: target.RemoteURL})
+	draftInput, _ := json.Marshal(githubDraftInput{Owner: target.Owner, Repo: target.Repo, Head: target.Head, Base: target.Base, Title: target.Title, Body: "Different", DependsOnEffectID: "branch"})
+	effects := []ExternalEffect{
+		{EffectID: "branch", AdapterIdentity: githubBranchAdapterID, CredentialID: target.Credential, InputJSON: string(branchInput)},
+		{EffectID: "draft", AdapterIdentity: githubDraftAdapterID, CredentialID: target.Credential, InputJSON: string(draftInput), DependsOn: []string{"branch"}},
+	}
+	if _, _, err := matchingGitHubEffects(effects, target); err == nil || !strings.Contains(err.Error(), "different GitHub pull-request") {
+		t.Fatalf("changed body was accepted: %v", err)
+	}
+}
+
+func TestGitHubResultRejectsMalformedReceiptURL(t *testing.T) {
+	target := githubTarget{Owner: "octo", Repo: "example", Head: "futurediff/tx_test", Base: "main"}
+	response := Response{
+		Effects:  []ExternalEffect{{EffectID: "draft", AdapterIdentity: githubDraftAdapterID}},
+		Receipts: []EffectReceipt{{EffectID: "draft", ProviderResourceID: "github://octo/example/pulls/not-a-number"}},
+	}
+	result := githubResult(response, target)
+	if !result.URLIsFallback || result.PullRequestURL != "https://github.com/octo/example/pulls" {
+		t.Fatalf("malformed receipt was trusted: %+v", result)
+	}
+}
+
+func TestLocalFinishRejectsPreparedExternalActions(t *testing.T) {
+	repo, workspace := makeRepoAndWorkspace(t)
+	engine := &fakeEngine{state: "ready", approved: true, repo: repo, workspace: workspace, effects: []ExternalEffect{{EffectID: "effect_slack", AdapterIdentity: "builtin.slack.message-outbox"}}}
+	app, _, errOut := newTestApp(t, engine, repo, workspace)
+	if code := app.Run(context.Background(), []string{"finish", "tx_test"}); code == 0 {
+		t.Fatal("local finish silently committed a prepared external action")
+	}
+	if !strings.Contains(errOut.String(), "cannot silently commit external actions") {
+		t.Fatalf("unclear prepared-effect error: %s", errOut.String())
+	}
+	for _, call := range engine.calls {
+		if call[0] == "commit" {
+			t.Fatalf("commit ran despite prepared external action: %v", engine.calls)
+		}
+	}
+}
+
+func TestGuidedPublishRejectsPreparedExternalActions(t *testing.T) {
+	repo, workspace := makeRepoAndWorkspace(t)
+	engine := &fakeEngine{state: "ready", approved: true, repo: repo, workspace: workspace, effects: []ExternalEffect{{EffectID: "effect_pr", AdapterIdentity: githubDraftAdapterID}}}
+	app, _, errOut := newTestApp(t, engine, repo, workspace)
+	if code := app.Run(context.Background(), []string{"publish", "tx_test"}); code == 0 {
+		t.Fatal("guided publish silently committed an external action")
+	}
+	if !strings.Contains(errOut.String(), "prepared external actions") {
+		t.Fatalf("unclear guided publish error: %s", errOut.String())
+	}
+}
+
+func TestFinishGitHubRejectsUnrelatedPreparedEffect(t *testing.T) {
+	repo, workspace := makeRepoAndWorkspace(t)
+	runGitTest(t, repo, "remote", "add", "origin", "https://github.com/octo/example.git")
+	engine := &fakeEngine{state: "sealed", repo: repo, workspace: workspace, effects: []ExternalEffect{{EffectID: "effect_slack", AdapterIdentity: "builtin.slack.message-outbox"}}}
+	app, _, errOut := newTestApp(t, engine, repo, workspace)
+	app.GitHubCredentialID = "github-main"
+	if code := app.Run(context.Background(), []string{"finish", "tx_test", "--github"}); code == 0 {
+		t.Fatal("guided GitHub finish accepted an unrelated prepared effect")
+	}
+	if !strings.Contains(errOut.String(), "cannot commit prepared effect") {
+		t.Fatalf("unclear unrelated-effect error: %s", errOut.String())
 	}
 }

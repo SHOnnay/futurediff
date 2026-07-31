@@ -55,7 +55,28 @@ refs/heads/futurediff/<transaction-id>
 
 The repository's current branch and current worktree remain unchanged.
 
+## Optional GitHub draft pull request
+
+When GitHub credentials are configured, select GitHub on the first finish run:
+
+```bash
+fdif finish --github
+```
+
+This keeps local branch publication as the foundation, then pushes that exact
+safe branch and creates a draft pull request. The provider request is prepared
+before verification, so the repository, base, head, title and body are part of
+the exact reviewed and approved transaction material.
+
+`--github` is optional. A missing GitHub configuration never prevents ordinary
+local publication with `fdif finish`.
+
+See [`FDIF_GITHUB_PUBLICATION.md`](FDIF_GITHUB_PUBLICATION.md) for credential
+setup, options, confirmation behavior and recovery guidance.
+
 ## What success looks like
+
+Local:
 
 ```text
 Reviewed change published locally
@@ -67,8 +88,20 @@ Current branch
   unchanged
 ```
 
-The new branch can be inspected, merged, pushed, or used to open a pull request.
-GitHub is an optional provider step, not a requirement for local success.
+GitHub:
+
+```text
+Reviewed change published and sent to GitHub
+
+Safe branch
+  futurediff/tx_...
+
+Draft PR
+  https://github.com/OWNER/REPOSITORY/pull/NUMBER
+
+Current branch
+  unchanged
+```
 
 ## Everyday commands
 
@@ -80,6 +113,7 @@ fdif shell                  open a shell in the safe working copy
 fdif review                 show changed files and a summary
 fdif review --full          show the exact diff
 fdif finish                 verify, approve and publish locally
+fdif finish --github        also create a GitHub draft pull request
 fdif abort | fdif discard   discard an unfinished change
 fdif doctor                 check local requirements
 fdif demo --yes             run the disposable automated demo
@@ -113,11 +147,14 @@ permissions are restrictive, and symbolic-link paths are rejected.
 ## Safety
 
 - daemon peer authentication remains enabled by default;
-- approval and local publication require exact confirmation;
+- approval and publication require exact confirmation;
 - non-interactive risky actions require `--yes`;
 - approval material is resolved again immediately before mutation;
+- GitHub branch creation is create-only and bound to the approved commit;
+- draft-PR creation depends on the exact prepared branch effect;
+- credential IDs may appear in transaction metadata, but tokens do not;
 - JSON mode never prompts and never contains ANSI decoration;
 - low-level FutureDiff exit codes are preserved;
 - `fdif` does not duplicate transaction business logic;
-- publishing creates a new `futurediff/<transaction-id>` branch and does not
-  switch or mutate the current branch.
+- publishing creates `futurediff/<transaction-id>` and does not switch or mutate
+  the current branch.

@@ -28,3 +28,4 @@ complete -c fdif -n '__fish_use_subcommand' -a version
 complete -c fdif -n '__fish_use_subcommand' -a help
 complete -c fdif -n '__fish_seen_subcommand_from daemon' -a 'status start stop restart logs'
 complete -c fdif -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish powershell'
+complete -c fdif -n '__fish_seen_subcommand_from finish' -a '--github --remote --base --title --body --body-file --credential-config --github-credential --full --yes'

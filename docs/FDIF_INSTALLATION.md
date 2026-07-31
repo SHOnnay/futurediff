@@ -1,10 +1,9 @@
 # Installing `fdif`
 
-`fdif` should be installed beside `futurediff` and `futurediffd` so it can discover both automatically.
+`fdif` should be installed beside `futurediff` and `futurediffd` so it can
+discover both automatically.
 
 ## Build through the repository
-
-After merging this implementation, `fdif` is part of `COMMANDS`:
 
 ```bash
 make build
@@ -38,11 +37,8 @@ Set-ExecutionPolicy -Scope Process Bypass
 .\scripts\Install-Fdif.ps1
 ```
 
-User-local destination is used by default. A custom destination:
-
-```powershell
-.\scripts\Install-Fdif.ps1 -Destination "$HOME\bin"
-```
+Windows binaries and completion generation are build-tested. The public alpha
+does not yet claim a complete secure Windows daemon and GitHub-provider runtime.
 
 ## Shell completion
 
@@ -71,9 +67,36 @@ PowerShell profile:
 fdif completion powershell | Out-File -Append -Encoding utf8 $PROFILE
 ```
 
-## First run
+## First local run
 
 ```bash
 fdif doctor
-fdif demo
+fdif demo --yes
 ```
+
+The demo is local and disposable. It does not require GitHub credentials.
+
+## Optional GitHub configuration
+
+GitHub publication is configured at daemon startup through a restricted
+credential configuration file. Start with:
+
+```bash
+mkdir -p "$HOME/.config/futurediff"
+cp examples/credentials/providers.example.json \
+  "$HOME/.config/futurediff/providers.json"
+chmod 600 "$HOME/.config/futurediff/providers.json"
+```
+
+Edit the destination allowlist for the intended repository, export the token
+source named by the config, then:
+
+```bash
+export FUTUREDIFF_CREDENTIAL_CONFIG="$HOME/.config/futurediff/providers.json"
+export FUTUREDIFF_GITHUB_CREDENTIAL_ID=github-main
+fdif daemon restart
+fdif doctor
+```
+
+Full setup and safe usage are documented in
+[`FDIF_GITHUB_PUBLICATION.md`](FDIF_GITHUB_PUBLICATION.md).

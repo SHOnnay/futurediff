@@ -47,11 +47,13 @@ type Patch struct {
 }
 
 type Response struct {
-	Patch         *Patch        `json:"patch,omitempty"`
-	Transaction   *Transaction  `json:"transaction,omitempty"`
-	Transactions  []Transaction `json:"transactions,omitempty"`
-	Workspace     *Workspace    `json:"workspace,omitempty"`
-	ResourceScope string        `json:"resource_scope,omitempty"`
+	Patch         *Patch           `json:"patch,omitempty"`
+	Transaction   *Transaction     `json:"transaction,omitempty"`
+	Transactions  []Transaction    `json:"transactions,omitempty"`
+	Workspace     *Workspace       `json:"workspace,omitempty"`
+	Effects       []ExternalEffect `json:"effects,omitempty"`
+	Receipts      []EffectReceipt  `json:"receipts,omitempty"`
+	ResourceScope string           `json:"resource_scope,omitempty"`
 }
 
 type ApprovalMaterial struct {
@@ -65,14 +67,68 @@ type CurrentTransaction struct {
 	SelectedAt     time.Time `json:"selected_at"`
 }
 
+type ExternalEffect struct {
+	EffectID        string   `json:"effect_id"`
+	TransactionID   string   `json:"transaction_id"`
+	AdapterIdentity string   `json:"adapter_identity"`
+	CredentialID    string   `json:"credential_id"`
+	Destination     string   `json:"destination"`
+	InputJSON       string   `json:"input_json"`
+	PreviewJSON     string   `json:"preview_json"`
+	Status          string   `json:"status"`
+	DependsOn       []string `json:"depends_on,omitempty"`
+}
+
+type EffectReceipt struct {
+	ReceiptID           string `json:"receipt_id"`
+	EffectID            string `json:"effect_id"`
+	ProviderOperationID string `json:"provider_operation_id,omitempty"`
+	ProviderResourceID  string `json:"provider_resource_id,omitempty"`
+	RequestDigest       string `json:"request_digest"`
+	ResponseDigest      string `json:"response_digest,omitempty"`
+	StatusQueryRef      string `json:"status_query_ref,omitempty"`
+}
+
+type githubBranchInput struct {
+	Owner     string `json:"owner"`
+	Repo      string `json:"repo"`
+	Branch    string `json:"branch"`
+	RemoteURL string `json:"remote_url"`
+}
+
+type githubDraftInput struct {
+	Owner             string `json:"owner"`
+	Repo              string `json:"repo"`
+	Title             string `json:"title"`
+	Body              string `json:"body,omitempty"`
+	Head              string `json:"head"`
+	Base              string `json:"base"`
+	DependsOnEffectID string `json:"depends_on_effect_id,omitempty"`
+}
+
+type GitHubPublishResult struct {
+	Requested          bool   `json:"requested"`
+	Owner              string `json:"owner"`
+	Repo               string `json:"repo"`
+	Branch             string `json:"branch"`
+	Base               string `json:"base"`
+	Draft              bool   `json:"draft"`
+	PullRequestURL     string `json:"pull_request_url,omitempty"`
+	URLIsFallback      bool   `json:"url_is_fallback,omitempty"`
+	EffectID           string `json:"effect_id,omitempty"`
+	ProviderResourceID string `json:"provider_resource_id,omitempty"`
+}
+
 type Config struct {
-	Binary       string `json:"binary"`
-	DaemonBinary string `json:"daemon_binary"`
-	Socket       string `json:"socket"`
-	StatePath    string `json:"state_path"`
-	VerifyPolicy string `json:"verify_policy"`
-	JSON         bool   `json:"json"`
-	Interactive  bool   `json:"interactive"`
-	Color        bool   `json:"color"`
-	Unicode      bool   `json:"unicode"`
+	Binary             string `json:"binary"`
+	DaemonBinary       string `json:"daemon_binary"`
+	Socket             string `json:"socket"`
+	StatePath          string `json:"state_path"`
+	VerifyPolicy       string `json:"verify_policy"`
+	CredentialConfig   string `json:"credential_config,omitempty"`
+	GitHubCredentialID string `json:"github_credential_id,omitempty"`
+	JSON               bool   `json:"json"`
+	Interactive        bool   `json:"interactive"`
+	Color              bool   `json:"color"`
+	Unicode            bool   `json:"unicode"`
 }

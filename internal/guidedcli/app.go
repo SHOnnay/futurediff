@@ -33,33 +33,37 @@ const defaultVerificationPolicy = `{
 }`
 
 type App struct {
-	In           io.Reader
-	Out          io.Writer
-	Err          io.Writer
-	Engine       Engine
-	Daemon       DaemonManager
-	Store        StateStore
-	Renderer     Renderer
-	Binary       string
-	DaemonBinary string
-	Socket       string
-	JSON         bool
-	Yes          bool
-	Interactive  bool
-	VerifyPolicy string
-	GitBinary    string
+	In                 io.Reader
+	Out                io.Writer
+	Err                io.Writer
+	Engine             Engine
+	Daemon             DaemonManager
+	Store              StateStore
+	Renderer           Renderer
+	Binary             string
+	DaemonBinary       string
+	Socket             string
+	JSON               bool
+	Yes                bool
+	Interactive        bool
+	VerifyPolicy       string
+	CredentialConfig   string
+	GitHubCredentialID string
+	GitBinary          string
 }
 
 type Options struct {
-	Binary         string
-	DaemonBinary   string
-	Socket         string
-	StatePath      string
-	VerifyPolicy   string
-	JSON           bool
-	Yes            bool
-	NoColor        bool
-	NonInteractive bool
+	Binary             string
+	DaemonBinary       string
+	Socket             string
+	StatePath          string
+	VerifyPolicy       string
+	CredentialConfig   string
+	GitHubCredentialID string
+	JSON               bool
+	Yes                bool
+	NoColor            bool
+	NonInteractive     bool
 }
 
 func New(options Options) *App {
@@ -73,6 +77,11 @@ func New(options Options) *App {
 	if statePath == "" {
 		statePath = DefaultStatePath()
 	}
+	credentialConfig := credentialConfigPath(options.CredentialConfig)
+	githubCredentialID := strings.TrimSpace(options.GitHubCredentialID)
+	if githubCredentialID == "" {
+		githubCredentialID = strings.TrimSpace(os.Getenv("FUTUREDIFF_GITHUB_CREDENTIAL_ID"))
+	}
 	interactive := !options.NonInteractive && stdinInteractive(os.Stdin) && writerIsTerminal(os.Stdout)
 	engine := ExecEngine{Binary: binary, Socket: socket}
 	renderer := NewRenderer(os.Stdout, os.Stderr, options.NoColor || options.JSON)
@@ -82,9 +91,10 @@ func New(options Options) *App {
 		Store:  StateStore{Path: statePath}, Renderer: renderer,
 		Binary: binary, DaemonBinary: daemonBinary, Socket: socket,
 		JSON: options.JSON, Yes: options.Yes, Interactive: interactive,
-		VerifyPolicy: options.VerifyPolicy, GitBinary: "git",
+		VerifyPolicy: options.VerifyPolicy, CredentialConfig: credentialConfig,
+		GitHubCredentialID: githubCredentialID, GitBinary: "git",
 	}
-	app.Daemon = DaemonManager{Engine: engine, Binary: daemonBinary, Socket: socket}
+	app.Daemon = DaemonManager{Engine: engine, Binary: daemonBinary, Socket: socket, CredentialConfig: credentialConfig}
 	return app
 }
 
@@ -184,6 +194,7 @@ Everyday workflow:
   fdif shell [tx]             open a shell in the safe working copy
   fdif review [tx] [--full]   review changed files and the exact diff
   fdif finish [tx] [--yes]    verify, approve and publish a safe local branch
+  fdif finish [tx] --github   also push the safe branch and create a draft PR
   fdif abort|discard [tx]     discard an unfinished change
   fdif demo [--yes]           run a disposable end-to-end demonstration
   fdif doctor                 check local requirements
@@ -207,9 +218,13 @@ Notes:
   - cooperative mode is the public-alpha default.
   - open the printed safe working copy in your editor or coding agent.
   - finish publishes a new local branch; it does not modify your current branch.
+  - --github is optional and requires a daemon credential configuration.
+  - GitHub options: --remote, --base, --title, --body, --body-file,
+    --github-credential.
 
 Global options are handled by cmd/fdif:
   --binary, --daemon-binary, --socket, --state, --policy,
+  --credential-config, --github-credential,
   --json, --yes, --no-color, --non-interactive`)
 }
 func (a *App) menu(ctx context.Context) error {
@@ -232,12 +247,13 @@ func (a *App) menu(ctx context.Context) error {
 2  View current change
 3  Review changed files
 4  Finish and publish a safe local branch
-5  View all changes
-6  Start or check daemon
-7  Run system check
-8  Help
+5  Finish and create a GitHub draft pull request
+6  View all changes
+7  Start or check daemon
+8  Run system check
+9  Help
 0  Exit`)
-	choice, err := a.prompt("Select [0-8]: ")
+	choice, err := a.prompt("Select [0-9]: ")
 	if err != nil {
 		return err
 	}
@@ -253,12 +269,14 @@ func (a *App) menu(ctx context.Context) error {
 	case "4":
 		return a.finish(ctx, nil)
 	case "5":
-		return a.transactions(ctx)
+		return a.finish(ctx, []string{"--github"})
 	case "6":
-		return a.daemon(ctx, []string{"status"})
+		return a.transactions(ctx)
 	case "7":
-		return a.doctor(ctx)
+		return a.daemon(ctx, []string{"status"})
 	case "8":
+		return a.doctor(ctx)
+	case "9":
 		a.help()
 		return nil
 	default:
@@ -379,7 +397,9 @@ func (a *App) status(ctx context.Context, args []string) error {
 	}
 	a.Renderer.fields([2]string{"Change ID", tx.TransactionID}, [2]string{"Status", tx.Status}, [2]string{"Mode", tx.Mode}, [2]string{"Repository", repo}, [2]string{"Safe working copy", workspace}, [2]string{"Changed", changed}, [2]string{"Patch", patchSize})
 	next := nextAction(tx.Status)
-	if tx.Status == "ready" && tx.ApprovalDigest != "" {
+	if hasGitHubEffects(response) {
+		next = "fdif finish --github"
+	} else if tx.Status == "ready" && tx.ApprovalDigest != "" {
 		next = "fdif publish"
 	}
 	if next != "" {
@@ -637,15 +657,19 @@ func (a *App) apply(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	return a.publish(ctx, id, nil)
+}
+
+func (a *App) publish(ctx context.Context, id string, target *githubTarget) error {
 	_, response, err := a.get(ctx, id)
 	if err != nil {
 		return err
 	}
+	if hasPreparedEffects(response) && target == nil {
+		return errors.New("this change contains prepared external actions; use fdif finish --github for the guided GitHub flow or inspect it with the low-level CLI")
+	}
 	if response.Transaction != nil && (response.Transaction.Status == "committed" || response.Transaction.Status == "complete") {
-		if !a.JSON {
-			fmt.Fprintln(a.Out, "This change is already published.")
-		}
-		return nil
+		return a.renderPublishResult(ctx, id, response, target)
 	}
 	if response.Transaction == nil || response.Transaction.Status != "ready" {
 		return fmt.Errorf("change must pass checks before publish; current status is %q", transactionStatus(response.Transaction))
@@ -659,26 +683,43 @@ func (a *App) apply(ctx context.Context, args []string) error {
 	}
 	if !a.Yes {
 		if !a.Interactive || a.JSON {
-			return errors.New("apply requires an interactive terminal or explicit --yes")
+			return errors.New("publish requires an interactive terminal or explicit --yes")
 		}
-		if !a.JSON {
+		repo, changed := "", ""
+		if response.Workspace != nil {
+			repo = response.Workspace.RepositoryRoot
+		}
+		if response.Patch != nil {
+			changed = strings.Join(response.Patch.ChangedPaths, ", ")
+		}
+		if target == nil {
 			a.Renderer.title("Publish safe local branch")
-			repo := ""
-			if response.Workspace != nil {
-				repo = response.Workspace.RepositoryRoot
-			}
-			changed := ""
-			if response.Patch != nil {
-				changed = strings.Join(response.Patch.ChangedPaths, ", ")
-			}
 			a.Renderer.fields([2]string{"Repository", repo}, [2]string{"Change ID", id}, [2]string{"Reviewed files", changed}, [2]string{"Exact version", shortHash(material.TransactionDigest)})
-		}
-		ok, confirmErr := a.confirm("Publish this exact approved change as a new local branch?", "PUBLISH")
-		if confirmErr != nil {
-			return confirmErr
-		}
-		if !ok {
-			return errors.New("publish declined")
+			ok, confirmErr := a.confirm("Publish this exact approved change as a new local branch?", "PUBLISH")
+			if confirmErr != nil {
+				return confirmErr
+			}
+			if !ok {
+				return errors.New("publish declined")
+			}
+		} else {
+			a.Renderer.title("Publish and create GitHub draft pull request")
+			a.Renderer.fields(
+				[2]string{"Repository", repo},
+				[2]string{"GitHub", target.Owner + "/" + target.Repo},
+				[2]string{"Base", target.Base},
+				[2]string{"Safe branch", target.Head},
+				[2]string{"Pull request", target.Title},
+				[2]string{"Reviewed files", changed},
+				[2]string{"Exact version", shortHash(material.TransactionDigest)},
+			)
+			ok, confirmErr := a.confirm("Publish this exact approved change and create a draft pull request?", "SEND")
+			if confirmErr != nil {
+				return confirmErr
+			}
+			if !ok {
+				return errors.New("GitHub publication declined")
+			}
 		}
 	}
 	material, err = a.approvalMaterial(ctx, id)
@@ -687,32 +728,19 @@ func (a *App) apply(ctx context.Context, args []string) error {
 	}
 	raw, err := a.Engine.Run(ctx, "commit", id, material.TransactionDigest)
 	if err != nil {
+		if response.Workspace != nil && localBranchExists(ctx, a.GitBinary, response.Workspace.RepositoryRoot, "futurediff/"+id) {
+			return fmt.Errorf("local safe branch was materialized, but publication did not complete; run fdif status %s and futurediff recover %s: %w", id, id, err)
+		}
 		return err
 	}
-	if a.JSON {
-		var canonical any
-		if err := json.Unmarshal(raw, &canonical); err != nil {
-			return err
-		}
-		repo := ""
-		if response.Workspace != nil {
-			repo = response.Workspace.RepositoryRoot
-		}
-		branch := "futurediff/" + id
-		commitOID := ""
-		if repo != "" {
-			if resolved, resolveErr := gitOutput(ctx, a.GitBinary, repo, "rev-parse", "--verify", "refs/heads/"+branch+"^{commit}"); resolveErr == nil {
-				commitOID = strings.TrimSpace(resolved)
-			}
-		}
-		return writeJSON(a.Out, map[string]any{"kind": "fdif-publish", "transaction_id": id, "repository": repo, "published_branch": branch, "commit_oid": commitOID, "current_branch_unchanged": true, "canonical_response": canonical})
+	final, err := decodeResponse(raw)
+	if err != nil {
+		return err
 	}
-	a.Renderer.success("Reviewed change published locally")
-	final, decodeErr := decodeResponse(raw)
-	status := "committed"
-	if decodeErr == nil && final.Transaction != nil {
-		status = final.Transaction.Status
-	}
+	return a.renderPublishResult(ctx, id, final, target)
+}
+
+func (a *App) renderPublishResult(ctx context.Context, id string, response Response, target *githubTarget) error {
 	repo := ""
 	if response.Workspace != nil {
 		repo = response.Workspace.RepositoryRoot
@@ -724,25 +752,97 @@ func (a *App) apply(ctx context.Context, args []string) error {
 			commitOID = strings.TrimSpace(resolved)
 		}
 	}
+	status := "committed"
+	if response.Transaction != nil && response.Transaction.Status != "" {
+		status = response.Transaction.Status
+	}
+	var github *GitHubPublishResult
+	if target != nil {
+		result := githubResult(response, *target)
+		github = &result
+	}
+	if a.JSON {
+		result := map[string]any{
+			"kind":                     "fdif-publish",
+			"transaction_id":           id,
+			"repository":               repo,
+			"status":                   status,
+			"published_branch":         branch,
+			"commit_oid":               commitOID,
+			"current_branch_unchanged": true,
+			"canonical_response":       response,
+		}
+		if github != nil {
+			result["github"] = github
+		}
+		_ = a.Store.Clear()
+		return writeJSON(a.Out, result)
+	}
+	if github == nil {
+		a.Renderer.success("Reviewed change published locally")
+	} else {
+		a.Renderer.success("Reviewed change published and sent to GitHub")
+	}
 	a.Renderer.fields([2]string{"Change ID", id}, [2]string{"Status", status}, [2]string{"Safe branch", branch}, [2]string{"Commit", shortHash(commitOID)}, [2]string{"Current branch", "unchanged"})
-	if repo != "" {
+	if github != nil {
+		a.Renderer.fields([2]string{"GitHub", github.Owner + "/" + github.Repo}, [2]string{"Draft PR", github.PullRequestURL})
+		if github.URLIsFallback {
+			a.Renderer.warning("The exact pull-request receipt URL was unavailable; open the pull-request list shown above.")
+		}
+	} else if repo != "" {
 		a.Renderer.next("review with: git -C " + strconv.Quote(repo) + " diff HEAD.." + branch)
 	}
 	_ = a.Store.Clear()
 	return nil
 }
 
+func localBranchExists(ctx context.Context, gitBinary, repository, branch string) bool {
+	if repository == "" {
+		return false
+	}
+	_, err := gitOutput(ctx, gitBinary, repository, "rev-parse", "--verify", "refs/heads/"+branch+"^{commit}")
+	return err == nil
+}
+
 func (a *App) finish(ctx context.Context, args []string) error {
+	options, err := parseFinishOptions(args, a.GitHubCredentialID)
+	if err != nil {
+		return err
+	}
 	id, err := a.resolveTransaction(ctx, firstPositional(args), false)
 	if err != nil {
 		return err
+	}
+	_, initial, err := a.get(ctx, id)
+	if err != nil {
+		return err
+	}
+	if !options.Enabled && hasPreparedEffects(initial) {
+		return errors.New("this change contains prepared external actions; rerun the matching guided provider flow or inspect it with the low-level CLI. Local-only finish cannot silently commit external actions")
 	}
 	if !a.JSON {
 		if err := a.review(ctx, append([]string{id}, optionalFlag(contains(args, "--full"), "--full")...)); err != nil {
 			return err
 		}
 	}
-	for step := 0; step < 6; step++ {
+	var target *githubTarget
+	if options.Enabled {
+		resolved, targetErr := resolveGitHubTarget(ctx, a.GitBinary, initial, id, options)
+		if targetErr != nil {
+			return targetErr
+		}
+		target = &resolved
+		if hasPreparedEffects(initial) {
+			if _, _, matchErr := matchingGitHubEffects(initial.Effects, resolved); matchErr != nil {
+				return matchErr
+			}
+		}
+		if !a.JSON {
+			a.Renderer.title("GitHub draft pull request selected")
+			a.Renderer.fields([2]string{"Repository", resolved.Owner + "/" + resolved.Repo}, [2]string{"Remote", resolved.Remote}, [2]string{"Base", resolved.Base}, [2]string{"Safe branch", resolved.Head}, [2]string{"Title", resolved.Title})
+		}
+	}
+	for step := 0; step < 8; step++ {
 		_, response, getErr := a.get(ctx, id)
 		if getErr != nil {
 			return getErr
@@ -756,6 +856,13 @@ func (a *App) finish(ctx context.Context, args []string) error {
 				return err
 			}
 		case "sealed":
+			if target != nil {
+				updated, prepareErr := a.prepareGitHubEffects(ctx, id, response, *target)
+				if prepareErr != nil {
+					return fmt.Errorf("prepare GitHub draft pull request: %w", prepareErr)
+				}
+				response = updated
+			}
 			verifyArgs := []string{id}
 			if a.VerifyPolicy != "" {
 				verifyArgs = append(verifyArgs, "--policy", a.VerifyPolicy)
@@ -764,18 +871,24 @@ func (a *App) finish(ctx context.Context, args []string) error {
 				return err
 			}
 		case "ready":
+			if target != nil {
+				branch, draft, matchErr := matchingGitHubEffects(response.Effects, *target)
+				if matchErr != nil {
+					return matchErr
+				}
+				if branch == nil || draft == nil {
+					return errors.New("GitHub publication was selected after verification; effects must be prepared while the change is sealed. Start a new change or finish this one locally")
+				}
+			}
 			if response.Transaction.ApprovalDigest == "" {
 				if err := a.runStep(func() error { return a.approve(ctx, append([]string{id}, optionalFlag(a.Yes, "--yes")...)) }); err != nil {
 					return err
 				}
 				continue
 			}
-			return a.apply(ctx, append([]string{id}, optionalFlag(a.Yes, "--yes")...))
+			return a.publish(ctx, id, target)
 		case "committed", "complete":
-			if !a.JSON {
-				a.Renderer.success("Change already complete")
-			}
-			return nil
+			return a.renderPublishResult(ctx, id, response, target)
 		case "aborted":
 			return errors.New("cannot finish an aborted transaction")
 		default:
@@ -980,6 +1093,19 @@ func (a *App) doctor(ctx context.Context) error {
 	} else {
 		checks = append(checks, check{"daemon", "warn", "not running"})
 	}
+	if a.CredentialConfig == "" {
+		checks = append(checks, check{"github_credentials", "warn", "not configured; local publication remains available"})
+	} else if info, err := os.Lstat(a.CredentialConfig); err != nil {
+		checks = append(checks, check{"github_credentials", "fail", err.Error()})
+	} else if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		checks = append(checks, check{"github_credentials", "fail", "credential config must be a regular file"})
+	} else if info.Mode().Perm()&0o077 != 0 {
+		checks = append(checks, check{"github_credentials", "fail", "credential config permissions must be 0600"})
+	} else if a.GitHubCredentialID == "" {
+		checks = append(checks, check{"github_credentials", "warn", "config file is present but no GitHub credential ID is selected"})
+	} else {
+		checks = append(checks, check{"github_credentials", "pass", "configured as " + a.GitHubCredentialID})
+	}
 	if a.JSON {
 		return writeJSON(a.Out, map[string]any{"kind": "fdif-doctor", "checks": checks})
 	}
@@ -1022,12 +1148,12 @@ func pathOr(explicit, found string) string {
 }
 
 func (a *App) config() error {
-	config := Config{Binary: a.Binary, DaemonBinary: a.DaemonBinary, Socket: a.Socket, StatePath: a.Store.Path, VerifyPolicy: pathOr(a.VerifyPolicy, "embedded basic policy"), JSON: a.JSON, Interactive: a.Interactive, Color: a.Renderer.Color, Unicode: a.Renderer.Unicode}
+	config := Config{Binary: a.Binary, DaemonBinary: a.DaemonBinary, Socket: a.Socket, StatePath: a.Store.Path, VerifyPolicy: pathOr(a.VerifyPolicy, "embedded basic policy"), CredentialConfig: a.CredentialConfig, GitHubCredentialID: a.GitHubCredentialID, JSON: a.JSON, Interactive: a.Interactive, Color: a.Renderer.Color, Unicode: a.Renderer.Unicode}
 	if a.JSON {
 		return writeJSON(a.Out, config)
 	}
 	a.Renderer.title("FutureDiff guided CLI configuration")
-	a.Renderer.fields([2]string{"binary", config.Binary}, [2]string{"daemon", config.DaemonBinary}, [2]string{"socket", config.Socket}, [2]string{"state", config.StatePath}, [2]string{"verification", config.VerifyPolicy}, [2]string{"interactive", strconv.FormatBool(config.Interactive)}, [2]string{"color", strconv.FormatBool(config.Color)}, [2]string{"unicode", strconv.FormatBool(config.Unicode)})
+	a.Renderer.fields([2]string{"binary", config.Binary}, [2]string{"daemon", config.DaemonBinary}, [2]string{"socket", config.Socket}, [2]string{"state", config.StatePath}, [2]string{"verification", config.VerifyPolicy}, [2]string{"credential config", cleanDisplayPath(config.CredentialConfig)}, [2]string{"GitHub credential", pathOr(config.GitHubCredentialID, "not configured")}, [2]string{"interactive", strconv.FormatBool(config.Interactive)}, [2]string{"color", strconv.FormatBool(config.Color)}, [2]string{"unicode", strconv.FormatBool(config.Unicode)})
 	return nil
 }
 
@@ -1332,8 +1458,13 @@ func gitOutput(ctx context.Context, binary, directory string, args ...string) (s
 }
 
 func firstPositional(args []string) string {
+	valueOptions := map[string]bool{
+		"--policy": true, "--mode": true, "--remote": true, "--base": true,
+		"--title": true, "--body": true, "--body-file": true,
+		"--github-credential": true,
+	}
 	for i := 0; i < len(args); i++ {
-		if args[i] == "--policy" || args[i] == "--mode" {
+		if valueOptions[args[i]] {
 			i++
 			continue
 		}

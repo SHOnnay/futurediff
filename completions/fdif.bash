@@ -8,6 +8,7 @@ _fdif_complete() {
   case "${COMP_WORDS[1]}" in
     daemon) COMPREPLY=( $(compgen -W "status start stop restart logs" -- "$cur") ) ;;
     completion) COMPREPLY=( $(compgen -W "bash zsh fish powershell" -- "$cur") ) ;;
+    finish) COMPREPLY=( $(compgen -W "--github --remote --base --title --body --body-file --credential-config --github-credential --full --yes" -- "$cur") ) ;;
   esac
 }
 complete -F _fdif_complete fdif
