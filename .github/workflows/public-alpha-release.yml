@@ -1,0 +1,185 @@
+name: public-alpha-release
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/public-alpha-release.yml'
+      - 'VERSION'
+      - 'Makefile'
+      - 'README.md'
+      - 'SECURITY.md'
+      - 'docs/FDIF_INSTALLATION.md'
+      - 'docs/LIMITATIONS.md'
+      - 'docs/QUICKSTART.md'
+      - 'scripts/build-public-release.sh'
+      - 'scripts/install-release.sh'
+      - 'tests/test_public_alpha.py'
+      - 'cmd/**'
+      - 'internal/**'
+      - 'completions/**'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Pre-1.0 version to validate without publishing
+        required: true
+        default: v0.1.0-alpha.1
+  push:
+    tags:
+      - 'v0.*'
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-amd64
+            runner: ubuntu-latest
+          - target: linux-arm64
+            runner: ubuntu-24.04-arm
+          - target: darwin-arm64
+            runner: macos-14
+          - target: darwin-amd64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.23.x'
+          cache: false
+      - name: Install SQLite development library
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ matrix.target }}" in
+            linux-*)
+              sudo apt-get update
+              sudo apt-get install -y libsqlite3-dev pkg-config
+              ;;
+            darwin-*)
+              brew install sqlite
+              echo "PKG_CONFIG_PATH=$(brew --prefix sqlite)/lib/pkgconfig" >> "$GITHUB_ENV"
+              echo "CGO_CFLAGS=-I$(brew --prefix sqlite)/include" >> "$GITHUB_ENV"
+              echo "CGO_LDFLAGS=-L$(brew --prefix sqlite)/lib" >> "$GITHUB_ENV"
+              ;;
+          esac
+      - name: Resolve version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF_TYPE}" == tag ]]; then
+            value=${GITHUB_REF_NAME}
+            [[ "$value" == "$(cat VERSION)" ]] || {
+              echo "tag $value does not match VERSION $(cat VERSION)" >&2
+              exit 1
+            }
+          elif [[ -n "${INPUT_VERSION:-}" ]]; then
+            value=$INPUT_VERSION
+          else
+            value=$(cat VERSION)
+          fi
+          echo "value=$value" >> "$GITHUB_OUTPUT"
+      - name: Run public alpha contract tests
+        shell: bash
+        run: python3 -m unittest discover -s tests -p 'test_public_alpha.py' -v
+      - name: Verify native target
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual=$(./scripts/build-public-release.sh --print-target)
+          [[ "$actual" == "${{ matrix.target }}" ]] || {
+            echo "runner target mismatch: expected ${{ matrix.target }}, got $actual" >&2
+            exit 1
+          }
+      - name: Package public binaries
+        shell: bash
+        run: ./scripts/build-public-release.sh "${{ steps.version.outputs.value }}" "$PWD/dist/public"
+      - name: Verify package checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist/public
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum -c *.sha256
+          else
+            shasum -a 256 -c *.sha256
+          fi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: public-${{ matrix.target }}
+          path: dist/public/*
+          if-no-files-found: error
+
+  verify:
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: public-*
+          path: dist
+          merge-multiple: true
+      - name: Verify release archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum -c *.sha256
+          sha256sum *.tar.gz > SHA256SUMS
+          sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@v7
+        with:
+          name: public-release-verified
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+            dist/SHA256SUMS
+          if-no-files-found: error
+
+  publish:
+    if: github.ref_type == 'tag'
+    needs: [package, verify]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: public-*
+          path: dist
+          merge-multiple: true
+      - name: Build and verify combined checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum -c *.sha256
+          sha256sum *.tar.gz > SHA256SUMS
+          sha256sum -c SHA256SUMS
+      - name: Attest release archives
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/*.tar.gz
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "FutureDiff $GITHUB_REF_NAME" \
+            --prerelease \
+            --generate-notes

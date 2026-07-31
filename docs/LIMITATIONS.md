@@ -1,0 +1,38 @@
+# FutureDiff Alpha Limitations
+
+FutureDiff is an early local-first alpha. This document defines what the public product does not yet promise.
+
+## Supported scope
+
+- one local user on one machine;
+- local Git repositories;
+- Linux and macOS runtime targets;
+- cooperative workspace operation by default;
+- manual editing or an externally launched coding agent;
+- safe local branch publication;
+- optional GitHub draft-PR publication.
+
+## Not supported or not guaranteed
+
+- exposing `futurediffd` or its socket over a network;
+- hosted, team, or multi-tenant operation;
+- secure Windows runtime operation;
+- launching or supervising coding-agent processes;
+- automatic merging into the source branch;
+- provider-generic pull-request publication beyond GitHub;
+- guaranteed Slack delivery;
+- formal uptime, disaster-recovery, retention, quota, RBAC, or SLO commitments;
+- external security certification or independent audit;
+- production-complete status.
+
+## Cooperative mode
+
+Cooperative mode creates an isolated Git working copy, but the user or agent must actually work inside that copy. Rootless OCI enforcement exists as experimental engineering work and is not required for the public alpha.
+
+## GitHub
+
+GitHub credentials are optional. `fdif finish` publishes locally without them. `fdif finish --github` requires an explicitly configured credential and repository allowlist.
+
+## Security reporting
+
+Do not include tokens, private keys, private source, or raw evidence containing secrets in public issues. Follow [SECURITY.md](../SECURITY.md).

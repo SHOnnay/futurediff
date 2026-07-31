@@ -6,10 +6,10 @@ on:
       version:
         description: Release version
         required: true
-        default: v1.40.0
+        default: v1.80.0-rc3
   push:
     tags:
-      - 'v*'
+      - 'v[1-9]*'
 
 permissions:
   contents: write
