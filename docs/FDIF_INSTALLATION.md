@@ -1,28 +1,79 @@
-# Installing `fdif`
+# Installing FutureDiff Alpha
 
-`fdif` should be installed beside `futurediff` and `futurediffd` so it can
-discover both automatically.
+`fdif`, `futurediff`, and `futurediffd` must be installed together so the guided CLI can discover the low-level client and daemon.
+
+## Verified release archive
+
+For a published release, download the archive and its checksum sidecar, then verify before extraction.
+
+Example for macOS ARM64:
+
+```bash
+VERSION=v0.1.0-alpha.1
+curl -fLO "https://github.com/SHOnnay/futurediff/releases/download/$VERSION/futurediff-$VERSION-darwin-arm64.tar.gz"
+curl -fLO "https://github.com/SHOnnay/futurediff/releases/download/$VERSION/futurediff-$VERSION-darwin-arm64.tar.gz.sha256"
+shasum -a 256 -c "futurediff-$VERSION-darwin-arm64.tar.gz.sha256"
+```
+
+Linux usually uses:
+
+```bash
+sha256sum -c "futurediff-$VERSION-linux-amd64.tar.gz.sha256"
+```
+
+Extract and inspect the archive before installation.
+
+## Reviewable installer
+
+Download the installer first, inspect it, then run it:
+
+```bash
+curl -fLo install-futurediff.sh \
+  https://raw.githubusercontent.com/SHOnnay/futurediff/main/scripts/install-release.sh
+less install-futurediff.sh
+bash install-futurediff.sh --version v0.1.0-alpha.1 --prefix "$HOME/.local"
+```
+
+The installer refuses unsupported operating systems or architectures and verifies the release checksum before copying binaries.
+
+To see the resolved asset without downloading:
+
+```bash
+bash install-futurediff.sh --version v0.1.0-alpha.1 --print-asset
+```
 
 ## Build through the repository
 
+Requirements:
+
+- Go 1.23+;
+- Git;
+- C compiler;
+- SQLite development headers.
+
 ```bash
+make check
 make build
 ls -l bin/fdif bin/futurediff bin/futurediffd
 ```
 
-## macOS and Linux
+Build and verify the native three-binary release archive from the repository:
 
 ```bash
-./scripts/install-fdif.sh
+make public-package
+make verify-public-package
 ```
 
-The default prefix is `/usr/local`. A user-local installation:
+Checksum sidecars contain the archive basename, so verification is performed
+inside the package directory by the Make target.
+
+## Source installer on macOS and Linux
 
 ```bash
 ./scripts/install-fdif.sh --prefix "$HOME/.local"
 ```
 
-Ensure `$HOME/.local/bin` is on `PATH`.
+This installer builds from the checked-out source. It is separate from the verified release installer.
 
 Dry run:
 
@@ -30,15 +81,9 @@ Dry run:
 ./scripts/install-fdif.sh --dry-run --prefix "$HOME/.local"
 ```
 
-## Windows PowerShell
+## Windows
 
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\scripts\Install-Fdif.ps1
-```
-
-Windows binaries and completion generation are build-tested. The public alpha
-does not yet claim a complete secure Windows daemon and GitHub-provider runtime.
+Windows binaries and completion generation remain build-tested, but the public alpha does not claim a complete secure Windows daemon and GitHub-provider runtime. The PowerShell source installer is retained for development only.
 
 ## Shell completion
 
@@ -61,13 +106,13 @@ Fish:
 fdif completion fish > ~/.config/fish/completions/fdif.fish
 ```
 
-PowerShell profile:
+PowerShell:
 
 ```powershell
 fdif completion powershell | Out-File -Append -Encoding utf8 $PROFILE
 ```
 
-## First local run
+## First run
 
 ```bash
 fdif doctor
@@ -78,25 +123,4 @@ The demo is local and disposable. It does not require GitHub credentials.
 
 ## Optional GitHub configuration
 
-GitHub publication is configured at daemon startup through a restricted
-credential configuration file. Start with:
-
-```bash
-mkdir -p "$HOME/.config/futurediff"
-cp examples/credentials/providers.example.json \
-  "$HOME/.config/futurediff/providers.json"
-chmod 600 "$HOME/.config/futurediff/providers.json"
-```
-
-Edit the destination allowlist for the intended repository, export the token
-source named by the config, then:
-
-```bash
-export FUTUREDIFF_CREDENTIAL_CONFIG="$HOME/.config/futurediff/providers.json"
-export FUTUREDIFF_GITHUB_CREDENTIAL_ID=github-main
-fdif daemon restart
-fdif doctor
-```
-
-Full setup and safe usage are documented in
-[`FDIF_GITHUB_PUBLICATION.md`](FDIF_GITHUB_PUBLICATION.md).
+GitHub publication is configured through a restricted credential configuration file. Follow [FDIF_GITHUB_PUBLICATION.md](FDIF_GITHUB_PUBLICATION.md). Never paste a token into documentation, logs, command arguments, or chat.

@@ -4,6 +4,7 @@
 .github/workflows/production-assurance.yml
 .github/workflows/production-closure.yml
 .github/workflows/production-launch.yml
+.github/workflows/public-alpha-release.yml
 .github/workflows/release-promotion.yml
 .github/workflows/release.yml
 .gitignore
@@ -12,7 +13,9 @@ LICENSE
 MANIFEST.apply
 Makefile
 README.md
+ROADMAP.md
 SECURITY.md
+VERSION
 cmd/fdif/main.go
 cmd/fdif/main_test.go
 cmd/futurediff-access-audit/main.go
@@ -138,6 +141,7 @@ docs/FDIF_GUIDED_CLI.md
 docs/FDIF_INSTALLATION.md
 docs/GITHUB_PUSH_GUIDE.md
 docs/INCIDENT_AND_RELEASE_GOVERNANCE.md
+docs/LIMITATIONS.md
 docs/MACOS_PEER_AUTH.md
 docs/MERGE-REPORT.md
 docs/OBSERVABILITY_AND_ALERTING.md
@@ -146,6 +150,7 @@ docs/POST_DEPLOYMENT_AND_ROLLBACK.md
 docs/PRODUCTION_CLOSURE.md
 docs/PRODUCTION_LAUNCH.md
 docs/PRODUCTION_RUNBOOK.md
+docs/QUICKSTART.md
 docs/RELEASE_PROMOTION.md
 docs/SLO.md
 docs/THREAT_MODEL.md
@@ -960,6 +965,7 @@ scripts/Promotion-Assurance.ps1
 scripts/Validate-Overlay.ps1
 scripts/apply-overlay.sh
 scripts/assurance.sh
+scripts/build-public-release.sh
 scripts/certify-rootless-oci.sh
 scripts/chaos-check.sh
 scripts/demo.sh
@@ -967,6 +973,7 @@ scripts/final-production-gate.sh
 scripts/futurediff-ui
 scripts/github-attestation-verify.sh
 scripts/install-fdif.sh
+scripts/install-release.sh
 scripts/operations-assurance.sh
 scripts/production-closure.sh
 scripts/production-launch.sh
@@ -991,6 +998,7 @@ tests/test_cli_ui.py
 tests/test_closure.py
 tests/test_operations.py
 tests/test_promotion.py
+tests/test_public_alpha.py
 tools/futurediff_assurance.py
 tools/futurediff_cli_ui.py
 tools/futurediff_closure.py
