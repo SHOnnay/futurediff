@@ -55,6 +55,10 @@ class PublicAlphaTests(unittest.TestCase):
         self.assertIn("shasum -a 256 -c", text)
         self.assertNotIn("--no-verify", text)
 
+    @unittest.skipIf(
+        os.name == "nt",
+        "public alpha shell tooling targets Linux and macOS",
+    )
     def test_script_help(self):
         for script in (
             "scripts/build-public-release.sh",
