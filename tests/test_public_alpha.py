@@ -1,3 +1,4 @@
+import os
 import subprocess
 import unittest
 from pathlib import Path
@@ -54,25 +55,32 @@ class PublicAlphaTests(unittest.TestCase):
         self.assertIn("shasum -a 256 -c", text)
         self.assertNotIn("--no-verify", text)
 
-    def test_script_help_and_asset_resolution(self):
-        subprocess.run(
-            ["bash", str(ROOT / "scripts/build-public-release.sh"), "--help"],
-            check=True,
-            stdout=subprocess.DEVNULL,
-        )
-        subprocess.run(
-            ["bash", str(ROOT / "scripts/install-release.sh"), "--help"],
-            check=True,
-            stdout=subprocess.DEVNULL,
-        )
+    def test_script_help(self):
+        for script in (
+            "scripts/build-public-release.sh",
+            "scripts/install-release.sh",
+        ):
+            subprocess.run(
+                ["bash", script, "--help"],
+                cwd=ROOT,
+                check=True,
+                stdout=subprocess.DEVNULL,
+            )
+
+    @unittest.skipIf(
+        os.name == "nt",
+        "public alpha installer targets Linux and macOS",
+    )
+    def test_installer_asset_resolution(self):
         result = subprocess.run(
             [
                 "bash",
-                str(ROOT / "scripts/install-release.sh"),
+                "scripts/install-release.sh",
                 "--version",
                 "v0.1.0-alpha.1",
                 "--print-asset",
             ],
+            cwd=ROOT,
             check=True,
             text=True,
             capture_output=True,
