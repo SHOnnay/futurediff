@@ -259,5 +259,22 @@ class PublicAlphaTests(unittest.TestCase):
         self.assertIn("/private/tmp", guided)
 
 
+    def test_guided_git_subprocess_boundary_contract(self):
+        app = read_utf8(ROOT / "internal/guidedcli/app.go")
+        security = read_utf8(ROOT / "SECURITY.md")
+        threat = read_utf8(ROOT / "docs/THREAT_MODEL.md")
+        guided = read_utf8(ROOT / "docs/FDIF_GUIDED_CLI.md")
+
+        self.assertIn('"GIT_CONFIG_NOSYSTEM=1"', app)
+        self.assertIn('"GIT_CONFIG_GLOBAL=" + os.DevNull', app)
+        self.assertIn('"GIT_TERMINAL_PROMPT=0"', app)
+        self.assertIn('"-c", "core.fsmonitor=false"', app)
+        self.assertIn('"-c", "credential.helper="', app)
+        self.assertIn('"-c", "core.hooksPath=/dev/null"', app)
+
+        self.assertIn("ambient `GIT_DIR`, `GIT_WORK_TREE`", security)
+        self.assertIn("Git config or environment injection", threat)
+        self.assertIn("disable hooks and fsmonitor", guided)
+
 if __name__ == "__main__":
     unittest.main()

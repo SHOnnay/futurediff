@@ -207,6 +207,7 @@ fdif demo --yes              run the disposable automated demo
 - approval material is resolved again immediately before mutation;
 - GitHub branch creation is create-only and bound to the approved commit;
 - credential IDs may appear in metadata, but tokens do not;
+- guided Git helper subprocesses ignore ambient `GIT_DIR` / `GIT_WORK_TREE`, disable hooks and fsmonitor, and never prompt for credentials;
 - JSON mode never prompts and contains no ANSI decoration;
 - low-level FutureDiff exit codes are preserved;
 - `fdif` does not duplicate transaction business logic;

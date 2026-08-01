@@ -943,3 +943,42 @@ func TestStartHidesOperatorDetailsUnlessVerbose(t *testing.T) {
 		t.Fatalf("verbose output omitted operator fields:\n%s", out.String())
 	}
 }
+
+func TestGitOutputIgnoresGlobalFsmonitorConfig(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-based fsmonitor probe is Unix-only")
+	}
+	repo, _ := makeRepoAndWorkspace(t)
+	home := t.TempDir()
+	marker := filepath.Join(t.TempDir(), "fsmonitor-hit")
+	script := filepath.Join(home, "fsmonitor.sh")
+	scriptBody := fmt.Sprintf("#!/bin/sh\nprintf 'hit' > %q\nexit 0\n", marker)
+	if err := os.WriteFile(script, []byte(scriptBody), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	config := "[core]\n\tfsmonitor = " + script + "\n"
+	if err := os.WriteFile(filepath.Join(home, ".gitconfig"), []byte(config), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	if _, err := gitOutput(context.Background(), "git", repo, "status", "--short"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatalf("global fsmonitor helper executed during guided git command: %v", err)
+	}
+}
+
+func TestGitOutputIgnoresAmbientGitDirAndWorkTree(t *testing.T) {
+	repo, _ := makeRepoAndWorkspace(t)
+	otherRepo, _ := makeRepoAndWorkspace(t)
+	t.Setenv("GIT_DIR", filepath.Join(otherRepo, ".git"))
+	t.Setenv("GIT_WORK_TREE", otherRepo)
+	output, err := gitOutput(context.Background(), "git", repo, "rev-parse", "--show-toplevel")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(output) != repo {
+		t.Fatalf("guided git command resolved %q, want %q", strings.TrimSpace(output), repo)
+	}
+}

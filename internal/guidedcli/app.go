@@ -1642,9 +1642,36 @@ func detectRepository(ctx context.Context, gitBinary, path string) (string, erro
 	return strings.TrimSpace(output), nil
 }
 
+func gitCommandEnv() []string {
+	return []string{
+		"PATH=" + os.Getenv("PATH"),
+		"LANG=C.UTF-8",
+		"LC_ALL=C.UTF-8",
+		"GIT_CONFIG_NOSYSTEM=1",
+		"GIT_CONFIG_GLOBAL=" + os.DevNull,
+		"GIT_OPTIONAL_LOCKS=0",
+		"GIT_EXTERNAL_DIFF=",
+		"GIT_DIFF_OPTS=",
+		"GIT_PAGER=cat",
+		"PAGER=cat",
+		"GIT_TERMINAL_PROMPT=0",
+		"GIT_ASKPASS=",
+		"SSH_ASKPASS=",
+	}
+}
+
 func gitOutput(ctx context.Context, binary, directory string, args ...string) (string, error) {
-	cmdArgs := append([]string{"-C", directory}, args...)
+	cmdArgs := []string{
+		"-c", "core.hooksPath=/dev/null",
+		"-c", "core.fsmonitor=false",
+		"-c", "credential.helper=",
+		"-c", "diff.external=",
+		"-c", "core.pager=cat",
+		"-C", directory,
+	}
+	cmdArgs = append(cmdArgs, args...)
 	cmd := exec.CommandContext(ctx, binary, cmdArgs...)
+	cmd.Env = gitCommandEnv()
 	var stdout, stderr strings.Builder
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
