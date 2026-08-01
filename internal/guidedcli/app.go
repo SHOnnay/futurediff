@@ -1635,11 +1635,20 @@ func detectRepository(ctx context.Context, gitBinary, path string) (string, erro
 	if err != nil {
 		return "", err
 	}
+	bare, bareErr := gitOutput(ctx, gitBinary, absolute, "rev-parse", "--is-bare-repository")
+	if bareErr == nil && strings.TrimSpace(bare) == "true" {
+		return "", fmt.Errorf("%s is a bare Git repository; use a checked-out worktree on a branch", absolute)
+	}
 	output, err := gitOutput(ctx, gitBinary, absolute, "rev-parse", "--show-toplevel")
 	if err != nil {
 		return "", fmt.Errorf("%s is not a Git repository", absolute)
 	}
-	return strings.TrimSpace(output), nil
+	root := strings.TrimSpace(output)
+	headRef, err := gitOutput(ctx, gitBinary, root, "symbolic-ref", "-q", "HEAD")
+	if err != nil || strings.TrimSpace(headRef) == "" {
+		return "", fmt.Errorf("%s has a detached HEAD; checkout a branch before running fdif start", root)
+	}
+	return root, nil
 }
 
 func gitCommandEnv() []string {

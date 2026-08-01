@@ -108,6 +108,12 @@ This does not turn on general symlink following:
 - daemon-root permissions remain private;
 - the effective canonical path is shown by `fdif config --explain`.
 
+`fdif start` also refuses unsupported repository shapes before it asks the daemon to
+create a change. In this alpha that includes bare repositories and detached HEAD
+states, because guided publication depends on a checked-out worktree with a
+stable branch reference.
+
+
 ## Recommended workflow
 
 From a Git repository:
@@ -208,6 +214,7 @@ fdif demo --yes              run the disposable automated demo
 - GitHub branch creation is create-only and bound to the approved commit;
 - credential IDs may appear in metadata, but tokens do not;
 - guided Git helper subprocesses ignore ambient `GIT_DIR` / `GIT_WORK_TREE`, disable hooks and fsmonitor, and never prompt for credentials;
+- `fdif start` rejects bare repositories and detached HEAD states before transaction creation;
 - JSON mode never prompts and contains no ANSI decoration;
 - low-level FutureDiff exit codes are preserved;
 - `fdif` does not duplicate transaction business logic;

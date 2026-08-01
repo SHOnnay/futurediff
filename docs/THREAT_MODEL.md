@@ -51,6 +51,7 @@ editor or agent can access through the user's ordinary OS permissions.
 | Unsafe daemon root | Canonical real directory, private permissions, local socket, and daemon secure-root audit |
 | Credential disclosure | Brokered credentials, minimized child environments, secret scanning, fingerprint-only findings |
 | Git config or environment injection | Guided Git subprocesses run with minimized environments, disabled hooks and fsmonitor, no external diff or pager, and no inherited credential prompts |
+| Detached or bare repository substituted for a reviewable branch | Guided entry rejects bare repositories and detached HEAD states before transaction creation |
 | Duplicate external effect | Idempotency keys, durable attempts, receipts, and reconciliation |
 | Unknown provider outcome | Persist unknown state; block dependent effects until reconciliation |
 | Evidence tampering | SHA-256 manifests, deterministic bundles, provenance, and optional signatures |

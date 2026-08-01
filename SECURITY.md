@@ -64,6 +64,8 @@ Path rules:
 
 Guided-CLI Git helper commands must not inherit ambient `GIT_DIR`, `GIT_WORK_TREE`, pager, askpass, fsmonitor, or global/system Git configuration. They run with a minimized environment, disabled hooks, disabled fsmonitor, disabled external diff, and disabled interactive credential prompting.
 
+The same guided boundary rejects bare repositories and detached HEAD states before transaction creation, so guided publication always starts from a checked-out worktree with a stable branch reference.
+
 This keeps repository detection, review, demo setup, and guided publication checks deterministic even when the caller shell or machine has hostile or surprising Git configuration.
 
 Canonicalization does not make cooperative mode an operating-system sandbox
