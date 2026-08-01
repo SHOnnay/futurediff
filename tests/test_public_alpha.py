@@ -1,17 +1,24 @@
+import ast
 import os
 import subprocess
 import unittest
 from pathlib import Path
 
+
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def read_utf8(path: Path) -> str:
+    """Read a repository text file with a platform-independent encoding."""
+    return path.read_text(encoding="utf-8")
 
 
 class PublicAlphaTests(unittest.TestCase):
     def test_version_is_pre_one_alpha(self):
-        self.assertEqual((ROOT / "VERSION").read_text().strip(), "v0.1.0-alpha.1")
+        self.assertEqual(read_utf8(ROOT / "VERSION").strip(), "v0.1.0-alpha.1")
 
     def test_readme_does_not_lead_with_internal_progress(self):
-        text = (ROOT / "README.md").read_text().lower()
+        text = read_utf8(ROOT / "README.md").lower()
         for banned in (
             "task 180",
             "v1.80.0",
@@ -23,13 +30,13 @@ class PublicAlphaTests(unittest.TestCase):
         self.assertIn("fdif finish --github", text)
 
     def test_public_package_is_three_binaries(self):
-        makefile = (ROOT / "Makefile").read_text()
+        makefile = read_utf8(ROOT / "Makefile")
         self.assertIn("PUBLIC_COMMANDS := fdif futurediff futurediffd", makefile)
         public_line = makefile.split("PUBLIC_COMMANDS :=", 1)[1].splitlines()[0]
         self.assertNotIn("futurediff-mcp", public_line)
 
     def test_public_workflow_has_native_targets(self):
-        text = (ROOT / ".github/workflows/public-alpha-release.yml").read_text()
+        text = read_utf8(ROOT / ".github/workflows/public-alpha-release.yml")
         for target in (
             "linux-amd64",
             "linux-arm64",
@@ -45,12 +52,12 @@ class PublicAlphaTests(unittest.TestCase):
         self.assertIn("INPUT_VERSION: ${{ inputs.version }}", text)
 
     def test_legacy_release_does_not_claim_v0_tags(self):
-        text = (ROOT / ".github/workflows/release.yml").read_text()
+        text = read_utf8(ROOT / ".github/workflows/release.yml")
         self.assertIn("'v[1-9]*'", text)
         self.assertNotIn("- 'v*'", text)
 
     def test_installer_requires_checksum(self):
-        text = (ROOT / "scripts/install-release.sh").read_text()
+        text = read_utf8(ROOT / "scripts/install-release.sh")
         self.assertIn("sha256sum -c", text)
         self.assertIn("shasum -a 256 -c", text)
         self.assertNotIn("--no-verify", text)
@@ -95,10 +102,10 @@ class PublicAlphaTests(unittest.TestCase):
         )
 
     def test_public_alpha_contract_is_enforced(self):
-        makefile = (ROOT / "Makefile").read_text()
-        workflow = (
+        makefile = read_utf8(ROOT / "Makefile")
+        workflow = read_utf8(
             ROOT / ".github/workflows/public-alpha-release.yml"
-        ).read_text()
+        )
         command = (
             "python3 -m unittest discover -s tests "
             "-p 'test_public_alpha.py' -v"
@@ -109,9 +116,9 @@ class PublicAlphaTests(unittest.TestCase):
         self.assertIn(command, workflow)
 
     def test_public_package_verification_is_directory_safe(self):
-        makefile = (ROOT / "Makefile").read_text()
-        readme = (ROOT / "README.md").read_text()
-        install = (ROOT / "docs/FDIF_INSTALLATION.md").read_text()
+        makefile = read_utf8(ROOT / "Makefile")
+        readme = read_utf8(ROOT / "README.md")
+        install = read_utf8(ROOT / "docs/FDIF_INSTALLATION.md")
         self.assertIn("verify-public-package:", makefile)
         self.assertIn('cd "$$out"', makefile)
         self.assertIn("sha256sum -c ./*.sha256", makefile)
@@ -120,7 +127,7 @@ class PublicAlphaTests(unittest.TestCase):
         self.assertIn("make verify-public-package", install)
 
     def test_public_archive_rejects_platform_metadata(self):
-        script = (ROOT / "scripts/build-public-release.sh").read_text()
+        script = read_utf8(ROOT / "scripts/build-public-release.sh")
         self.assertIn("COPYFILE_DISABLE=1 tar -czf", script)
         self.assertIn("-name '._*'", script)
         self.assertIn("-name '.DS_Store'", script)
@@ -142,6 +149,28 @@ class PublicAlphaTests(unittest.TestCase):
             "$name/completions/fdif.ps1",
         ):
             self.assertIn(required, script)
+
+
+def test_repository_text_reads_use_explicit_encoding(self):
+    tree = ast.parse(read_utf8(Path(__file__)))
+    unqualified = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if not isinstance(node.func, ast.Attribute):
+            continue
+        if node.func.attr != "read_text":
+            continue
+        has_encoding = any(
+            keyword.arg == "encoding" for keyword in node.keywords
+        )
+        if not has_encoding:
+            unqualified.append(node.lineno)
+    self.assertEqual(
+        unqualified,
+        [],
+        f"read_text calls without explicit encoding: {unqualified}",
+    )
 
     def test_document_links_exist(self):
         for path in (
