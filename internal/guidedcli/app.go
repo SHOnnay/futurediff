@@ -43,9 +43,12 @@ type App struct {
 	Binary             string
 	DaemonBinary       string
 	Socket             string
+	Paths              PathConfig
+	InitErr            error
 	JSON               bool
 	Yes                bool
 	Interactive        bool
+	Verbose            bool
 	VerifyPolicy       string
 	CredentialConfig   string
 	GitHubCredentialID string
@@ -55,6 +58,7 @@ type App struct {
 type Options struct {
 	Binary             string
 	DaemonBinary       string
+	Home               string
 	Socket             string
 	StatePath          string
 	VerifyPolicy       string
@@ -62,6 +66,7 @@ type Options struct {
 	GitHubCredentialID string
 	JSON               bool
 	Yes                bool
+	Verbose            bool
 	NoColor            bool
 	NonInteractive     bool
 }
@@ -69,13 +74,12 @@ type Options struct {
 func New(options Options) *App {
 	binary := findBinary(options.Binary, "FUTUREDIFF_BINARY", "futurediff")
 	daemonBinary := findBinary(options.DaemonBinary, "FUTUREDIFF_DAEMON_BINARY", "futurediffd")
-	socket := options.Socket
-	if socket == "" {
-		socket = os.Getenv("FUTUREDIFF_SOCKET")
-	}
-	statePath := options.StatePath
-	if statePath == "" {
-		statePath = DefaultStatePath()
+	paths, pathErr := resolvePathConfig(options)
+	socket := paths.Socket.Path
+	statePath := paths.State.Path
+	if pathErr != nil {
+		socket = strings.TrimSpace(options.Socket)
+		statePath = strings.TrimSpace(options.StatePath)
 	}
 	credentialConfig := credentialConfigPath(options.CredentialConfig)
 	githubCredentialID := strings.TrimSpace(options.GitHubCredentialID)
@@ -90,11 +94,15 @@ func New(options Options) *App {
 		Engine: engine,
 		Store:  StateStore{Path: statePath}, Renderer: renderer,
 		Binary: binary, DaemonBinary: daemonBinary, Socket: socket,
-		JSON: options.JSON, Yes: options.Yes, Interactive: interactive,
+		Paths: paths, InitErr: pathErr,
+		JSON: options.JSON, Yes: options.Yes, Interactive: interactive, Verbose: options.Verbose,
 		VerifyPolicy: options.VerifyPolicy, CredentialConfig: credentialConfig,
 		GitHubCredentialID: githubCredentialID, GitBinary: "git",
 	}
-	app.Daemon = DaemonManager{Engine: engine, Binary: daemonBinary, Socket: socket, CredentialConfig: credentialConfig}
+	app.Daemon = DaemonManager{
+		Engine: engine, Binary: daemonBinary, Socket: socket,
+		Root: paths.Home.Path, CredentialConfig: credentialConfig,
+	}
 	return app
 }
 
@@ -105,20 +113,29 @@ func stdinInteractive(in *os.File) bool {
 
 func (a *App) Run(ctx context.Context, args []string) int {
 	if len(args) == 0 {
-		if !a.Interactive {
-			return a.fail(errors.New("no command supplied; run fdif --help"))
+		if a.InitErr != nil {
+			return a.fail(a.InitErr)
 		}
-		if err := a.menu(ctx); err != nil {
+		if err := a.landing(); err != nil {
 			return a.fail(err)
 		}
 		return 0
 	}
 	command := args[0]
 	args = args[1:]
+	if a.InitErr != nil && command != "help" && command != "--help" && command != "-h" && command != "version" && command != "--version" && command != "completion" {
+		return a.fail(a.InitErr)
+	}
 	var err error
 	switch command {
 	case "help", "--help", "-h":
 		a.help()
+	case "menu":
+		if !a.Interactive {
+			err = errors.New("fdif menu requires an interactive terminal")
+		} else {
+			err = a.menu(ctx)
+		}
 	case "version", "--version":
 		err = a.version(ctx)
 	case "start", "create", "new":
@@ -154,7 +171,7 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	case "doctor":
 		err = a.doctor(ctx)
 	case "config":
-		err = a.config()
+		err = a.config(args)
 	case "demo":
 		err = a.demo(ctx, args)
 	case "completion":
@@ -185,48 +202,118 @@ func (a *App) fail(err error) int {
 func (a *App) help() {
 	fmt.Fprintln(a.Out, `FutureDiff guided CLI
 
-Review changes in a safe working copy before they reach your current branch.
+Review AI-assisted changes in a safe working copy before they reach GitHub or
+your current branch.
+
+First steps:
+  fdif                         show a newcomer-oriented starting point
+  fdif start|new [repo]        create and select a safe working copy
+  fdif demo [--yes]            run a disposable end-to-end demonstration
+  fdif doctor                  check local requirements and paths
 
 Everyday workflow:
-  fdif start|new [repo]       create and select a safe working copy
-  fdif status [tx]            show the current change and next step
-  fdif workspace [tx]         print the safe working-copy path
-  fdif shell [tx]             open a shell in the safe working copy
-  fdif review [tx] [--full]   review changed files and the exact diff
-  fdif finish [tx] [--yes]    verify, approve and publish a safe local branch
-  fdif finish [tx] --github   also push the safe branch and create a draft PR
-  fdif abort|discard [tx]     discard an unfinished change
-  fdif demo [--yes]           run a disposable end-to-end demonstration
-  fdif doctor                 check local requirements
+  fdif status [tx]             show the current change and next step
+  fdif workspace [tx]          print the safe working-copy path
+  fdif shell [tx]              open a shell in the safe working copy
+  fdif review [tx] [--full]    review changed files and the exact diff
+  fdif finish [tx] [--yes]     verify, approve and publish a safe local branch
+  fdif finish [tx] --github    also push the safe branch and create a draft PR
+  fdif abort|discard [tx]      discard an unfinished change
 
 Advanced workflow:
-  fdif seal [tx]              freeze the exact reviewed patch
-  fdif verify [tx]            run the configured verification policy
-  fdif approve [tx]           approve the exact verified version
-  fdif publish [tx]           publish futurediff/<transaction-id> locally
-  fdif transactions           list changes
-  fdif use [tx]               select the current change
-  fdif events [tx]            show audit events
-  fdif daemon <action>        status, start, stop, restart or logs
-  fdif config                 show guided CLI configuration
-  fdif completion <shell>     print Bash, Zsh, Fish or PowerShell completion
-  fdif version                show version information
+  fdif menu                    open the interactive menu
+  fdif seal [tx]               freeze the exact reviewed patch
+  fdif verify [tx]             run the configured verification policy
+  fdif approve [tx]            approve the exact verified version
+  fdif publish [tx]            publish futurediff/<transaction-id> locally
+  fdif transactions            list changes
+  fdif use [tx]                select the current change
+  fdif events [tx]             show audit events
+  fdif daemon <action>         status, start, stop, restart or logs
+  fdif config [--explain]      show effective paths and their sources
+  fdif completion <shell>      print Bash, Zsh, Fish or PowerShell completion
+  fdif version                 show version information
+
+Path model:
+  --home PATH                  set one FutureDiff home for state, daemon,
+                               runtime files and safe working copies
+  FDIF_HOME                    environment equivalent of --home
+  FUTUREDIFF_ROOT              supported as a legacy home setting
+  --state PATH                 advanced override for only the current-selection
+                               file; it does not relocate daemon workspaces
 
 Notes:
   - start and new are equivalent.
   - abort and discard are equivalent.
-  - cooperative mode is the public-alpha default.
-  - open the printed safe working copy in your editor or coding agent.
+  - cooperative mode is the public-alpha default, not an OS sandbox.
   - finish publishes a new local branch; it does not modify your current branch.
   - --github is optional and requires a daemon credential configuration.
   - GitHub options: --remote, --base, --title, --body, --body-file,
     --github-credential.
 
 Global options are handled by cmd/fdif:
-  --binary, --daemon-binary, --socket, --state, --policy,
+  --home, --root, --binary, --daemon-binary, --socket, --state, --policy,
   --credential-config, --github-credential,
-  --json, --yes, --no-color, --non-interactive`)
+  --json, --yes, --verbose, --no-color, --non-interactive`)
 }
+
+func (a *App) landing() error {
+	current, loadErr := a.Store.Load()
+	hasCurrent := loadErr == nil && current.TransactionID != ""
+	if loadErr != nil && !errors.Is(loadErr, os.ErrNotExist) {
+		return loadErr
+	}
+	if a.JSON {
+		result := map[string]any{
+			"kind":    "fdif-start",
+			"product": "FutureDiff",
+			"purpose": "Review AI-assisted changes before they reach GitHub or your current branch.",
+			"commands": map[string]string{
+				"start":  "fdif start",
+				"doctor": "fdif doctor",
+				"demo":   "fdif demo --yes",
+				"help":   "fdif --help",
+			},
+			"active_change": hasCurrent,
+		}
+		if hasCurrent {
+			result["continue"] = map[string]string{
+				"status": "fdif status",
+				"review": "fdif review --full",
+				"finish": "fdif finish",
+			}
+			if a.Verbose {
+				result["transaction_id"] = current.TransactionID
+			}
+		}
+		return writeJSON(a.Out, result)
+	}
+	a.Renderer.title("FutureDiff")
+	fmt.Fprintln(a.Out, "Review AI-assisted changes before they reach GitHub or your current branch.")
+	fmt.Fprintln(a.Out)
+	if hasCurrent {
+		a.Renderer.success("Active change detected")
+		if a.Verbose {
+			fmt.Fprintln(a.Out, "  Change ID:", current.TransactionID)
+		}
+		fmt.Fprintln(a.Out, "  Inspect:  fdif status")
+		fmt.Fprintln(a.Out, "  Review:   fdif review --full")
+		fmt.Fprintln(a.Out, "  Finish:   fdif finish")
+		fmt.Fprintln(a.Out)
+	}
+	fmt.Fprintln(a.Out, "Start a change:")
+	fmt.Fprintln(a.Out, "  fdif start")
+	fmt.Fprintln(a.Out)
+	fmt.Fprintln(a.Out, "Check your setup:")
+	fmt.Fprintln(a.Out, "  fdif doctor")
+	fmt.Fprintln(a.Out)
+	fmt.Fprintln(a.Out, "Try a disposable demo:")
+	fmt.Fprintln(a.Out, "  fdif demo --yes")
+	fmt.Fprintln(a.Out)
+	fmt.Fprintln(a.Out, "Run fdif --help for all commands. Use fdif menu for the interactive menu.")
+	return nil
+}
+
 func (a *App) menu(ctx context.Context) error {
 	a.Renderer.title("FutureDiff")
 	fmt.Fprintln(a.Out, "Review changes safely before they reach your branch")
@@ -363,11 +450,22 @@ func (a *App) start(ctx context.Context, args []string) error {
 	if response.Workspace != nil {
 		workspace = response.Workspace.WorkspacePath
 	}
-	a.Renderer.fields([2]string{"Change ID", response.Transaction.TransactionID}, [2]string{"Repository", repoRoot}, [2]string{"Safe working copy", workspace}, [2]string{"Mode", response.Transaction.Mode})
+	a.Renderer.fields([2]string{"Open", workspace}, [2]string{"Repository", repoRoot})
+	if a.Verbose {
+		a.Renderer.fields(
+			[2]string{"Change ID", response.Transaction.TransactionID},
+			[2]string{"Mode", response.Transaction.Mode},
+			[2]string{"FutureDiff home", a.Paths.Home.Path},
+		)
+	}
 	fmt.Fprintln(a.Out)
+	fmt.Fprintln(a.Out, "Your current branch was not modified.")
 	fmt.Fprintln(a.Out, "Work only in the safe working copy shown above.")
+	fmt.Fprintln(a.Out, "When the change is ready, run:")
+	fmt.Fprintln(a.Out, "  fdif review --full")
+	fmt.Fprintln(a.Out, "  fdif finish")
+	fmt.Fprintln(a.Out)
 	fmt.Fprintln(a.Out, "Open it in your editor or coding agent, or run: fdif shell")
-	a.Renderer.next("when the change is ready: fdif review, then fdif finish")
 	return nil
 }
 
@@ -395,7 +493,25 @@ func (a *App) status(ctx context.Context, args []string) error {
 		changed = strings.Join(response.Patch.ChangedPaths, ", ")
 		patchSize = formatBytes(response.Patch.PatchSizeBytes)
 	}
-	a.Renderer.fields([2]string{"Change ID", tx.TransactionID}, [2]string{"Status", tx.Status}, [2]string{"Mode", tx.Mode}, [2]string{"Repository", repo}, [2]string{"Safe working copy", workspace}, [2]string{"Changed", changed}, [2]string{"Patch", patchSize})
+	fields := [][2]string{
+		{"Stage", friendlyStage(tx.Status)},
+		{"Repository", repo},
+		{"Safe working copy", workspace},
+	}
+	if changed != "" {
+		fields = append(fields, [2]string{"Changed", changed})
+	}
+	if patchSize != "" {
+		fields = append(fields, [2]string{"Patch", patchSize})
+	}
+	if a.Verbose {
+		fields = append(fields,
+			[2]string{"Change ID", tx.TransactionID},
+			[2]string{"Internal status", tx.Status},
+			[2]string{"Mode", tx.Mode},
+		)
+	}
+	a.Renderer.fields(fields...)
 	next := nextAction(tx.Status)
 	if hasGitHubEffects(response) {
 		next = "fdif finish --github"
@@ -491,7 +607,11 @@ func (a *App) review(ctx context.Context, args []string) error {
 		}
 		return writeJSON(a.Out, result)
 	}
-	a.Renderer.title("Review change " + shortID(id))
+	title := "Review change"
+	if a.Verbose {
+		title += " " + shortID(id)
+	}
+	a.Renderer.title(title)
 	if strings.TrimSpace(status) == "" {
 		fmt.Fprintln(a.Out, "No changes detected in the safe working copy.")
 	} else {
@@ -694,7 +814,15 @@ func (a *App) publish(ctx context.Context, id string, target *githubTarget) erro
 		}
 		if target == nil {
 			a.Renderer.title("Publish safe local branch")
-			a.Renderer.fields([2]string{"Repository", repo}, [2]string{"Change ID", id}, [2]string{"Reviewed files", changed}, [2]string{"Exact version", shortHash(material.TransactionDigest)})
+			fields := [][2]string{
+				{"Repository", repo},
+				{"Reviewed files", changed},
+				{"Exact version", shortHash(material.TransactionDigest)},
+			}
+			if a.Verbose {
+				fields = append(fields, [2]string{"Change ID", id})
+			}
+			a.Renderer.fields(fields...)
 			ok, confirmErr := a.confirm("Publish this exact approved change as a new local branch?", "PUBLISH")
 			if confirmErr != nil {
 				return confirmErr
@@ -783,7 +911,10 @@ func (a *App) renderPublishResult(ctx context.Context, id string, response Respo
 	} else {
 		a.Renderer.success("Reviewed change published and sent to GitHub")
 	}
-	a.Renderer.fields([2]string{"Change ID", id}, [2]string{"Status", status}, [2]string{"Safe branch", branch}, [2]string{"Commit", shortHash(commitOID)}, [2]string{"Current branch", "unchanged"})
+	a.Renderer.fields([2]string{"Safe branch", branch}, [2]string{"Commit", shortHash(commitOID)}, [2]string{"Current branch", "unchanged"})
+	if a.Verbose {
+		a.Renderer.fields([2]string{"Change ID", id}, [2]string{"Status", status})
+	}
 	if github != nil {
 		a.Renderer.fields([2]string{"GitHub", github.Owner + "/" + github.Repo}, [2]string{"Draft PR", github.PullRequestURL})
 		if github.URLIsFallback {
@@ -1054,10 +1185,9 @@ func (a *App) daemon(ctx context.Context, args []string) error {
 		}
 		return nil
 	case "logs":
-		root := os.Getenv("FUTUREDIFF_ROOT")
+		root := a.Paths.Home.Path
 		if root == "" {
-			home, _ := os.UserHomeDir()
-			root = filepath.Join(home, ".futurediff")
+			root = a.Daemon.Root
 		}
 		logPath := filepath.Join(root, "futurediffd.log")
 		if a.JSON {
@@ -1087,6 +1217,18 @@ func (a *App) doctor(ctx context.Context) error {
 		checks = append(checks, check{"git", "pass", path})
 	} else {
 		checks = append(checks, check{"git", "fail", err.Error()})
+	}
+	if a.Paths.Home.Path != "" {
+		if _, err := os.Lstat(a.Paths.Home.Path); os.IsNotExist(err) {
+			checks = append(checks, check{"futurediff_home", "pass", a.Paths.Home.Path + " (will be created with private permissions)"})
+		} else if err != nil {
+			checks = append(checks, check{"futurediff_home", "fail", err.Error()})
+		} else if err := validatePrivateDirectory(a.Paths.Home.Path); err != nil {
+			checks = append(checks, check{"futurediff_home", "fail", err.Error()})
+		} else {
+			checks = append(checks, check{"futurediff_home", "pass", a.Paths.Home.Path})
+		}
+		checks = append(checks, check{"safe_workspaces", "pass", a.Paths.WorkspaceRoot.Path})
 	}
 	if err := a.Daemon.Status(ctx); err == nil {
 		checks = append(checks, check{"daemon", "pass", "running"})
@@ -1147,14 +1289,68 @@ func pathOr(explicit, found string) string {
 	return explicit
 }
 
-func (a *App) config() error {
-	config := Config{Binary: a.Binary, DaemonBinary: a.DaemonBinary, Socket: a.Socket, StatePath: a.Store.Path, VerifyPolicy: pathOr(a.VerifyPolicy, "embedded basic policy"), CredentialConfig: a.CredentialConfig, GitHubCredentialID: a.GitHubCredentialID, JSON: a.JSON, Interactive: a.Interactive, Color: a.Renderer.Color, Unicode: a.Renderer.Unicode}
+func (a *App) config(args []string) error {
+	explain := false
+	for _, arg := range args {
+		switch arg {
+		case "--explain":
+			explain = true
+		default:
+			return fmt.Errorf("unknown config option %q", arg)
+		}
+	}
+	config := Config{
+		Binary: a.Binary, DaemonBinary: a.DaemonBinary,
+		Home: a.Paths.Home.Path, Socket: a.Socket, StatePath: a.Store.Path,
+		RuntimePath: a.Paths.Runtime.Path, WorkspaceRoot: a.Paths.WorkspaceRoot.Path,
+		Paths:            a.Paths,
+		VerifyPolicy:     pathOr(a.VerifyPolicy, "embedded basic policy"),
+		CredentialConfig: a.CredentialConfig, GitHubCredentialID: a.GitHubCredentialID,
+		JSON: a.JSON, Interactive: a.Interactive, Verbose: a.Verbose,
+		Color: a.Renderer.Color, Unicode: a.Renderer.Unicode,
+	}
 	if a.JSON {
 		return writeJSON(a.Out, config)
 	}
+	if explain {
+		a.Renderer.title("FutureDiff paths")
+		printResolvedPath(a.Out, "Home", a.Paths.Home)
+		printResolvedPath(a.Out, "Current selection", a.Paths.State)
+		printResolvedPath(a.Out, "Daemon socket", a.Paths.Socket)
+		printResolvedPath(a.Out, "Runtime", a.Paths.Runtime)
+		printResolvedPath(a.Out, "Safe workspaces", a.Paths.WorkspaceRoot)
+		fmt.Fprintln(a.Out)
+		fmt.Fprintln(a.Out, "The advanced --state option changes only the current-selection file.")
+		fmt.Fprintln(a.Out, "Use --home or FDIF_HOME to relocate daemon data and safe workspaces together.")
+		return nil
+	}
 	a.Renderer.title("FutureDiff guided CLI configuration")
-	a.Renderer.fields([2]string{"binary", config.Binary}, [2]string{"daemon", config.DaemonBinary}, [2]string{"socket", config.Socket}, [2]string{"state", config.StatePath}, [2]string{"verification", config.VerifyPolicy}, [2]string{"credential config", cleanDisplayPath(config.CredentialConfig)}, [2]string{"GitHub credential", pathOr(config.GitHubCredentialID, "not configured")}, [2]string{"interactive", strconv.FormatBool(config.Interactive)}, [2]string{"color", strconv.FormatBool(config.Color)}, [2]string{"unicode", strconv.FormatBool(config.Unicode)})
+	a.Renderer.fields(
+		[2]string{"home", config.Home},
+		[2]string{"current selection", config.StatePath},
+		[2]string{"runtime", config.RuntimePath},
+		[2]string{"safe workspaces", config.WorkspaceRoot},
+		[2]string{"socket", config.Socket},
+		[2]string{"binary", config.Binary},
+		[2]string{"daemon", config.DaemonBinary},
+		[2]string{"verification", config.VerifyPolicy},
+		[2]string{"credential config", cleanDisplayPath(config.CredentialConfig)},
+		[2]string{"GitHub credential", pathOr(config.GitHubCredentialID, "not configured")},
+		[2]string{"interactive", strconv.FormatBool(config.Interactive)},
+		[2]string{"verbose", strconv.FormatBool(config.Verbose)},
+		[2]string{"color", strconv.FormatBool(config.Color)},
+		[2]string{"unicode", strconv.FormatBool(config.Unicode)},
+	)
+	fmt.Fprintln(a.Out)
+	fmt.Fprintln(a.Out, "Run fdif config --explain to see where every path came from.")
 	return nil
+}
+
+func printResolvedPath(out io.Writer, label string, value ResolvedPath) {
+	fmt.Fprintln(out, label+":")
+	fmt.Fprintln(out, "  "+cleanDisplayPath(value.Path))
+	fmt.Fprintln(out, "  source: "+value.Source)
+	fmt.Fprintln(out)
 }
 
 func (a *App) demo(ctx context.Context, args []string) error {
@@ -1514,6 +1710,29 @@ func indent(value, prefix string) string {
 	}
 	return strings.Join(lines, "\n")
 }
+func friendlyStage(status string) string {
+	switch status {
+	case "active":
+		return "Editing"
+	case "sealed":
+		return "Change frozen"
+	case "ready":
+		return "Checks passed; approval required"
+	case "approved":
+		return "Approved; ready to publish"
+	case "committed", "complete":
+		return "Published"
+	case "aborted":
+		return "Discarded"
+	case "failed":
+		return "Needs attention"
+	case "":
+		return "Unknown"
+	default:
+		return status
+	}
+}
+
 func nextAction(status string) string {
 	switch status {
 	case "active":

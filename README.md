@@ -12,7 +12,7 @@ FutureDiff is a local-first approval checkpoint for AI-assisted development. It 
 
 GitHub publication is optional. FutureDiff can also push the approved branch and open a **draft pull request** without modifying the branch you were originally working on.
 
-> **Status:** Public alpha development line. Designed for one user on one machine, with Linux and macOS as the supported runtime targets. Until a tagged prerelease is available, build from source. See [Current limitations](#current-limitations).
+> **Status:** Public alpha. Designed for one user on one machine, with Linux and macOS as the supported runtime targets. Use the latest GitHub prerelease for packaged binaries; the default branch may contain unreleased stabilization work. See [Current limitations](#current-limitations).
 
 ---
 
@@ -91,16 +91,36 @@ Add the local binaries to your shell for the current session:
 export PATH="$PWD/bin:$PATH"
 ```
 
-Check the environment and run the disposable demo:
+See the newcomer starting screen, check the environment, and run the disposable demo:
 
 ```bash
+fdif
 fdif doctor
 fdif demo --yes
 ```
 
+Bare `fdif` is safe in both interactive and non-interactive terminals. The numbered interactive menu is available with `fdif menu`.
+
 The demo does not require GitHub credentials and does not modify one of your existing repositories.
 
 For a shorter walkthrough, see [docs/QUICKSTART.md](docs/QUICKSTART.md).
+
+### Keep local paths together
+
+FutureDiff uses one local home for its current-change selection, daemon socket, runtime files, and safe workspaces:
+
+```text
+~/.futurediff
+```
+
+For an isolated environment, set one alternative home:
+
+```bash
+FDIF_HOME=/tmp/futurediff-test fdif config --explain
+FDIF_HOME=/tmp/futurediff-test fdif demo --yes
+```
+
+Normal macOS aliases such as `/tmp` are canonicalized before use. Arbitrary user-controlled symlink traversal is still rejected. The advanced `--state` option changes only the current-selection file; use `--home` or `FDIF_HOME` to relocate daemon data and workspaces together.
 
 ---
 
@@ -220,7 +240,8 @@ FutureDiff does **not** automatically merge a change into your active branch.
 
 | Command | Purpose |
 |---|---|
-| `fdif` | Open the guided workflow |
+| `fdif` | Show the starting screen and next commands |
+| `fdif menu` | Open the interactive numbered menu |
 | `fdif start` | Start an isolated change |
 | `fdif new` | Alias for `fdif start` |
 | `fdif status` | Show the active transaction and state |
@@ -232,7 +253,8 @@ FutureDiff does **not** automatically merge a change into your active branch.
 | `fdif finish --github` | Also push and open a draft GitHub PR |
 | `fdif abort` | Abort the active change |
 | `fdif discard` | Alias for `fdif abort` |
-| `fdif doctor` | Check dependencies and daemon health |
+| `fdif config --explain` | Show effective paths and configuration sources |
+| `fdif doctor` | Check dependencies, paths, and daemon health |
 | `fdif demo --yes` | Run the disposable local demo |
 | `fdif completion <shell>` | Generate shell completion |
 
@@ -345,6 +367,14 @@ When GitHub publication is enabled:
 ### Cooperative mode is not a sandbox
 
 The public-alpha default creates an isolated working copy, but it does not force an arbitrary process to remain inside that copy. Rootless OCI enforcement exists as experimental engineering work and is not a public-alpha guarantee.
+
+### Local path safety
+
+`fdif`, its daemon launcher, socket, current-selection file, runtime files, and safe workspaces share one resolved FutureDiff home. Known operating-system aliases needed for normal platform behavior are canonicalized, while arbitrary symlinked parents, a symlink home, and a symlink current-selection file remain rejected. Inspect the exact effective locations with:
+
+```bash
+fdif config --explain
+```
 
 Read [SECURITY.md](SECURITY.md) before using FutureDiff with sensitive repositories.
 
@@ -519,6 +549,7 @@ On Linux, use `sha256sum -c MANIFEST.sha256` when appropriate.
 - [Limitations](docs/LIMITATIONS.md)
 - [Security policy](SECURITY.md)
 - [Roadmap](ROADMAP.md)
+- [Unified home and path decision](docs/adr/0003-fdif-home-and-path-canonicalization.md)
 
 ### Deeper technical material
 
@@ -577,8 +608,7 @@ Keep changes focused, include tests, and avoid expanding public claims without m
 
 Near-term work includes:
 
-- publishing the first public-alpha release;
-- recording a complete public end-to-end demonstration;
+- stabilizing first-run and configuration UX across Linux and macOS;
 - improving structured logs and stable error reporting;
 - strengthening provider recovery UX;
 - increasing core-path test coverage;

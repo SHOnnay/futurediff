@@ -96,3 +96,32 @@ func TestStateStoreRejectsBroadPermissions(t *testing.T) {
 		t.Fatal("state file with broad permissions was accepted")
 	}
 }
+
+func TestDarwinStateStoreWorksBelowTmpAlias(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("macOS /tmp alias test")
+	}
+	rawRoot, err := os.MkdirTemp("/tmp", "futurediff-state-test-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolvedRoot, err := filepath.EvalSymlinks(rawRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(resolvedRoot)
+	if err := os.Chmod(resolvedRoot, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	store := StateStore{Path: filepath.Join(rawRoot, "current.json")}
+	if err := store.Save("tx_tmp", "/repo"); err != nil {
+		t.Fatalf("save below /tmp failed: %v", err)
+	}
+	current, err := store.Load()
+	if err != nil {
+		t.Fatalf("load below /tmp failed: %v", err)
+	}
+	if current.TransactionID != "tx_tmp" {
+		t.Fatalf("unexpected state: %+v", current)
+	}
+}

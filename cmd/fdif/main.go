@@ -41,18 +41,24 @@ func parseArguments(args []string) (guidedcli.Options, []string, error) {
 			options.NoColor = true
 		case "--non-interactive":
 			options.NonInteractive = true
-		case "--binary", "--daemon-binary", "--socket", "--state", "--policy", "--credential-config", "--github-credential":
+		case "--verbose", "-v":
+			options.Verbose = true
+		case "--home", "--root", "--binary", "--daemon-binary", "--socket", "--state", "--policy", "--credential-config", "--github-credential":
 			if i+1 >= len(args) {
 				return options, nil, fmt.Errorf("%s requires a value", arg)
 			}
 			i++
-			setOption(&options, arg, args[i])
+			if err := setOption(&options, arg, args[i]); err != nil {
+				return options, nil, err
+			}
 		default:
 			if key, value, ok := strings.Cut(arg, "="); ok && isValueOption(key) {
 				if value == "" {
 					return options, nil, fmt.Errorf("%s requires a value", key)
 				}
-				setOption(&options, key, value)
+				if err := setOption(&options, key, value); err != nil {
+					return options, nil, err
+				}
 				continue
 			}
 			remaining = append(remaining, arg)
@@ -72,15 +78,20 @@ func isFinishValueOption(arg string) bool {
 
 func isValueOption(key string) bool {
 	switch key {
-	case "--binary", "--daemon-binary", "--socket", "--state", "--policy", "--credential-config", "--github-credential":
+	case "--home", "--root", "--binary", "--daemon-binary", "--socket", "--state", "--policy", "--credential-config", "--github-credential":
 		return true
 	default:
 		return false
 	}
 }
 
-func setOption(options *guidedcli.Options, key, value string) {
+func setOption(options *guidedcli.Options, key, value string) error {
 	switch key {
+	case "--home", "--root":
+		if options.Home != "" && options.Home != value {
+			return fmt.Errorf("--home and --root specify different paths")
+		}
+		options.Home = value
 	case "--binary":
 		options.Binary = value
 	case "--daemon-binary":
@@ -96,4 +107,5 @@ func setOption(options *guidedcli.Options, key, value string) {
 	case "--github-credential":
 		options.GitHubCredentialID = value
 	}
+	return nil
 }

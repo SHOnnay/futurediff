@@ -157,6 +157,7 @@ docs/THREAT_MODEL.md
 docs/TRANSPARENCY_AND_EXCEPTIONS.md
 docs/UPGRADE_AND_ROLLBACK.md
 docs/WHAT_REMAINS_BEFORE_PRODUCTION.md
+docs/adr/0003-fdif-home-and-path-canonicalization.md
 docs/adr/ADR-022-go-primary-language.md
 docs/adr/ADR-023-go-sqlite-bootstrap-adapter.md
 docs/adr/ADR-024-go-daemon-is-authoritative.md
@@ -707,6 +708,8 @@ internal/guidedcli/daemon_test.go
 internal/guidedcli/engine.go
 internal/guidedcli/engine_test.go
 internal/guidedcli/github.go
+internal/guidedcli/paths.go
+internal/guidedcli/paths_test.go
 internal/guidedcli/render.go
 internal/guidedcli/state.go
 internal/guidedcli/state_test.go

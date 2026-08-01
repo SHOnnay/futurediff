@@ -1,5 +1,6 @@
 import ast
 import os
+import re
 import subprocess
 import unittest
 from pathlib import Path
@@ -14,8 +15,16 @@ def read_utf8(path: Path) -> str:
 
 
 class PublicAlphaTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.version = read_utf8(ROOT / "VERSION").strip()
+
     def test_version_is_pre_one_alpha(self):
-        self.assertEqual(read_utf8(ROOT / "VERSION").strip(), "v0.1.0-alpha.1")
+        self.assertRegex(
+            self.version,
+            r"^v0\.[0-9]+\.[0-9]+-alpha\.[0-9]+$",
+        )
+        self.assertEqual(self.version, "v0.1.0-alpha.2")
 
     def test_readme_does_not_lead_with_internal_progress(self):
         text = read_utf8(ROOT / "README.md").lower()
@@ -28,6 +37,8 @@ class PublicAlphaTests(unittest.TestCase):
             self.assertNotIn(banned, text)
         self.assertIn("review ai-assisted code changes", text)
         self.assertIn("fdif finish --github", text)
+        self.assertIn("show the starting screen", text)
+        self.assertNotIn("| `fdif` | open the guided workflow |", text)
 
     def test_public_package_is_three_binaries(self):
         makefile = read_utf8(ROOT / "Makefile")
@@ -50,6 +61,13 @@ class PublicAlphaTests(unittest.TestCase):
         self.assertIn("artifact-metadata: write", text)
         self.assertIn("if: github.ref_type == 'tag'", text)
         self.assertIn("INPUT_VERSION: ${{ inputs.version }}", text)
+        self.assertIn(f"default: {self.version}", text)
+        for path in (
+            "docs/FDIF_GUIDED_CLI.md",
+            "docs/FDIF_COMMAND_REFERENCE.md",
+            "docs/adr/**",
+        ):
+            self.assertIn(path, text)
 
     def test_legacy_release_does_not_claim_v0_tags(self):
         text = read_utf8(ROOT / ".github/workflows/release.yml")
@@ -61,6 +79,7 @@ class PublicAlphaTests(unittest.TestCase):
         self.assertIn("sha256sum -c", text)
         self.assertIn("shasum -a 256 -c", text)
         self.assertNotIn("--no-verify", text)
+        self.assertIn(self.version, text)
 
     @unittest.skipIf(
         os.name == "nt",
@@ -88,7 +107,7 @@ class PublicAlphaTests(unittest.TestCase):
                 "bash",
                 "scripts/install-release.sh",
                 "--version",
-                "v0.1.0-alpha.1",
+                self.version,
                 "--print-asset",
             ],
             cwd=ROOT,
@@ -96,9 +115,10 @@ class PublicAlphaTests(unittest.TestCase):
             text=True,
             capture_output=True,
         )
+        escaped = re.escape(self.version)
         self.assertRegex(
             result.stdout.strip(),
-            r"^futurediff-v0\.1\.0-alpha\.1-(linux|darwin)-(amd64|arm64)\.tar\.gz$",
+            rf"^futurediff-{escaped}-(linux|darwin)-(amd64|arm64)\.tar\.gz$",
         )
 
     def test_public_alpha_contract_is_enforced(self):
@@ -150,27 +170,26 @@ class PublicAlphaTests(unittest.TestCase):
         ):
             self.assertIn(required, script)
 
-
-def test_repository_text_reads_use_explicit_encoding(self):
-    tree = ast.parse(read_utf8(Path(__file__)))
-    unqualified = []
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-        if not isinstance(node.func, ast.Attribute):
-            continue
-        if node.func.attr != "read_text":
-            continue
-        has_encoding = any(
-            keyword.arg == "encoding" for keyword in node.keywords
+    def test_repository_text_reads_use_explicit_encoding(self):
+        tree = ast.parse(read_utf8(Path(__file__)))
+        unqualified = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if not isinstance(node.func, ast.Attribute):
+                continue
+            if node.func.attr != "read_text":
+                continue
+            has_encoding = any(
+                keyword.arg == "encoding" for keyword in node.keywords
+            )
+            if not has_encoding:
+                unqualified.append(node.lineno)
+        self.assertEqual(
+            unqualified,
+            [],
+            f"read_text calls without explicit encoding: {unqualified}",
         )
-        if not has_encoding:
-            unqualified.append(node.lineno)
-    self.assertEqual(
-        unqualified,
-        [],
-        f"read_text calls without explicit encoding: {unqualified}",
-    )
 
     def test_document_links_exist(self):
         for path in (
@@ -179,12 +198,39 @@ def test_repository_text_reads_use_explicit_encoding(self):
             "ROADMAP.md",
             "docs/QUICKSTART.md",
             "docs/LIMITATIONS.md",
+            "docs/THREAT_MODEL.md",
             "docs/FDIF_INSTALLATION.md",
             "docs/FDIF_GUIDED_CLI.md",
             "docs/FDIF_COMMAND_REFERENCE.md",
             "docs/FDIF_GITHUB_PUBLICATION.md",
+            "docs/adr/0003-fdif-home-and-path-canonicalization.md",
         ):
             self.assertTrue((ROOT / path).exists(), path)
+
+    def test_first_run_and_path_ux_contract(self):
+        app = read_utf8(ROOT / "internal/guidedcli/app.go")
+        paths = read_utf8(ROOT / "internal/guidedcli/paths.go")
+        main = read_utf8(ROOT / "cmd/fdif/main.go")
+        guided = read_utf8(ROOT / "docs/FDIF_GUIDED_CLI.md")
+
+        self.assertIn("a.landing()", app)
+        self.assertIn('case "menu":', app)
+        self.assertNotIn("no command supplied", app)
+        self.assertIn("fdif config --explain", app)
+        self.assertIn("Your current branch was not modified", app)
+        self.assertIn("if a.Verbose", app)
+
+        self.assertIn('os.Getenv("FDIF_HOME")', paths)
+        self.assertIn('os.Getenv("FUTUREDIFF_ROOT")', paths)
+        self.assertIn('"--state (advanced)"', paths)
+        self.assertIn('path == "/tmp"', paths)
+        self.assertIn("refusing home path that is itself a symlink", paths)
+
+        for flag in ("--home", "--root", "--verbose"):
+            self.assertIn(flag, main)
+        self.assertIn("This behavior is the same when stdout is not a terminal", guided)
+        self.assertIn("FDIF_HOME", guided)
+        self.assertIn("/private/tmp", guided)
 
 
 if __name__ == "__main__":

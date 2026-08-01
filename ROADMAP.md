@@ -1,17 +1,31 @@
 # FutureDiff Roadmap
 
-This roadmap separates the public product from experimental and internal assurance work. It is directional, not a delivery guarantee.
+This roadmap separates the public product from experimental and internal
+assurance work. It is directional, not a delivery guarantee.
 
 ## Public alpha — `v0.1.x`
+
+### Shipped in `v0.1.0-alpha.1`
 
 - local-first guided workflow on Linux and macOS;
 - exact diff review and digest-bound approval;
 - safe local branch publication;
 - optional draft GitHub pull request;
-- three-binary release packages with checksums;
+- three-binary release packages with checksums and attestations;
 - verified installer and shell completions;
-- one public end-to-end demonstration;
+- public end-to-end workflow validation;
 - clear limitations and security boundaries.
+
+### UX stabilization for `v0.1.0-alpha.2`
+
+- truthful bare-`fdif` starting screen in TTY and non-TTY contexts;
+- explicit `fdif menu` command;
+- unified `--home` / `FDIF_HOME` path model;
+- explained configuration sources with `fdif config --explain`;
+- safe canonicalization of normal macOS temporary paths;
+- newcomer-first start and publication output;
+- verbose and JSON paths for operator details;
+- regression coverage for path precedence, symlinks, and first-run behavior.
 
 ## Public beta — `v0.2.x` and later
 
@@ -47,4 +61,6 @@ These require separate product and security designs:
 
 ## Versioning
 
-Public product versions follow semantic pre-1.0 versioning. Protocol, API-contract, evidence-schema, and internal task identifiers remain separate and do not determine product maturity.
+Public product versions follow semantic pre-1.0 versioning. Protocol,
+API-contract, evidence-schema, and internal task identifiers remain separate
+and do not determine product maturity.

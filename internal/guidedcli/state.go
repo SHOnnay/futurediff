@@ -15,21 +15,27 @@ type StateStore struct {
 }
 
 func DefaultStatePath() string {
-	if root := os.Getenv("FUTUREDIFF_ROOT"); root != "" {
-		return filepath.Join(root, "current-transaction.json")
+	paths, err := resolvePathConfig(Options{})
+	if err == nil {
+		return paths.State.Path
 	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".futurediff", "current-transaction.json")
 }
 
-func (s StateStore) Load() (CurrentTransaction, error) {
+func (s StateStore) effectivePath() (string, error) {
 	if s.Path == "" {
-		return CurrentTransaction{}, errors.New("current transaction state path is empty")
+		return "", errors.New("current transaction state path is empty")
 	}
-	if err := rejectSymlinkedParent(filepath.Dir(s.Path)); err != nil {
+	return canonicalizeFilePath(s.Path)
+}
+
+func (s StateStore) Load() (CurrentTransaction, error) {
+	path, err := s.effectivePath()
+	if err != nil {
 		return CurrentTransaction{}, err
 	}
-	info, err := os.Lstat(s.Path)
+	info, err := os.Lstat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return CurrentTransaction{}, os.ErrNotExist
@@ -37,15 +43,15 @@ func (s StateStore) Load() (CurrentTransaction, error) {
 		return CurrentTransaction{}, err
 	}
 	if info.Mode()&os.ModeSymlink != 0 {
-		return CurrentTransaction{}, fmt.Errorf("refusing symlink state file %s", s.Path)
+		return CurrentTransaction{}, fmt.Errorf("refusing symlink state file %s", path)
 	}
 	if !info.Mode().IsRegular() {
-		return CurrentTransaction{}, fmt.Errorf("state path is not a regular file: %s", s.Path)
+		return CurrentTransaction{}, fmt.Errorf("state path is not a regular file: %s", path)
 	}
 	if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
 		return CurrentTransaction{}, fmt.Errorf("state file permissions are too broad: %o", info.Mode().Perm())
 	}
-	data, err := os.ReadFile(s.Path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return CurrentTransaction{}, err
 	}
@@ -63,15 +69,25 @@ func (s StateStore) Save(transactionID, repositoryRoot string) error {
 	if transactionID == "" {
 		return errors.New("transaction ID is required")
 	}
-	dir := filepath.Dir(s.Path)
+	path, err := s.effectivePath()
+	if err != nil {
+		return err
+	}
+	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
-	if err := rejectSymlinkedParent(dir); err != nil {
+	info, err := os.Lstat(dir)
+	if err != nil {
 		return err
 	}
-	if info, err := os.Lstat(s.Path); err == nil && info.Mode()&os.ModeSymlink != 0 {
-		return fmt.Errorf("refusing to replace symlink state file %s", s.Path)
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return fmt.Errorf("state directory must be a real directory: %s", dir)
+	}
+	if info, statErr := os.Lstat(path); statErr == nil && info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("refusing to replace symlink state file %s", path)
+	} else if statErr != nil && !os.IsNotExist(statErr) {
+		return statErr
 	}
 	current := CurrentTransaction{TransactionID: transactionID, RepositoryRoot: repositoryRoot, SelectedAt: time.Now().UTC()}
 	data, err := json.MarshalIndent(current, "", "  ")
@@ -100,35 +116,30 @@ func (s StateStore) Save(transactionID, repositoryRoot string) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	if err := os.Rename(tmpName, s.Path); err != nil {
+	if err := os.Rename(tmpName, path); err != nil {
 		return err
 	}
-	return os.Chmod(s.Path, 0o600)
+	return os.Chmod(path, 0o600)
 }
 
 func (s StateStore) Clear() error {
-	err := os.Remove(s.Path)
+	path, err := s.effectivePath()
+	if err != nil {
+		return err
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("refusing symlink state file %s", path)
+	}
+	err = os.Remove(path)
 	if os.IsNotExist(err) {
 		return nil
 	}
 	return err
-}
-
-func rejectSymlinkedParent(dir string) error {
-	clean, err := filepath.Abs(filepath.Clean(dir))
-	if err != nil {
-		return err
-	}
-	resolved, err := filepath.EvalSymlinks(clean)
-	if err != nil {
-		return err
-	}
-	resolved, err = filepath.Abs(resolved)
-	if err != nil {
-		return err
-	}
-	if resolved != clean {
-		return fmt.Errorf("refusing state path through symlinked directory: %s", dir)
-	}
-	return nil
 }

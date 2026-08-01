@@ -21,6 +21,24 @@ type DaemonManager struct {
 	UnsafeNoAuth     bool
 }
 
+func (d DaemonManager) resolvedRoot() (string, error) {
+	root := strings.TrimSpace(d.Root)
+	if root == "" {
+		root = strings.TrimSpace(os.Getenv("FDIF_HOME"))
+	}
+	if root == "" {
+		root = strings.TrimSpace(os.Getenv("FUTUREDIFF_ROOT"))
+	}
+	if root == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		root = filepath.Join(home, ".futurediff")
+	}
+	return canonicalizeHomePath(root)
+}
+
 func (d DaemonManager) Status(ctx context.Context) error {
 	_, err := d.Engine.Run(ctx, "health")
 	return err
@@ -29,22 +47,6 @@ func (d DaemonManager) Status(ctx context.Context) error {
 func (d DaemonManager) Start(ctx context.Context) error {
 	if d.Status(ctx) == nil {
 		return nil
-	}
-	root := d.Root
-	if root == "" {
-		if value := os.Getenv("FUTUREDIFF_ROOT"); value != "" {
-			root = value
-		} else {
-			home, _ := os.UserHomeDir()
-			root = filepath.Join(home, ".futurediff")
-		}
-	}
-	if err := os.MkdirAll(root, 0o700); err != nil {
-		return err
-	}
-	args := []string{"--root", root}
-	if d.Socket != "" {
-		args = append(args, "--socket", d.Socket)
 	}
 	if d.CredentialConfig != "" {
 		info, statErr := os.Lstat(d.CredentialConfig)
@@ -57,6 +59,19 @@ func (d DaemonManager) Start(ctx context.Context) error {
 		if info.Mode().Perm()&0o077 != 0 {
 			return errors.New("credential config permissions are too broad; use chmod 600")
 		}
+	}
+	root, err := d.resolvedRoot()
+	if err != nil {
+		return err
+	}
+	if err := ensurePrivateDirectory(root); err != nil {
+		return err
+	}
+	args := []string{"--root", root}
+	if d.Socket != "" {
+		args = append(args, "--socket", d.Socket)
+	}
+	if d.CredentialConfig != "" {
 		args = append(args, "--credential-config", d.CredentialConfig)
 	}
 	if d.UnsafeNoAuth {
@@ -92,14 +107,9 @@ func (d DaemonManager) Start(ctx context.Context) error {
 }
 
 func (d DaemonManager) Stop() error {
-	root := d.Root
-	if root == "" {
-		if value := os.Getenv("FUTUREDIFF_ROOT"); value != "" {
-			root = value
-		} else {
-			home, _ := os.UserHomeDir()
-			root = filepath.Join(home, ".futurediff")
-		}
+	root, err := d.resolvedRoot()
+	if err != nil {
+		return err
 	}
 	pidPath := filepath.Join(root, "futurediff.pid")
 	info, err := os.Lstat(pidPath)

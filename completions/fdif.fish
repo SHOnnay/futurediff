@@ -22,6 +22,7 @@ complete -c fdif -n '__fish_use_subcommand' -a discard
 complete -c fdif -n '__fish_use_subcommand' -a daemon
 complete -c fdif -n '__fish_use_subcommand' -a doctor
 complete -c fdif -n '__fish_use_subcommand' -a config
+complete -c fdif -n '__fish_use_subcommand' -a menu
 complete -c fdif -n '__fish_use_subcommand' -a demo
 complete -c fdif -n '__fish_use_subcommand' -a completion
 complete -c fdif -n '__fish_use_subcommand' -a version
