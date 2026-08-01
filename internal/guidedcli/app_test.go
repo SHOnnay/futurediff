@@ -138,9 +138,11 @@ func newTestApp(t *testing.T, engine Engine, repo, workspace string) (*App, *byt
 	return app, out, errOut
 }
 
-func makeRepoAndWorkspace(t *testing.T) (string, string) {
+func makeRepoAtPath(t *testing.T, repo string) string {
 	t.Helper()
-	repo := realTempDir(t)
+	if err := os.MkdirAll(repo, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	runGitTest(t, repo, "init", "-b", "main")
 	runGitTest(t, repo, "config", "user.name", "Test")
 	runGitTest(t, repo, "config", "user.email", "test@localhost")
@@ -149,6 +151,12 @@ func makeRepoAndWorkspace(t *testing.T) (string, string) {
 	}
 	runGitTest(t, repo, "add", "README.md")
 	runGitTest(t, repo, "commit", "-m", "init")
+	return repo
+}
+
+func makeRepoAndWorkspace(t *testing.T) (string, string) {
+	t.Helper()
+	repo := makeRepoAtPath(t, realTempDir(t))
 	workspace := filepath.Join(realTempDir(t), "workspace")
 	runGitTest(t, repo, "worktree", "add", "--detach", workspace, "HEAD")
 	if err := os.WriteFile(filepath.Join(workspace, "README.md"), []byte("hello\nfuture\n"), 0o644); err != nil {
@@ -941,5 +949,84 @@ func TestStartHidesOperatorDetailsUnlessVerbose(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "Change ID") || !strings.Contains(out.String(), "Mode") {
 		t.Fatalf("verbose output omitted operator fields:\n%s", out.String())
+	}
+}
+
+func TestGitOutputIgnoresGlobalFsmonitorConfig(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-based fsmonitor probe is Unix-only")
+	}
+	repo, _ := makeRepoAndWorkspace(t)
+	home := t.TempDir()
+	marker := filepath.Join(t.TempDir(), "fsmonitor-hit")
+	script := filepath.Join(home, "fsmonitor.sh")
+	scriptBody := fmt.Sprintf("#!/bin/sh\nprintf 'hit' > %q\nexit 0\n", marker)
+	if err := os.WriteFile(script, []byte(scriptBody), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	config := "[core]\n\tfsmonitor = " + script + "\n"
+	if err := os.WriteFile(filepath.Join(home, ".gitconfig"), []byte(config), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	if _, err := gitOutput(context.Background(), "git", repo, "status", "--short"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatalf("global fsmonitor helper executed during guided git command: %v", err)
+	}
+}
+
+func TestGitOutputIgnoresAmbientGitDirAndWorkTree(t *testing.T) {
+	repo, _ := makeRepoAndWorkspace(t)
+	otherRepo, _ := makeRepoAndWorkspace(t)
+	t.Setenv("GIT_DIR", filepath.Join(otherRepo, ".git"))
+	t.Setenv("GIT_WORK_TREE", otherRepo)
+	output, err := gitOutput(context.Background(), "git", repo, "rev-parse", "--show-toplevel")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(output) != repo {
+		t.Fatalf("guided git command resolved %q, want %q", strings.TrimSpace(output), repo)
+	}
+}
+
+func TestDetectRepositoryRejectsDetachedHEAD(t *testing.T) {
+	repo := makeRepoAtPath(t, filepath.Join(t.TempDir(), "detached-repo"))
+	runGitTest(t, repo, "switch", "--detach", "HEAD")
+	_, err := detectRepository(context.Background(), "git", repo)
+	if err == nil || !strings.Contains(err.Error(), "detached HEAD") {
+		t.Fatalf("detached HEAD repository was not rejected: %v", err)
+	}
+}
+
+func TestDetectRepositoryRejectsBareRepository(t *testing.T) {
+	repo := filepath.Join(t.TempDir(), "bare-repo.git")
+	if err := os.MkdirAll(repo, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	runGitTest(t, repo, "init", "--bare")
+	_, err := detectRepository(context.Background(), "git", repo)
+	if err == nil || !strings.Contains(err.Error(), "bare Git repository") {
+		t.Fatalf("bare repository was not rejected: %v", err)
+	}
+}
+
+func TestDetectRepositoryHandlesPathsWithSpacesAndMetacharacters(t *testing.T) {
+	repo := makeRepoAtPath(t, filepath.Join(t.TempDir(), "repo with spaces [safe];!"))
+	nested := filepath.Join(repo, "nested dir")
+	if err := os.MkdirAll(nested, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	root, err := detectRepository(context.Background(), "git", nested)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := filepath.EvalSymlinks(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if root != want {
+		t.Fatalf("detectRepository resolved %q, want %q", root, want)
 	}
 }

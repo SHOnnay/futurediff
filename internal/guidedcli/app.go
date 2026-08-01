@@ -1635,16 +1635,52 @@ func detectRepository(ctx context.Context, gitBinary, path string) (string, erro
 	if err != nil {
 		return "", err
 	}
+	bare, bareErr := gitOutput(ctx, gitBinary, absolute, "rev-parse", "--is-bare-repository")
+	if bareErr == nil && strings.TrimSpace(bare) == "true" {
+		return "", fmt.Errorf("%s is a bare Git repository; use a checked-out worktree on a branch", absolute)
+	}
 	output, err := gitOutput(ctx, gitBinary, absolute, "rev-parse", "--show-toplevel")
 	if err != nil {
 		return "", fmt.Errorf("%s is not a Git repository", absolute)
 	}
-	return strings.TrimSpace(output), nil
+	root := strings.TrimSpace(output)
+	headRef, err := gitOutput(ctx, gitBinary, root, "symbolic-ref", "-q", "HEAD")
+	if err != nil || strings.TrimSpace(headRef) == "" {
+		return "", fmt.Errorf("%s has a detached HEAD; checkout a branch before running fdif start", root)
+	}
+	return root, nil
+}
+
+func gitCommandEnv() []string {
+	return []string{
+		"PATH=" + os.Getenv("PATH"),
+		"LANG=C.UTF-8",
+		"LC_ALL=C.UTF-8",
+		"GIT_CONFIG_NOSYSTEM=1",
+		"GIT_CONFIG_GLOBAL=" + os.DevNull,
+		"GIT_OPTIONAL_LOCKS=0",
+		"GIT_EXTERNAL_DIFF=",
+		"GIT_DIFF_OPTS=",
+		"GIT_PAGER=cat",
+		"PAGER=cat",
+		"GIT_TERMINAL_PROMPT=0",
+		"GIT_ASKPASS=",
+		"SSH_ASKPASS=",
+	}
 }
 
 func gitOutput(ctx context.Context, binary, directory string, args ...string) (string, error) {
-	cmdArgs := append([]string{"-C", directory}, args...)
+	cmdArgs := []string{
+		"-c", "core.hooksPath=/dev/null",
+		"-c", "core.fsmonitor=false",
+		"-c", "credential.helper=",
+		"-c", "diff.external=",
+		"-c", "core.pager=cat",
+		"-C", directory,
+	}
+	cmdArgs = append(cmdArgs, args...)
 	cmd := exec.CommandContext(ctx, binary, cmdArgs...)
+	cmd.Env = gitCommandEnv()
 	var stdout, stderr strings.Builder
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
