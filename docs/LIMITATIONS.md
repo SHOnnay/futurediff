@@ -1,6 +1,7 @@
 # FutureDiff Alpha Limitations
 
-FutureDiff is an early local-first alpha. This document defines what the public product does not yet promise.
+FutureDiff is an early local-first alpha. This document defines what the public
+product does not yet promise.
 
 ## Supported scope
 
@@ -9,6 +10,8 @@ FutureDiff is an early local-first alpha. This document defines what the public 
 - Linux and macOS runtime targets;
 - cooperative workspace operation by default;
 - manual editing or an externally launched coding agent;
+- newcomer-oriented `fdif` starting and continuation guidance;
+- one configurable FutureDiff home for daemon data and safe workspaces;
 - safe local branch publication;
 - optional GitHub draft-PR publication.
 
@@ -27,12 +30,28 @@ FutureDiff is an early local-first alpha. This document defines what the public 
 
 ## Cooperative mode
 
-Cooperative mode creates an isolated Git working copy, but the user or agent must actually work inside that copy. Rootless OCI enforcement exists as experimental engineering work and is not required for the public alpha.
+Cooperative mode creates an isolated Git working copy, but the user or agent
+must actually work inside that copy. Rootless OCI enforcement exists as
+experimental engineering work and is not a public-alpha guarantee.
+
+## Paths and isolation
+
+`--home` or `FDIF_HOME` relocates the daemon root, socket, current-selection
+file, runtime directory, and safe workspaces together. The compatibility
+`--state` option relocates only the current-selection file.
+
+FutureDiff canonicalizes a small set of trusted operating-system path aliases
+so normal macOS locations such as `/tmp` work. Arbitrary user-created symlink
+traversal and a home that is itself a symlink remain rejected. This is path
+hardening, not a complete filesystem sandbox.
 
 ## GitHub
 
-GitHub credentials are optional. `fdif finish` publishes locally without them. `fdif finish --github` requires an explicitly configured credential and repository allowlist.
+GitHub credentials are optional. `fdif finish` publishes locally without them.
+`fdif finish --github` requires an explicitly configured credential and
+repository allowlist.
 
 ## Security reporting
 
-Do not include tokens, private keys, private source, or raw evidence containing secrets in public issues. Follow [SECURITY.md](../SECURITY.md).
+Do not include tokens, private keys, private source, or raw evidence containing
+secrets in public issues. Follow [SECURITY.md](../SECURITY.md).

@@ -5,15 +5,108 @@
 ```text
 futurediffd   authoritative local daemon
 futurediff    exact, scriptable low-level client
-fdif          guided command for people
+fdif          newcomer-oriented guided command
 ```
 
 The public-alpha workflow is local-first and cooperative. FutureDiff creates a
 safe Git working copy. A human or an externally launched coding agent edits
-that copy. FutureDiff then reviews, verifies, approves and publishes the exact
-result as a new local branch.
+that copy. FutureDiff then reviews, verifies, approves, and publishes the exact
+result as a new safe branch.
 
-FutureDiff does **not** launch or supervise coding agents in the alpha.
+FutureDiff does **not** launch or supervise coding agents in this alpha.
+
+## First run
+
+Running `fdif` without a subcommand shows a deterministic starting screen:
+
+```text
+FutureDiff
+Review AI-assisted changes before they reach GitHub or your current branch.
+
+Start a change:
+  fdif start
+
+Check your setup:
+  fdif doctor
+
+Try a disposable demo:
+  fdif demo --yes
+```
+
+This behavior is the same when stdout is not a terminal. It does not fail with
+“no command supplied,” and it does not silently require an interactive menu.
+
+The numbered menu remains available explicitly:
+
+```bash
+fdif menu
+```
+
+`fdif menu` requires an interactive terminal.
+
+When a current change is selected, the starting screen points to `status`,
+`review --full`, and `finish`. Transaction IDs stay hidden unless verbose or
+structured output is requested.
+
+## One home, consistent paths
+
+The default FutureDiff home is:
+
+```text
+~/.futurediff
+```
+
+From that home, `fdif` derives:
+
+```text
+current-transaction.json   local current-change selection
+futurediff.sock            local daemon socket
+runtime/                    daemon runtime and safe Git workspaces
+futurediffd.log             daemon log
+```
+
+Set one alternative root with either:
+
+```bash
+fdif --home /path/to/fdif-home config --explain
+```
+
+or:
+
+```bash
+FDIF_HOME=/path/to/fdif-home fdif config --explain
+```
+
+Configuration precedence is:
+
+```text
+--home / --root
+FDIF_HOME
+FUTUREDIFF_ROOT (legacy)
+~/.futurediff
+```
+
+The socket may still be overridden explicitly with `--socket` or
+`FUTUREDIFF_SOCKET`.
+
+`--state` is an advanced compatibility option. It relocates only the
+current-selection JSON file; it does not change daemon data or workspace
+placement. `fdif config --explain` shows every effective path and its source so
+this distinction is visible.
+
+## Path safety and macOS aliases
+
+FutureDiff canonicalizes trusted operating-system aliases before creating or
+using its private home. A path beneath macOS `/tmp`, for example, is used under
+its canonical `/private/tmp` location.
+
+This does not turn on general symlink following:
+
+- a configured home that is itself a symlink is rejected;
+- arbitrary user-controlled symlinked parent directories are rejected;
+- the current-selection file may not be a symlink;
+- daemon-root permissions remain private;
+- the effective canonical path is shown by `fdif config --explain`.
 
 ## Recommended workflow
 
@@ -23,10 +116,20 @@ From a Git repository:
 fdif start
 ```
 
-`fdif new` is a friendly alias for the same operation.
+`fdif new` is an alias. Normal output emphasizes:
 
-FutureDiff prints a safe working-copy path. Open that path in your editor or
-coding agent. You can also open a terminal there:
+1. where the safe working copy is;
+2. that the current branch was not modified;
+3. the next review and finish commands.
+
+Internal details such as the transaction ID and cooperative mode are available
+with:
+
+```bash
+fdif --verbose start
+```
+
+Open the safe path in an editor or coding agent, or run:
 
 ```bash
 fdif shell
@@ -45,9 +148,9 @@ Finish the local workflow:
 fdif finish
 ```
 
-`finish` is state-aware. It reviews the safe working copy, freezes the exact
-patch, runs checks, resolves the canonical transaction digest, asks for exact
-approval, and publishes:
+`finish` reviews the safe working copy, freezes the exact patch, runs checks,
+resolves the canonical transaction digest, asks for exact approval, and
+publishes:
 
 ```text
 refs/heads/futurediff/<transaction-id>
@@ -63,98 +166,49 @@ When GitHub credentials are configured, select GitHub on the first finish run:
 fdif finish --github
 ```
 
-This keeps local branch publication as the foundation, then pushes that exact
+Local branch publication remains the foundation. FutureDiff pushes that exact
 safe branch and creates a draft pull request. The provider request is prepared
-before verification, so the repository, base, head, title and body are part of
-the exact reviewed and approved transaction material.
+before verification, so repository, base, head, title, and body are part of the
+reviewed and approved transaction material.
 
-`--github` is optional. A missing GitHub configuration never prevents ordinary
-local publication with `fdif finish`.
-
-See [`FDIF_GITHUB_PUBLICATION.md`](FDIF_GITHUB_PUBLICATION.md) for credential
-setup, options, confirmation behavior and recovery guidance.
-
-## What success looks like
-
-Local:
-
-```text
-Reviewed change published locally
-
-Safe branch
-  futurediff/tx_...
-
-Current branch
-  unchanged
-```
-
-GitHub:
-
-```text
-Reviewed change published and sent to GitHub
-
-Safe branch
-  futurediff/tx_...
-
-Draft PR
-  https://github.com/OWNER/REPOSITORY/pull/NUMBER
-
-Current branch
-  unchanged
-```
+See [`FDIF_GITHUB_PUBLICATION.md`](FDIF_GITHUB_PUBLICATION.md).
 
 ## Everyday commands
 
 ```text
-fdif start | fdif new       create a safe working copy
-fdif status                 show the current change
-fdif workspace              print the safe working-copy path
-fdif shell                  open a shell in the safe working copy
-fdif review                 show changed files and a summary
-fdif review --full          show the exact diff
-fdif finish                 verify, approve and publish locally
-fdif finish --github        also create a GitHub draft pull request
-fdif abort | fdif discard   discard an unfinished change
-fdif doctor                 check local requirements
-fdif demo --yes             run the disposable automated demo
+fdif                         show the first-run/continue screen
+fdif menu                    open the interactive numbered menu
+fdif start | fdif new        create a safe working copy
+fdif status                  show the current change
+fdif workspace               print the safe working-copy path
+fdif shell                   open a shell in the safe working copy
+fdif review --full           show the exact diff
+fdif finish                  verify, approve, and publish locally
+fdif finish --github         also create a GitHub draft pull request
+fdif abort | fdif discard    discard an unfinished change
+fdif config --explain        explain effective paths and sources
+fdif doctor                  check requirements and effective home
+fdif demo --yes              run the disposable automated demo
 ```
 
-The lower-level `seal`, `verify`, `approve`, and `publish` commands remain
-available for advanced users and automation.
+## Cooperative-mode boundary
 
-## Cooperative mode
-
-Cooperative mode is the public-alpha default:
-
-- FutureDiff isolates repository changes in a separate Git worktree.
-- The user is responsible for running the editor or coding agent inside that
-  safe working copy.
-- FutureDiff verifies what is present at review time.
+- FutureDiff isolates changes in a separate Git worktree.
+- The user is responsible for running the editor or agent inside that path.
+- FutureDiff verifies what exists at review time.
+- Cooperative isolation is not an operating-system sandbox.
 - Enforced rootless OCI execution remains experimental.
 
-## Current change pointer
-
-`fdif` stores only a local pointer at:
-
-```text
-~/.futurediff/current-transaction.json
-```
-
-It contains the transaction ID, repository root, and selection time. It
-contains no approval digest or credential material. Writes are atomic,
-permissions are restrictive, and symbolic-link paths are rejected.
-
-## Safety
+## Safety properties
 
 - daemon peer authentication remains enabled by default;
 - approval and publication require exact confirmation;
 - non-interactive risky actions require `--yes`;
 - approval material is resolved again immediately before mutation;
 - GitHub branch creation is create-only and bound to the approved commit;
-- draft-PR creation depends on the exact prepared branch effect;
-- credential IDs may appear in transaction metadata, but tokens do not;
-- JSON mode never prompts and never contains ANSI decoration;
+- credential IDs may appear in metadata, but tokens do not;
+- JSON mode never prompts and contains no ANSI decoration;
 - low-level FutureDiff exit codes are preserved;
 - `fdif` does not duplicate transaction business logic;
-- publishing creates `futurediff/<transaction-id>` and does not switch or mutate
-  the current branch.
+- publication creates `futurediff/<transaction-id>` and never switches or
+  mutates the current branch.

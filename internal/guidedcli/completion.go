@@ -10,7 +10,7 @@ var fdifCommands = []string{
 	"start", "new", "create", "status", "workspace", "shell", "review", "seal",
 	"verify", "approve", "publish", "apply", "commit", "finish",
 	"transactions", "list", "use", "events", "abort", "discard", "daemon", "doctor",
-	"config", "demo", "completion", "version", "help",
+	"config", "menu", "demo", "completion", "version", "help",
 }
 
 func completionScript(shell string) (string, error) {
@@ -27,6 +27,7 @@ func completionScript(shell string) (string, error) {
   case "${COMP_WORDS[1]}" in
     daemon) COMPREPLY=( $(compgen -W "status start stop restart logs" -- "$cur") ) ;;
     completion) COMPREPLY=( $(compgen -W "bash zsh fish powershell" -- "$cur") ) ;;
+    config) COMPREPLY=( $(compgen -W "--explain" -- "$cur") ) ;;
     finish) COMPREPLY=( $(compgen -W "--github --remote --base --title --body --body-file --credential-config --github-credential --full --yes" -- "$cur") ) ;;
   esac
 }
@@ -44,6 +45,7 @@ _fdif() {
   case "$words[2]" in
     daemon) _values 'action' status start stop restart logs ;;
     completion) _values 'shell' bash zsh fish powershell ;;
+    config) _values 'option' --explain ;;
     finish) _values 'option' --github --remote --base --title --body --body-file --credential-config --github-credential --full --yes ;;
   esac
 }
@@ -74,6 +76,7 @@ compdef _fdif fdif
   $values = switch ($parent) {
     'daemon' { @('status','start','stop','restart','logs') }
     'completion' { @('bash','zsh','fish','powershell') }
+    'config' { @('--explain') }
     'finish' { @('--github','--remote','--base','--title','--body','--body-file','--github-credential','--full','--yes') }
     default { @() }
   }

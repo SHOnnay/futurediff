@@ -764,3 +764,182 @@ func TestFinishGitHubRejectsUnrelatedPreparedEffect(t *testing.T) {
 		t.Fatalf("unclear unrelated-effect error: %s", errOut.String())
 	}
 }
+
+func TestNoArgsShowsNewcomerLandingWithoutTTY(t *testing.T) {
+	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
+	store := StateStore{Path: filepath.Join(realTempDir(t), "current.json")}
+	app := &App{
+		In: strings.NewReader(""), Out: out, Err: errOut,
+		Store: store, Renderer: Renderer{Out: out, Err: errOut, Color: false, Unicode: false},
+		Interactive: false,
+	}
+	if code := app.Run(context.Background(), nil); code != 0 {
+		t.Fatalf("landing exit code %d: %s", code, errOut.String())
+	}
+	for _, want := range []string{"FutureDiff", "fdif start", "fdif doctor", "fdif demo --yes", "fdif --help"} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("landing missing %q:\n%s", want, out.String())
+		}
+	}
+	if strings.Contains(errOut.String(), "no command supplied") {
+		t.Fatalf("old no-command error remains: %s", errOut.String())
+	}
+}
+
+func TestNoArgsJSONShowsStableLandingDocument(t *testing.T) {
+	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
+	store := StateStore{Path: filepath.Join(realTempDir(t), "current.json")}
+	if err := store.Save("tx_active", "/repo"); err != nil {
+		t.Fatal(err)
+	}
+	app := &App{
+		Out: out, Err: errOut, Store: store, JSON: true,
+		Renderer: Renderer{Out: out, Err: errOut},
+	}
+	if code := app.Run(context.Background(), nil); code != 0 {
+		t.Fatalf("landing exit code %d: %s", code, errOut.String())
+	}
+	var result map[string]any
+	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, out.String())
+	}
+	if result["kind"] != "fdif-start" || result["active_change"] != true {
+		t.Fatalf("unexpected landing JSON: %#v", result)
+	}
+	if _, leaked := result["transaction_id"]; leaked {
+		t.Fatalf("normal landing leaked operator detail: %#v", result)
+	}
+}
+
+func TestExplicitMenuRequiresInteractiveTerminal(t *testing.T) {
+	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
+	app := &App{Out: out, Err: errOut, Renderer: Renderer{Out: out, Err: errOut}, Interactive: false}
+	if code := app.Run(context.Background(), []string{"menu"}); code == 0 {
+		t.Fatal("non-interactive menu unexpectedly succeeded")
+	}
+	if !strings.Contains(errOut.String(), "requires an interactive terminal") {
+		t.Fatalf("unclear menu error: %s", errOut.String())
+	}
+}
+
+func TestNewUsesOneResolvedHomeForDaemonStateAndSocket(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "fdif-home")
+	app := New(Options{Home: home, NonInteractive: true, NoColor: true})
+	if app.InitErr != nil {
+		t.Fatal(app.InitErr)
+	}
+	wantHome, err := canonicalizeHomePath(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if app.Paths.Home.Path != wantHome {
+		t.Fatalf("home = %s, want %s", app.Paths.Home.Path, wantHome)
+	}
+	if app.Daemon.Root != wantHome {
+		t.Fatalf("daemon root = %s, want %s", app.Daemon.Root, wantHome)
+	}
+	if app.Store.Path != filepath.Join(wantHome, "current-transaction.json") {
+		t.Fatalf("state = %s", app.Store.Path)
+	}
+	if app.Socket != filepath.Join(wantHome, "futurediff.sock") || app.Daemon.Socket != app.Socket {
+		t.Fatalf("socket mismatch: app=%s daemon=%s", app.Socket, app.Daemon.Socket)
+	}
+	if app.Paths.WorkspaceRoot.Path != filepath.Join(wantHome, "runtime") {
+		t.Fatalf("workspace root = %s", app.Paths.WorkspaceRoot.Path)
+	}
+}
+
+func TestConfigExplainShowsEffectivePathSources(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "fdif-home")
+	paths, err := resolvePathConfig(Options{Home: home})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
+	app := &App{
+		Out: out, Err: errOut, Paths: paths, Socket: paths.Socket.Path,
+		Store:    StateStore{Path: paths.State.Path},
+		Renderer: Renderer{Out: out, Err: errOut, Color: false, Unicode: false},
+	}
+	if code := app.Run(context.Background(), []string{"config", "--explain"}); code != 0 {
+		t.Fatalf("config exit code %d: %s", code, errOut.String())
+	}
+	for _, want := range []string{"FutureDiff paths", "Current selection:", "Safe workspaces:", "source: --home / --root", "derived from home", "advanced --state"} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("config explain missing %q:\n%s", want, out.String())
+		}
+	}
+}
+
+func TestStatusUsesFriendlyStageAndHidesOperatorDetails(t *testing.T) {
+	repo, workspace := makeRepoAndWorkspace(t)
+	engine := &fakeEngine{state: "active", repo: repo, workspace: workspace}
+	app, out, errOut := newTestApp(t, engine, repo, workspace)
+	if code := app.Run(context.Background(), []string{"status", "tx_test"}); code != 0 {
+		t.Fatalf("status exit code %d: %s", code, errOut.String())
+	}
+	if !strings.Contains(out.String(), "Stage") || !strings.Contains(out.String(), "Editing") {
+		t.Fatalf("status omitted friendly stage:\n%s", out.String())
+	}
+	for _, hidden := range []string{"Change ID", "Internal status", "Mode"} {
+		if strings.Contains(out.String(), hidden) {
+			t.Fatalf("normal status exposed %q:\n%s", hidden, out.String())
+		}
+	}
+
+	out.Reset()
+	app.Verbose = true
+	if code := app.Run(context.Background(), []string{"status", "tx_test"}); code != 0 {
+		t.Fatalf("verbose status exit code %d: %s", code, errOut.String())
+	}
+	for _, visible := range []string{"Change ID", "Internal status", "Mode"} {
+		if !strings.Contains(out.String(), visible) {
+			t.Fatalf("verbose status omitted %q:\n%s", visible, out.String())
+		}
+	}
+}
+
+func TestReviewHidesTransactionIDUnlessVerbose(t *testing.T) {
+	repo, workspace := makeRepoAndWorkspace(t)
+	engine := &fakeEngine{state: "active", repo: repo, workspace: workspace}
+	app, out, errOut := newTestApp(t, engine, repo, workspace)
+	if code := app.Run(context.Background(), []string{"review", "tx_test"}); code != 0 {
+		t.Fatalf("review exit code %d: %s", code, errOut.String())
+	}
+	if strings.Contains(out.String(), "tx_test") {
+		t.Fatalf("normal review exposed transaction ID:\n%s", out.String())
+	}
+
+	out.Reset()
+	app.Verbose = true
+	if code := app.Run(context.Background(), []string{"review", "tx_test"}); code != 0 {
+		t.Fatalf("verbose review exit code %d: %s", code, errOut.String())
+	}
+	if !strings.Contains(out.String(), "tx_test") {
+		t.Fatalf("verbose review omitted transaction ID:\n%s", out.String())
+	}
+}
+
+func TestStartHidesOperatorDetailsUnlessVerbose(t *testing.T) {
+	repo, workspace := makeRepoAndWorkspace(t)
+	engine := &fakeEngine{state: "active", repo: repo, workspace: workspace}
+	app, out, errOut := newTestApp(t, engine, repo, workspace)
+	if code := app.Run(context.Background(), []string{"start", repo}); code != 0 {
+		t.Fatalf("start exit code %d: %s", code, errOut.String())
+	}
+	if strings.Contains(out.String(), "Change ID") || strings.Contains(out.String(), "Mode") {
+		t.Fatalf("normal output exposed operator fields:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "Your current branch was not modified") {
+		t.Fatalf("normal output omitted safety promise:\n%s", out.String())
+	}
+
+	out.Reset()
+	app.Verbose = true
+	if code := app.Run(context.Background(), []string{"start", repo}); code != 0 {
+		t.Fatalf("verbose start exit code %d: %s", code, errOut.String())
+	}
+	if !strings.Contains(out.String(), "Change ID") || !strings.Contains(out.String(), "Mode") {
+		t.Fatalf("verbose output omitted operator fields:\n%s", out.String())
+	}
+}

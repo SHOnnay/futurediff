@@ -1,7 +1,7 @@
 #compdef fdif
 _fdif() {
   local -a commands
-  commands=(start new create status workspace shell review seal verify approve publish apply commit finish transactions list use events abort discard daemon doctor config demo completion version help)
+  commands=(start new create status workspace shell review seal verify approve publish apply commit finish transactions list use events abort discard daemon doctor config menu demo completion version help)
   if (( CURRENT == 2 )); then
     _describe 'command' commands
     return
@@ -9,6 +9,7 @@ _fdif() {
   case "$words[2]" in
     daemon) _values 'action' status start stop restart logs ;;
     completion) _values 'shell' bash zsh fish powershell ;;
+    config) _values 'option' --explain ;;
     finish) _values 'option' --github --remote --base --title --body --body-file --credential-config --github-credential --full --yes ;;
   esac
 }

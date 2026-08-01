@@ -9,7 +9,11 @@ on:
       - 'README.md'
       - 'SECURITY.md'
       - 'docs/FDIF_INSTALLATION.md'
+      - 'docs/FDIF_GUIDED_CLI.md'
+      - 'docs/FDIF_COMMAND_REFERENCE.md'
+      - 'docs/adr/**'
       - 'docs/LIMITATIONS.md'
+      - 'docs/THREAT_MODEL.md'
       - 'docs/QUICKSTART.md'
       - 'scripts/build-public-release.sh'
       - 'scripts/install-release.sh'
@@ -22,7 +26,7 @@ on:
       version:
         description: Pre-1.0 version to validate without publishing
         required: true
-        default: v0.1.0-alpha.1
+        default: v0.1.0-alpha.2
   push:
     tags:
       - 'v0.*'

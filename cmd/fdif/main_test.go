@@ -50,3 +50,32 @@ func TestParseArgumentsPreservesFinishOptionValuesThatLookGlobal(t *testing.T) {
 		}
 	}
 }
+
+func TestParseArgumentsAcceptsUnifiedHomeAndVerbose(t *testing.T) {
+	options, args, err := parseArguments([]string{"start", "--home", "/tmp/fdif-home", "--verbose"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if options.Home != "/tmp/fdif-home" || !options.Verbose {
+		t.Fatalf("unexpected options: %+v", options)
+	}
+	if len(args) != 1 || args[0] != "start" {
+		t.Fatalf("unexpected remaining args: %v", args)
+	}
+}
+
+func TestParseArgumentsRootAliasMatchesHome(t *testing.T) {
+	options, _, err := parseArguments([]string{"--home=/tmp/fdif", "--root", "/tmp/fdif", "config"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if options.Home != "/tmp/fdif" {
+		t.Fatalf("unexpected home: %+v", options)
+	}
+}
+
+func TestParseArgumentsRejectsConflictingHomeAliases(t *testing.T) {
+	if _, _, err := parseArguments([]string{"--home", "/tmp/one", "--root", "/tmp/two", "config"}); err == nil {
+		t.Fatal("conflicting --home and --root were accepted")
+	}
+}

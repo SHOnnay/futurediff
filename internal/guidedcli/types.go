@@ -120,15 +120,20 @@ type GitHubPublishResult struct {
 }
 
 type Config struct {
-	Binary             string `json:"binary"`
-	DaemonBinary       string `json:"daemon_binary"`
-	Socket             string `json:"socket"`
-	StatePath          string `json:"state_path"`
-	VerifyPolicy       string `json:"verify_policy"`
-	CredentialConfig   string `json:"credential_config,omitempty"`
-	GitHubCredentialID string `json:"github_credential_id,omitempty"`
-	JSON               bool   `json:"json"`
-	Interactive        bool   `json:"interactive"`
-	Color              bool   `json:"color"`
-	Unicode            bool   `json:"unicode"`
+	Binary             string     `json:"binary"`
+	DaemonBinary       string     `json:"daemon_binary"`
+	Home               string     `json:"home"`
+	Socket             string     `json:"socket"`
+	StatePath          string     `json:"state_path"`
+	RuntimePath        string     `json:"runtime_path"`
+	WorkspaceRoot      string     `json:"workspace_root"`
+	Paths              PathConfig `json:"paths"`
+	VerifyPolicy       string     `json:"verify_policy"`
+	CredentialConfig   string     `json:"credential_config,omitempty"`
+	GitHubCredentialID string     `json:"github_credential_id,omitempty"`
+	JSON               bool       `json:"json"`
+	Interactive        bool       `json:"interactive"`
+	Verbose            bool       `json:"verbose"`
+	Color              bool       `json:"color"`
+	Unicode            bool       `json:"unicode"`
 }
