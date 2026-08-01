@@ -9,6 +9,7 @@ import (
 	"github.com/SHOnnay/futurediff/internal/authorization"
 	"github.com/SHOnnay/futurediff/internal/capability"
 	"github.com/SHOnnay/futurediff/internal/ledger"
+	"github.com/SHOnnay/futurediff/internal/operatoraudit"
 	"github.com/SHOnnay/futurediff/internal/peerauth"
 	"github.com/SHOnnay/futurediff/internal/requestid"
 )
@@ -49,7 +50,11 @@ func (s *Server) authorizationGuard(next http.Handler) http.Handler {
 		}
 		identity, ok := peerauth.FromContext(r.Context())
 		if !ok {
-			s.recordAuthorization(r, ledger.AuthorizationDecisionInput{PrincipalID: peerauth.Principal(r.Context()), OperationID: matched.Endpoint.OperationID, Allowed: false, Source: "rbac", ReasonCode: "peer_identity_unavailable", PolicyDigest: s.Authorizer.Digest(), RequestID: requestid.From(r.Context())})
+			input := ledger.AuthorizationDecisionInput{PrincipalID: peerauth.Principal(r.Context()), OperationID: matched.Endpoint.OperationID, Allowed: false, Source: "rbac", ReasonCode: "peer_identity_unavailable", PolicyDigest: s.Authorizer.Digest(), RequestID: requestid.From(r.Context())}
+			s.recordAuthorization(r, input)
+			if !s.auditRequired(w, r, operatoraudit.Input{EventType: "authorization.denied", Target: operatoraudit.Target{ResourceType: "api_operation", ResourceID: matched.Endpoint.OperationID}, Result: operatoraudit.ResultDenied, PolicyDecision: operatoraudit.PolicyDeny, Metadata: map[string]string{"reason": input.ReasonCode}}) {
+				return
+			}
 			writeJSON(w, http.StatusForbidden, map[string]any{"error": "authorization_denied", "message": "kernel-authenticated peer identity is required"})
 			return
 		}
@@ -92,6 +97,9 @@ func (s *Server) authorizationGuard(next http.Handler) http.Handler {
 				}
 			}
 			s.recordAuthorization(r, ledger.AuthorizationDecisionInput{PrincipalID: principal, OperationID: matched.Endpoint.OperationID, ResourceID: resourceID, Allowed: false, Source: "capability", ReasonCode: "capability_rejected", PolicyDigest: decision.PolicyDigest, Roles: decision.Roles, RequestID: requestid.From(r.Context())})
+			if !s.auditRequired(w, r, operatoraudit.Input{TransactionID: resourceID, EventType: "capability.denied", Target: auditTargetForRequest(r), Result: operatoraudit.ResultDenied, PolicyDecision: operatoraudit.PolicyDeny, Metadata: map[string]string{"reason": "capability_rejected"}}) {
+				return
+			}
 			writeJSON(w, http.StatusForbidden, map[string]any{"error": "authorization_denied", "message": "signed capability was invalid, expired, out of scope, or already used"})
 			return
 		}
@@ -100,6 +108,9 @@ func (s *Server) authorizationGuard(next http.Handler) http.Handler {
 			reason = "resource_scope_denied"
 		}
 		s.recordAuthorization(r, ledger.AuthorizationDecisionInput{PrincipalID: principal, OperationID: matched.Endpoint.OperationID, ResourceID: resourceID, Allowed: false, Source: "rbac", ReasonCode: reason, PolicyDigest: decision.PolicyDigest, Roles: decision.Roles, RequestID: requestid.From(r.Context())})
+		if !s.auditRequired(w, r, operatoraudit.Input{TransactionID: resourceID, EventType: "authorization.denied", Target: auditTargetForRequest(r), Result: operatoraudit.ResultDenied, PolicyDecision: operatoraudit.PolicyDeny, Metadata: map[string]string{"reason": reason}}) {
+			return
+		}
 		if roleAllowed && !resourceAllowed {
 			writeJSON(w, http.StatusNotFound, map[string]any{"error": "transaction_not_found", "message": "transaction is not visible to this principal"})
 			return

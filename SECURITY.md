@@ -71,3 +71,18 @@ This keeps repository detection, review, demo setup, and guided publication chec
 Canonicalization does not make cooperative mode an operating-system sandbox
 and cannot remove every same-user time-of-check/time-of-use race. Do not point
 FutureDiff at directories controlled by another user.
+
+## Local operator audit trail
+
+Security-sensitive daemon and API actions are recorded in a separate local operator audit trail.
+
+Required properties:
+
+- append-only JSONL storage under the private FutureDiff home;
+- deterministic redaction of secret-bearing metadata;
+- no raw tokens, private keys, cookies, full environment dumps, or raw provider response bodies;
+- hash chaining so ordinary modification, deletion, insertion, reordering, and truncation are detectable;
+- dedicated verification through `futurediff-audit --operator-events`.
+- retained as ordinary local evidence under the private FutureDiff home until explicit operator cleanup or backup/restore handling removes it.
+
+This trail is tamper-evident, not tamper-proof. It does not claim protection against a fully privileged local administrator who can rewrite data and recompute hashes.

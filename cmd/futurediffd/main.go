@@ -29,6 +29,7 @@ import (
 	"github.com/SHOnnay/futurediff/internal/ledger"
 	"github.com/SHOnnay/futurediff/internal/maintenance"
 	"github.com/SHOnnay/futurediff/internal/operatorapproval"
+	"github.com/SHOnnay/futurediff/internal/operatoraudit"
 	"github.com/SHOnnay/futurediff/internal/peerauth"
 	"github.com/SHOnnay/futurediff/internal/quota"
 	"github.com/SHOnnay/futurediff/internal/ratelimit"
@@ -343,7 +344,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("allowed peer UIDs: %v", err)
 	}
-	server := &api.Server{Service: svc, SocketPath: *socket, Maintenance: &maintenance.Manager{Path: filepath.Join(*root, "maintenance.json")}, Drain: drain.New(), RequirePeerCredentials: !*disablePeerAuth, AllowedPeerUIDs: peerUIDs, RateLimiter: rateLimiter, StorageGuard: storageGuard, Authorizer: authorizer, CapabilityKeyring: capabilityKeys}
+	auditRoot, err := filepath.Abs(*root)
+	if err != nil {
+		log.Fatalf("operator audit root: %v", err)
+	}
+	server := &api.Server{Service: svc, SocketPath: *socket, Maintenance: &maintenance.Manager{Path: filepath.Join(*root, "maintenance.json")}, Drain: drain.New(), RequirePeerCredentials: !*disablePeerAuth, AllowedPeerUIDs: peerUIDs, RateLimiter: rateLimiter, StorageGuard: storageGuard, Authorizer: authorizer, CapabilityKeyring: capabilityKeys, OperatorAudit: &operatoraudit.Store{Root: auditRoot}}
 	errCh := make(chan error, 1)
 	go func() { errCh <- server.Serve() }()
 	fmt.Printf("FutureDiff Go daemon listening on %s\n", *socket)
