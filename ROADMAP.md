@@ -16,7 +16,7 @@ assurance work. It is directional, not a delivery guarantee.
 - public end-to-end workflow validation;
 - clear limitations and security boundaries.
 
-### UX stabilization for `v0.1.0-alpha.2`
+### UX stabilization for `v0.1.0-alpha.3`
 
 - truthful bare-`fdif` starting screen in TTY and non-TTY contexts;
 - explicit `fdif menu` command;

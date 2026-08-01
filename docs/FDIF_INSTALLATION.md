@@ -9,7 +9,7 @@ For a published release, download the archive and its checksum sidecar, then ver
 Example for macOS ARM64:
 
 ```bash
-VERSION=v0.1.0-alpha.2
+VERSION=v0.1.0-alpha.3
 curl -fLO "https://github.com/SHOnnay/futurediff/releases/download/$VERSION/futurediff-$VERSION-darwin-arm64.tar.gz"
 curl -fLO "https://github.com/SHOnnay/futurediff/releases/download/$VERSION/futurediff-$VERSION-darwin-arm64.tar.gz.sha256"
 shasum -a 256 -c "futurediff-$VERSION-darwin-arm64.tar.gz.sha256"
@@ -31,7 +31,7 @@ Download the installer first, inspect it, then run it:
 curl -fLo install-futurediff.sh \
   https://raw.githubusercontent.com/SHOnnay/futurediff/main/scripts/install-release.sh
 less install-futurediff.sh
-bash install-futurediff.sh --version v0.1.0-alpha.2 --prefix "$HOME/.local"
+bash install-futurediff.sh --version v0.1.0-alpha.3 --prefix "$HOME/.local"
 ```
 
 The installer refuses unsupported operating systems or architectures and verifies the release checksum before copying binaries.
@@ -39,7 +39,7 @@ The installer refuses unsupported operating systems or architectures and verifie
 To see the resolved asset without downloading:
 
 ```bash
-bash install-futurediff.sh --version v0.1.0-alpha.2 --print-asset
+bash install-futurediff.sh --version v0.1.0-alpha.3 --print-asset
 ```
 
 ## Build through the repository

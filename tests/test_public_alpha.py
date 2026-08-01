@@ -24,7 +24,7 @@ class PublicAlphaTests(unittest.TestCase):
             self.version,
             r"^v0\.[0-9]+\.[0-9]+-alpha\.[0-9]+$",
         )
-        self.assertEqual(self.version, "v0.1.0-alpha.2")
+        self.assertEqual(self.version, "v0.1.0-alpha.3")
 
     def test_readme_does_not_lead_with_internal_progress(self):
         text = read_utf8(ROOT / "README.md").lower()
@@ -169,6 +169,32 @@ class PublicAlphaTests(unittest.TestCase):
             "$name/completions/fdif.ps1",
         ):
             self.assertIn(required, script)
+
+    def test_public_release_script_avoids_pipefail_version_checks(self):
+        script = read_utf8(ROOT / "scripts/build-public-release.sh")
+        self.assertIn("verify_binary_version()", script)
+        self.assertIn(
+            "public binary version output does not include $version",
+            script,
+        )
+        self.assertIn('verify_binary_version "$stage/bin/fdif" version', script)
+        self.assertIn(
+            'verify_binary_version "$stage/bin/futurediff" version',
+            script,
+        )
+        self.assertIn(
+            'verify_binary_version "$stage/bin/futurediffd" --version',
+            script,
+        )
+        self.assertNotIn('"$stage/bin/fdif" version | grep -Fq "$version"', script)
+        self.assertNotIn(
+            '"$stage/bin/futurediff" version | grep -Fq "$version"',
+            script,
+        )
+        self.assertNotIn(
+            '"$stage/bin/futurediffd" --version | grep -Fq "$version"',
+            script,
+        )
 
     def test_repository_text_reads_use_explicit_encoding(self):
         tree = ast.parse(read_utf8(Path(__file__)))

@@ -26,7 +26,7 @@ on:
       version:
         description: Pre-1.0 version to validate without publishing
         required: true
-        default: v0.1.0-alpha.2
+        default: v0.1.0-alpha.3
   push:
     tags:
       - 'v0.*'
