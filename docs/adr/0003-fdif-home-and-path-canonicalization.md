@@ -1,6 +1,6 @@
 # ADR 0003: Unified `fdif` home and safe path canonicalization
 
-- Status: accepted for `v0.1.0-alpha.2`
+- Status: accepted for `v0.1.0-alpha.3`
 - Date: 2026-08-01
 
 ## Context

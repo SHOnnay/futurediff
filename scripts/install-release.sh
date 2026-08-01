@@ -12,7 +12,7 @@ usage() {
 usage: install-release.sh --version VERSION [options]
 
 Options:
-  --version VERSION   required release, for example v0.1.0-alpha.2
+  --version VERSION   required release, for example v0.1.0-alpha.3
   --prefix DIR        installation prefix (default: $HOME/.local)
   --repo OWNER/REPO   release repository (default: SHOnnay/futurediff)
   --dry-run           print actions without downloading or installing

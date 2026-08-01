@@ -62,6 +62,29 @@ name="futurediff-$version-$platform-$arch"
 stage="$out/$name"
 archive="$out/$name.tar.gz"
 
+verify_binary_version() {
+  local binary output
+  binary=$1
+  shift
+
+  if [[ ! -x $binary ]]; then
+    echo "expected public binary is missing or not executable: $binary" >&2
+    exit 1
+  fi
+
+  if ! output=$("$binary" "$@" 2>&1); then
+    echo "failed to read version from public binary: $binary $*" >&2
+    printf '%s\n' "$output" >&2
+    exit 1
+  fi
+
+  if [[ $output != *"$version"* ]]; then
+    echo "public binary version output does not include $version: $binary $*" >&2
+    printf '%s\n' "$output" >&2
+    exit 1
+  fi
+}
+
 rm -rf "$stage" "$archive" "$archive.sha256"
 mkdir -p "$stage/bin" "$stage/completions"
 
@@ -81,9 +104,9 @@ cp "$root"/completions/_fdif "$root"/completions/fdif.bash \
    "$root"/completions/fdif.fish "$root"/completions/fdif.ps1 \
    "$stage/completions/"
 
-"$stage/bin/fdif" version | grep -Fq "$version"
-"$stage/bin/futurediff" version | grep -Fq "$version"
-"$stage/bin/futurediffd" --version | grep -Fq "$version"
+verify_binary_version "$stage/bin/fdif" version
+verify_binary_version "$stage/bin/futurediff" version
+verify_binary_version "$stage/bin/futurediffd" --version
 
 metadata_path=$(
   find "$stage" \( -name '._*' -o -name '.DS_Store' \) -print -quit
