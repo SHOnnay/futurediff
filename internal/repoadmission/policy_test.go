@@ -286,6 +286,14 @@ func TestLoadRejectsOversizedAndTrailingJSON(t *testing.T) {
 		t.Fatalf("trailing JSON accepted: %v", err)
 	}
 }
+func TestLoadRejectsUnknownFields(t *testing.T) {
+	root := t.TempDir()
+	unknown := filepath.Join(root, "unknown-field.json")
+	writeFile(t, unknown, `{"version":"0.2","policy_id":"p","allowed_roots":["`+root+`"],"unexpected_field":true}`, 0o600)
+	if _, err := Load(unknown); err == nil || !strings.Contains(err.Error(), "unknown field") {
+		t.Fatalf("policy with unknown field accepted: %v", err)
+	}
+}
 
 func TestValidateRejectsUnavailableRootAndUnsafePrefix(t *testing.T) {
 	p := Policy{Version: Version, PolicyID: "p", AllowedRoots: []string{filepath.Join(t.TempDir(), "missing")}}
