@@ -193,6 +193,8 @@ fdif finish                  verify, approve, and publish locally
 fdif finish --github         also create a GitHub draft pull request
 fdif abort | fdif discard    discard an unfinished change
 fdif config --explain        explain effective paths and sources
+fdif recover                 report or run canonical recovery for the current change
+fdif use --clear             remove the current-change selection without touching evidence
 fdif doctor                  check requirements and effective home
 fdif demo --yes              run the disposable automated demo
 ```
@@ -204,6 +206,29 @@ fdif demo --yes              run the disposable automated demo
 - FutureDiff verifies what exists at review time.
 - Cooperative isolation is not an operating-system sandbox.
 - Enforced rootless OCI execution remains experimental.
+## Recovery and stale selections
+
+The guided CLI keeps one local pointer to the current change in
+`current-transaction.json`. Recovery behavior is fail-closed:
+
+- `fdif recover` reports a stable `reason_code` (see the command reference)
+  and, only with explicit `--yes`, invokes the daemon's canonical recovery.
+- The guided CLI never silently selects a different change, silently aborts,
+  silently recreates a deleted workspace, or deletes evidence.
+- A selection that points at a transaction the daemon no longer knows is
+  reported as `selection_transaction_missing`; `fdif recover --yes` clears the
+  stale pointer (`selection_repaired: true`). `fdif use --clear` is the
+  always-explicit alternative.
+- A deleted safe working copy is reported as `workspace_missing` with a
+  recommendation to discard the change explicitly (`fdif abort <id> --yes`).
+- Interrupted publication is reconciled only through the daemon's canonical
+  recovery path; the guided CLI formats the daemon's decision.
+
+The `--json` output of `fdif recover` never prompts and contains no ANSI
+decoration; risky recovery always requires `--yes`.
+
+See [`FDIF_COMMAND_REFERENCE.md`](FDIF_COMMAND_REFERENCE.md) and
+[`adr/ADR-098-guided-recovery-and-stale-selection.md`](adr/ADR-098-guided-recovery-and-stale-selection.md).
 
 ## Safety properties
 

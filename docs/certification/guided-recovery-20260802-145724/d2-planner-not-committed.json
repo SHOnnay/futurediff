@@ -1,0 +1,17 @@
+{
+  "input": {
+    "name": "guided-interrupted-publication-not-committed",
+    "transaction_status": "needs_reconciliation",
+    "effect_status": "unknown",
+    "provider_status": "not_committed",
+    "has_receipt": false,
+    "repository_published": false,
+    "source_moved": false
+  },
+  "plan": {
+    "action": "rearm_effect",
+    "blind_retry_allowed": false,
+    "requires_human": false,
+    "reason": "provider proves no mutation occurred"
+  }
+}

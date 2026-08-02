@@ -1,0 +1,11 @@
+{
+  "kind": "recovery_report",
+  "reason_code": "workspace_missing",
+  "transaction_id": "tx_a693f0e17d48ff6321d25c1c",
+  "current_status": "active",
+  "recovery_required": false,
+  "safe_to_retry": false,
+  "recommended_action": "the safe working copy is missing; unsealed edits are not recoverable; fdif abort tx_a693f0e17d48ff6321d25c1c --yes",
+  "workspace_available": false,
+  "selection_repaired": false
+}

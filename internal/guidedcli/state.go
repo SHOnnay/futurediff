@@ -1,14 +1,23 @@
 package guidedcli
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
+	"syscall"
 	"time"
 )
+
+// maxStateFileBytes bounds the current-transaction selection file. The file is
+// written only by Save and is a few hundred bytes; anything near this cap is
+// either corrupt or tampered with.
+const maxStateFileBytes = 64 << 10
 
 type StateStore struct {
 	Path string
@@ -30,6 +39,18 @@ func (s StateStore) effectivePath() (string, error) {
 	return canonicalizeFilePath(s.Path)
 }
 
+// openNoFollow opens the selection file without following a final symlink.
+// Between the Lstat validation and the actual read a concurrent process could
+// otherwise swap the validated file for a symlink to an attacker-controlled
+// path; opening with O_NOFOLLOW and validating the opened descriptor closes
+// that race on POSIX platforms.
+func openNoFollow(path string) (*os.File, error) {
+	if runtime.GOOS == "windows" {
+		return os.Open(path)
+	}
+	return os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+}
+
 func (s StateStore) Load() (CurrentTransaction, error) {
 	path, err := s.effectivePath()
 	if err != nil {
@@ -42,32 +63,125 @@ func (s StateStore) Load() (CurrentTransaction, error) {
 		}
 		return CurrentTransaction{}, err
 	}
-	if info.Mode()&os.ModeSymlink != 0 {
-		return CurrentTransaction{}, fmt.Errorf("refusing symlink state file %s", path)
+	if err := validateStateFileInfo(info, path); err != nil {
+		return CurrentTransaction{}, err
 	}
-	if !info.Mode().IsRegular() {
-		return CurrentTransaction{}, fmt.Errorf("state path is not a regular file: %s", path)
+	file, err := openNoFollow(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return CurrentTransaction{}, os.ErrNotExist
+		}
+		return CurrentTransaction{}, err
 	}
-	if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
-		return CurrentTransaction{}, fmt.Errorf("state file permissions are too broad: %o", info.Mode().Perm())
-	}
-	data, err := os.ReadFile(path)
+	defer file.Close()
+	// Validate the descriptor we actually read from, not the path we
+	// validated earlier (TOCTOU).
+	opened, err := file.Stat()
 	if err != nil {
 		return CurrentTransaction{}, err
 	}
-	var current CurrentTransaction
-	if err := json.Unmarshal(data, &current); err != nil {
-		return CurrentTransaction{}, fmt.Errorf("decode current transaction state: %w", err)
+	if err := validateStateFileInfo(opened, path); err != nil {
+		return CurrentTransaction{}, err
 	}
-	if current.TransactionID == "" {
-		return CurrentTransaction{}, errors.New("current transaction state has no transaction_id")
+	if opened.Size() > maxStateFileBytes {
+		return CurrentTransaction{}, fmt.Errorf("state file exceeds the maximum size of %d bytes", maxStateFileBytes)
+	}
+	data, err := io.ReadAll(io.LimitReader(file, maxStateFileBytes+1))
+	if err != nil {
+		return CurrentTransaction{}, err
+	}
+	if len(data) > maxStateFileBytes {
+		return CurrentTransaction{}, fmt.Errorf("state file exceeds the maximum size of %d bytes", maxStateFileBytes)
+	}
+	current, err := decodeCurrentTransaction(data)
+	if err != nil {
+		return CurrentTransaction{}, err
+	}
+	if err := validateCurrentTransaction(current); err != nil {
+		return CurrentTransaction{}, err
 	}
 	return current, nil
+}
+
+func validateStateFileInfo(info os.FileInfo, path string) error {
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("refusing symlink state file %s", path)
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("state path is not a regular file: %s", path)
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
+		return fmt.Errorf("state file permissions are too broad: %o", info.Mode().Perm())
+	}
+	return nil
+}
+
+// decodeCurrentTransaction strictly decodes the selection file: unknown
+// fields and trailing JSON are rejected rather than silently ignored.
+func decodeCurrentTransaction(data []byte) (CurrentTransaction, error) {
+	var current CurrentTransaction
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&current); err != nil {
+		return CurrentTransaction{}, fmt.Errorf("decode current transaction state: %w", err)
+	}
+	if decoder.More() {
+		return CurrentTransaction{}, errors.New("current transaction state contains trailing data")
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		return CurrentTransaction{}, errors.New("current transaction state contains trailing data")
+	}
+	return current, nil
+}
+
+// validateCurrentTransaction enforces the selection file contract: a
+// transaction ID with the ledger shape, an absolute repository root when one
+// is recorded, and a plausible selection timestamp.
+func validateCurrentTransaction(current CurrentTransaction) error {
+	if current.TransactionID == "" {
+		return errors.New("current transaction state has no transaction_id")
+	}
+	if !validTransactionID(current.TransactionID) {
+		return fmt.Errorf("current transaction state has an invalid transaction_id %q", current.TransactionID)
+	}
+	if current.RepositoryRoot != "" && !filepath.IsAbs(current.RepositoryRoot) {
+		return fmt.Errorf("current transaction state repository_root is not an absolute path: %q", current.RepositoryRoot)
+	}
+	if current.SelectedAt.IsZero() {
+		return errors.New("current transaction state has no selected_at timestamp")
+	}
+	if current.SelectedAt.After(time.Now().Add(24 * time.Hour)) {
+		return fmt.Errorf("current transaction state selected_at is in the future: %s", current.SelectedAt.UTC().Format(time.RFC3339))
+	}
+	return nil
+}
+
+// validTransactionID matches the ledger identifier shape (tx_ followed by a
+// non-empty run of letters, digits, underscores, or hyphens).
+func validTransactionID(value string) bool {
+	if !strings.HasPrefix(value, "tx_") || len(value) <= len("tx_") {
+		return false
+	}
+	for _, r := range value[len("tx_"):] {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '_', r == '-':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func (s StateStore) Save(transactionID, repositoryRoot string) error {
 	if transactionID == "" {
 		return errors.New("transaction ID is required")
+	}
+	if !validTransactionID(transactionID) {
+		return fmt.Errorf("invalid transaction ID %q", transactionID)
+	}
+	if repositoryRoot != "" && !filepath.IsAbs(repositoryRoot) {
+		return fmt.Errorf("repository root is not an absolute path: %q", repositoryRoot)
 	}
 	path, err := s.effectivePath()
 	if err != nil {
@@ -119,7 +233,25 @@ func (s StateStore) Save(transactionID, repositoryRoot string) error {
 	if err := os.Rename(tmpName, path); err != nil {
 		return err
 	}
-	return os.Chmod(path, 0o600)
+	return syncDirectory(dir)
+}
+
+// syncDirectory fsyncs the parent directory so the rename itself is durable,
+// not just the file content. Best-effort on platforms without directory
+// fsync support.
+func syncDirectory(dir string) error {
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	handle, err := os.Open(dir)
+	if err != nil {
+		return nil
+	}
+	defer handle.Close()
+	if err := handle.Sync(); err != nil {
+		return nil
+	}
+	return nil
 }
 
 func (s StateStore) Clear() error {

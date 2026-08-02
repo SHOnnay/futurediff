@@ -1,0 +1,10 @@
+{
+  "kind": "recovery_report",
+  "reason_code": "selection_transaction_missing",
+  "transaction_id": "tx_deadbeefdeadbeefdeadbeef",
+  "recovery_required": false,
+  "safe_to_retry": true,
+  "recommended_action": "fdif use --clear, then fdif use <transaction-id>",
+  "workspace_available": false,
+  "selection_repaired": false
+}

@@ -1,6 +1,6 @@
 Register-ArgumentCompleter -Native -CommandName fdif -ScriptBlock {
   param($wordToComplete, $commandAst, $cursorPosition)
-  $commands = @('start','new','create','status','workspace','shell','review','seal','verify','approve','publish','apply','commit','finish','transactions','list','use','events','abort','discard','daemon','doctor','config','menu','demo','completion','version','help')
+  $commands = @('start','new','create','status','workspace','shell','review','seal','verify','approve','publish','apply','commit','finish','recover','transactions','list','use','events','abort','discard','daemon','doctor','config','menu','demo','completion','version','help')
   $tokens = $commandAst.CommandElements
   if ($tokens.Count -le 2) {
     $commands | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
@@ -14,6 +14,8 @@ Register-ArgumentCompleter -Native -CommandName fdif -ScriptBlock {
     'completion' { @('bash','zsh','fish','powershell') }
     'config' { @('--explain') }
     'finish' { @('--github','--remote','--base','--title','--body','--body-file','--github-credential','--full','--yes') }
+    'recover' { @('--yes','--json') }
+    'use' { @('--clear','--json') }
     default { @() }
   }
   $values | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {

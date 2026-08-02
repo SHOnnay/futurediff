@@ -1,0 +1,40 @@
+{
+  "checks": [
+    {
+      "ID": "futurediff_binary",
+      "Status": "pass",
+      "Detail": "/tmp/futurediff-guided-recovery.jXcFjY/futurediff"
+    },
+    {
+      "ID": "futurediffd_binary",
+      "Status": "pass",
+      "Detail": "/tmp/futurediff-guided-recovery.jXcFjY/futurediffd"
+    },
+    {
+      "ID": "git",
+      "Status": "pass",
+      "Detail": "/usr/bin/git"
+    },
+    {
+      "ID": "futurediff_home",
+      "Status": "pass",
+      "Detail": "/private/tmp/futurediff-guided-recovery.jXcFjY/home"
+    },
+    {
+      "ID": "safe_workspaces",
+      "Status": "pass",
+      "Detail": "/private/tmp/futurediff-guided-recovery.jXcFjY/home/runtime"
+    },
+    {
+      "ID": "daemon",
+      "Status": "pass",
+      "Detail": "running"
+    },
+    {
+      "ID": "github_credentials",
+      "Status": "warn",
+      "Detail": "not configured; local publication remains available"
+    }
+  ],
+  "kind": "fdif-doctor"
+}

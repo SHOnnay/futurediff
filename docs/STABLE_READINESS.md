@@ -94,10 +94,21 @@ Completed on 2026-08-02 against the disposable repository `SHOnnay/futurediff-ce
 - disposable repository archived after evidence verification; no unrelated repository touched; no secrets captured.
 
 Evidence and the full report live in `docs/certification/GITHUB_WRITE_RECOVERY_2026-08-02.md` with machine-readable artifacts under `docs/certification/github-write-recovery-20260802/`. The exact sequence is recorded in `scripts/certify-github-write-recovery.sh`.
+### Guided-recovery and stale-selection certification
+
+Completed on 2026-08-02 with a fully local drill (`scripts/certify-guided-recovery.sh`, no network, no tokens):
+
+- stale selection → `fdif recover --json` reports `selection_transaction_missing` with `selection_repaired: false`; `fdif recover --yes` clears the stale pointer (`selection_repaired: true`);
+- deleted active safe working copy → `workspace_missing` with `workspace_available: false` and an explicit `fdif abort <id> --yes` recommendation; the guided CLI never recreates the workspace;
+- interrupted sealed flow → `no_recovery_needed`, then the flow completes and commits exactly once;
+- interrupted publication → the recovery planner refuses blind retry on ambiguous provider state (`query_status`) and re-arms only when the provider proves no mutation (`rearm_effect`); the daemon refuses a second `recover` on an already committed change (409 `recovery_failed`), proving recovery never double-publishes;
+- hardened `current-transaction.json` store: bounded size, strict unknown-field rejection, symlink/permission rejection, atomic replacement, and ENOENT normalization for a file removed between stat and open (verified under `go test -race` with concurrent access).
+
+Evidence lives in `docs/certification/guided-recovery-20260802-144845/` (`SUMMARY.json` plus per-scenario artifacts).
 
 ## Required before beta
 
-- guided recovery for stale selections, deleted workspaces, and interrupted top-level flows;
+- guided recovery for stale selections, deleted workspaces, and interrupted top-level flows — **completed 2026-08-02** (see the guided-recovery certification above);
 - corruption, stale-lock, and disk-pressure drills with operator guidance;
 - concrete provider-integration evidence for every supported provider surface.
 
@@ -123,7 +134,7 @@ These should remain product safeguards even in stable releases:
 
 ### Critical
 
-1. guided recovery and stale-selection hardening.
+1. guided recovery and stale-selection hardening — **completed 2026-08-02** (see the guided-recovery certification above).
 
 ### High
 

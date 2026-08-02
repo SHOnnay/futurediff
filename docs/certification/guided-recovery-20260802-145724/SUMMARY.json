@@ -1,0 +1,19 @@
+{
+  "kind": "guided-recovery-certification",
+  "generated_at": "2026-08-02T14:57:30Z",
+  "host": "Darwin-arm64",
+  "scenarios": ["stale_selection", "workspace_missing", "interrupted_sealed_flow", "interrupted_publication"],
+  "failures": 0,
+  "evidence": [
+  "/Users/sakibulhudaonnay/Downloads/futurediff-production/futurediff/docs/certification/guided-recovery-20260802-145724/00-doctor.json",
+  "/Users/sakibulhudaonnay/Downloads/futurediff-production/futurediff/docs/certification/guided-recovery-20260802-145724/a1-stale-report.json",
+  "/Users/sakibulhudaonnay/Downloads/futurediff-production/futurediff/docs/certification/guided-recovery-20260802-145724/a2-stale-repair.json",
+  "/Users/sakibulhudaonnay/Downloads/futurediff-production/futurediff/docs/certification/guided-recovery-20260802-145724/b1-workspace-missing.json",
+  "/Users/sakibulhudaonnay/Downloads/futurediff-production/futurediff/docs/certification/guided-recovery-20260802-145724/b2-abort.json",
+  "/Users/sakibulhudaonnay/Downloads/futurediff-production/futurediff/docs/certification/guided-recovery-20260802-145724/c1-sealed-recovery.json",
+  "/Users/sakibulhudaonnay/Downloads/futurediff-production/futurediff/docs/certification/guided-recovery-20260802-145724/d1-planner-ambiguous.json",
+  "/Users/sakibulhudaonnay/Downloads/futurediff-production/futurediff/docs/certification/guided-recovery-20260802-145724/d2-planner-not-committed.json",
+  "/Users/sakibulhudaonnay/Downloads/futurediff-production/futurediff/docs/certification/guided-recovery-20260802-145724/d3-recover-committed.json",
+  "/Users/sakibulhudaonnay/Downloads/futurediff-production/futurediff/docs/certification/guided-recovery-20260802-145724/SUMMARY.json"
+]
+}
