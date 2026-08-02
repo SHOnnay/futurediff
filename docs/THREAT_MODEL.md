@@ -51,15 +51,15 @@ editor or agent can access through the user's ordinary OS permissions.
 | Custom selection path misrepresented as workspace root | One home model, scoped `--state` compatibility option, and `config --explain` source reporting |
 | Unsafe daemon root | Canonical real directory, private permissions, local socket, and daemon secure-root audit |
 | Credential disclosure | Brokered credentials, minimized child environments, secret scanning, fingerprint-only findings |
-| Git config or environment injection | Guided Git subprocesses run with minimized environments, disabled hooks and fsmonitor, no external diff or pager, and no inherited credential prompts |
-| Detached or bare repository substituted for a reviewable branch | Guided entry rejects bare repositories and detached HEAD states before transaction creation |
+| Git config, environment, or replacement-object injection | Guided Git subprocesses run with minimized environments, disabled hooks and fsmonitor, no external diff or pager, no inherited credential prompts, and replacement-object interpretation disabled |
+| Detached, bare, shallow, history-substituted, or unsupported repository shape | Stable-default repository admission rejects detached HEAD, linked worktrees, shallow history, replacement refs, grafts, alternate object stores, symlinked object directories, non-local HEAD refs, and unsupported ref formats unless a reviewed custom policy explicitly allows a narrow exception |
 | Duplicate external effect | Idempotency keys, durable attempts, receipts, and reconciliation |
 | Unknown provider outcome | Persist unknown state; block dependent effects until reconciliation |
 | Evidence tampering | SHA-256 manifests, deterministic bundles, provenance, and optional signatures |
 | Operator action dispute or silent local policy denial | Separate operator audit trail with deterministic redaction, crash-safe append, and hash-chain verification |
 | CI dependency compromise | Pin workflow actions to reviewed major or immutable commit references |
 | Backup corruption | Embedded manifest, safe extraction, and full restore verification |
-| Policy weakening | Versioned policies, reviewable diffs, readiness gate, and release-candidate evidence |
+| Policy weakening or policy-file substitution | Versioned policies, stable fail-closed defaults, bounded regular policy files, symlink rejection, POSIX write-permission checks, reviewable diffs, readiness gate, and release-candidate evidence |
 
 ## Explicit non-claims
 

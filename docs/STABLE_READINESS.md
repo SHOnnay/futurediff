@@ -59,33 +59,38 @@ Current automated evidence includes:
 
 Windows remains unsupported because no native Windows runtime, peer-auth, installer, or hosted release validation has been completed.
 
-## Current milestone
+### Tamper-evident operator audit trail
 
-### Immutable operator audit trail
-
-This milestone adds a separate local operator audit trail for security-sensitive daemon/API actions.
-
-Required properties:
+Completed in the merged `hardening/immutable-audit-trail` milestone:
 
 - append-only JSONL storage with hash chaining;
 - deterministic redaction and no secret logging;
 - crash-safe append and concurrent-writer protection;
-- explicit verification command distinct from ordinary diagnostics;
-- honest local trust-boundary documentation.
+- explicit verification tooling distinct from ordinary diagnostics;
+- fail-closed recording before high-risk mutation;
+- honest documentation of the local trust boundary.
 
-This trail is intended to be tamper-evident, not tamper-proof. It does not claim protection against a fully privileged host administrator.
+The trail is tamper-evident, not tamper-proof. It does not claim protection against a fully privileged host administrator.
+
+### Stable-default repository admission
+
+Completed in this milestone:
+
+- repository-admission policy version `0.2` is enforced automatically when the service has no custom policy;
+- shallow repositories, replacement refs, grafts, alternate object databases, symlinked object directories, linked worktrees, detached HEAD, non-local HEAD refs, and unsupported ref formats fail closed unless a reviewed custom policy explicitly permits them;
+- the Git subprocess boundary disables replacement-object interpretation even before admission evaluation;
+- policy files must be bounded regular files and cannot be symlinks or group/world-writable on POSIX systems;
+- decisions include stable reason codes and inspected repository facts for operator guidance and tests.
 
 ## Required before beta
 
 - real disposable GitHub write-and-recovery certification evidence;
 - guided recovery for stale selections, deleted workspaces, and interrupted top-level flows;
-- broader stable-default repository admission for hostile repository content and unsupported repository shapes;
 - corruption, stale-lock, and disk-pressure drills with operator guidance;
 - concrete provider-integration evidence for every supported provider surface.
 
 ## Required before stable
 
-- immutable operator audit trail with verification tooling and recovery guidance;
 - signed release artifacts;
 - published SBOM assets;
 - reproducibility evidence for packaged releases;
@@ -106,15 +111,13 @@ These should remain product safeguards even in stable releases:
 
 ### Critical
 
-1. stable-default repository admission hardening;
-2. guided recovery and stale-selection hardening.
+1. guided recovery and stale-selection hardening.
 
 ### High
 
-1. immutable operator audit trail;
-2. corruption, stale-lock, and disk-pressure drills;
-3. stable release evidence set: signatures, SBOMs, reproducibility, install/upgrade/uninstall evidence;
-4. real hosted GitHub write/recovery certification.
+1. corruption, stale-lock, and disk-pressure drills;
+2. stable release evidence set: signatures, SBOMs, reproducibility, install/upgrade/uninstall evidence;
+3. real hosted GitHub write/recovery certification.
 
 ### Medium
 

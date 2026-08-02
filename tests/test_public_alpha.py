@@ -278,8 +278,8 @@ class PublicAlphaTests(unittest.TestCase):
 
         self.assertIn("ambient `GIT_DIR`, `GIT_WORK_TREE`", security)
         self.assertIn("rejects bare repositories and detached HEAD states", security)
-        self.assertIn("Git config or environment injection", threat)
-        self.assertIn("Detached or bare repository substituted", threat)
+        self.assertIn("Git config, environment, or replacement-object injection", threat)
+        self.assertIn("Detached, bare, shallow, history-substituted, or unsupported repository shape", threat)
         self.assertIn("disable hooks and fsmonitor", guided)
         self.assertIn("rejects bare repositories and detached HEAD states", guided)
 

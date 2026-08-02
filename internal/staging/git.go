@@ -38,15 +38,21 @@ func gitEnv() []string {
 	return []string{
 		"PATH=" + os.Getenv("PATH"), "HOME=/nonexistent", "LANG=C.UTF-8", "LC_ALL=C.UTF-8",
 		"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_OPTIONAL_LOCKS=0",
+		"GIT_NO_REPLACE_OBJECTS=1", "GIT_TERMINAL_PROMPT=0",
 		"GIT_EXTERNAL_DIFF=", "GIT_DIFF_OPTS=", "GIT_PAGER=cat", "PAGER=cat",
 	}
 }
 
-func runGit(repo string, args ...string) ([]byte, error) {
-	base := []string{"-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "-c", "diff.external=", "-c", "core.pager=cat"}
+func gitCommand(repo string, env []string, args ...string) *exec.Cmd {
+	base := []string{"--no-replace-objects", "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "-c", "diff.external=", "-c", "core.pager=cat"}
 	cmd := exec.Command("git", append(base, args...)...)
 	cmd.Dir = repo
-	cmd.Env = gitEnv()
+	cmd.Env = env
+	return cmd
+}
+
+func runGit(repo string, args ...string) ([]byte, error) {
+	cmd := gitCommand(repo, gitEnv(), args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
@@ -229,9 +235,7 @@ func (m Manager) PredictMaterializedRef(workspace domain.Workspace, patch domain
 		return domain.MaterializedRef{}, errors.New("stored patch digest mismatch")
 	}
 	args := []string{"commit-tree", patch.StagedTreeOID, "-p", workspace.BaseOID, "-m", "FutureDiff transaction " + workspace.TransactionID}
-	cmd := exec.Command("git", append([]string{"-c", "core.hooksPath=/dev/null"}, args...)...)
-	cmd.Dir = workspace.RepositoryRoot
-	cmd.Env = materializedCommitEnvironment(patch.GeneratedAt)
+	cmd := gitCommand(workspace.RepositoryRoot, materializedCommitEnvironment(patch.GeneratedAt), args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return domain.MaterializedRef{}, fmt.Errorf("git commit-tree: %w: %s", err, strings.TrimSpace(string(out)))
