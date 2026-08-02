@@ -152,6 +152,7 @@ docs/PRODUCTION_LAUNCH.md
 docs/PRODUCTION_RUNBOOK.md
 docs/QUICKSTART.md
 docs/RELEASE_PROMOTION.md
+docs/REPOSITORY_ADMISSION.md
 docs/SLO.md
 docs/STABLE_READINESS.md
 docs/THREAT_MODEL.md
@@ -641,6 +642,7 @@ internal/app/external_effects_test.go
 internal/app/quorum_approval_test.go
 internal/app/quota_test.go
 internal/app/recovery_test.go
+internal/app/repository_admission_test.go
 internal/app/service.go
 internal/app/signed_approval_test.go
 internal/app/slack_outbox_test.go

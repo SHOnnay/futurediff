@@ -98,11 +98,25 @@ func (s *Service) CreateForPrincipal(req CreateRequest, principalID string) (Tra
 	if err != nil {
 		return TransactionView{}, err
 	}
-	if s.RepositoryPolicy != nil {
-		decision := s.RepositoryPolicy.Evaluate(inspect, policy)
-		if !decision.Allowed {
-			return TransactionView{}, fmt.Errorf("repository admission rejected: %s", strings.Join(decision.Reasons, "; "))
+	repositoryPolicy := s.RepositoryPolicy
+	if repositoryPolicy == nil {
+		stableDefault, err := repoadmission.StableDefaultForPath(inspect.RepositoryRoot)
+		if err != nil {
+			return TransactionView{}, fmt.Errorf("configure stable repository admission: %w", err)
 		}
+		repositoryPolicy = &stableDefault
+	}
+	decision := repositoryPolicy.Evaluate(inspect, policy)
+	if !decision.Allowed {
+		reasons := make([]string, 0, len(decision.Reasons))
+		for i, reason := range decision.Reasons {
+			if i < len(decision.ReasonCodes) {
+				reasons = append(reasons, decision.ReasonCodes[i]+": "+reason)
+			} else {
+				reasons = append(reasons, reason)
+			}
+		}
+		return TransactionView{}, fmt.Errorf("repository admission rejected by %s: %s", decision.PolicyID, strings.Join(reasons, "; "))
 	}
 	id := domain.NewID("tx")
 	workspace, err := s.Staging.Create(id, inspect, policy)
