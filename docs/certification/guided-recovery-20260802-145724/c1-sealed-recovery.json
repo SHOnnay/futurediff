@@ -1,0 +1,11 @@
+{
+  "kind": "recovery_report",
+  "reason_code": "no_recovery_needed",
+  "transaction_id": "tx_9b9fda741fd93c597c3c798c",
+  "current_status": "sealed",
+  "recovery_required": false,
+  "safe_to_retry": true,
+  "recommended_action": "fdif verify",
+  "workspace_available": true,
+  "selection_repaired": false
+}

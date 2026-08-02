@@ -9,7 +9,7 @@ import (
 var fdifCommands = []string{
 	"start", "new", "create", "status", "workspace", "shell", "review", "seal",
 	"verify", "approve", "publish", "apply", "commit", "finish",
-	"transactions", "list", "use", "events", "abort", "discard", "daemon", "doctor",
+	"recover", "transactions", "list", "use", "events", "abort", "discard", "daemon", "doctor",
 	"config", "menu", "demo", "completion", "version", "help",
 }
 
@@ -29,6 +29,8 @@ func completionScript(shell string) (string, error) {
     completion) COMPREPLY=( $(compgen -W "bash zsh fish powershell" -- "$cur") ) ;;
     config) COMPREPLY=( $(compgen -W "--explain" -- "$cur") ) ;;
     finish) COMPREPLY=( $(compgen -W "--github --remote --base --title --body --body-file --credential-config --github-credential --full --yes" -- "$cur") ) ;;
+    recover) COMPREPLY=( $(compgen -W "--yes --json" -- "$cur") ) ;;
+    use) COMPREPLY=( $(compgen -W "--clear --json" -- "$cur") ) ;;
   esac
 }
 complete -F _fdif_complete fdif
@@ -47,6 +49,8 @@ _fdif() {
     completion) _values 'shell' bash zsh fish powershell ;;
     config) _values 'option' --explain ;;
     finish) _values 'option' --github --remote --base --title --body --body-file --credential-config --github-credential --full --yes ;;
+    recover) _values 'option' --yes --json ;;
+    use) _values 'option' --clear --json ;;
   esac
 }
 compdef _fdif fdif
@@ -58,6 +62,8 @@ compdef _fdif fdif
 			fmt.Fprintf(&b, "complete -c fdif -n '__fish_use_subcommand' -a %s\n", command)
 		}
 		b.WriteString("complete -c fdif -n '__fish_seen_subcommand_from daemon' -a 'status start stop restart logs'\n")
+		b.WriteString("complete -c fdif -n '__fish_seen_subcommand_from recover' -a '--yes --json'\n")
+		b.WriteString("complete -c fdif -n '__fish_seen_subcommand_from use' -a '--clear --json'\n")
 		b.WriteString("complete -c fdif -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish powershell'\n")
 		b.WriteString("complete -c fdif -n '__fish_seen_subcommand_from finish' -a '--github --remote --base --title --body --body-file --credential-config --github-credential --full --yes'\n")
 		return b.String(), nil
@@ -78,6 +84,8 @@ compdef _fdif fdif
     'completion' { @('bash','zsh','fish','powershell') }
     'config' { @('--explain') }
     'finish' { @('--github','--remote','--base','--title','--body','--body-file','--github-credential','--full','--yes') }
+    'recover' { @('--yes','--json') }
+    'use' { @('--clear','--json') }
     default { @() }
   }
   $values | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {

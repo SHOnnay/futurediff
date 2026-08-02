@@ -1,0 +1,5 @@
+{
+  "kind": "daemon-recover-refusal",
+  "exit_code": 1,
+  "raw": "error: daemon returned 409 Conflict: {\"error\":\"recovery_failed\",\"message\":\"transaction committed is not recoverable\"}"
+}

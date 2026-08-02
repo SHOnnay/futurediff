@@ -68,12 +68,15 @@ fdif workspace [transaction-id]
 fdif shell [transaction-id]
 fdif status [transaction-id]
 fdif transactions
-fdif use [transaction-id]
+	fdif use --clear
 ```
 
 `new` is an alias of `start`. Normal `start` output prioritizes the safe path,
 the unchanged-source-branch guarantee, and next commands. Add global
 `--verbose` to show transaction and mode details.
+`use --clear` removes the local current-change selection without touching any
+transaction evidence. `use [transaction-id]` validates the ID against the
+daemon before saving the selection.
 
 ## Review and publish locally
 
@@ -162,6 +165,59 @@ and confirmation:
 ```bash
 fdif daemon start --unsafe-disable-peer-auth
 ```
+## Recovery
+
+```bash
+fdif recover [transaction-id] [--yes]
+```
+
+`recover` reports the recovery state of a change and, with explicit `--yes`,
+runs the daemon's canonical recovery endpoint. It never reimplements
+reconciliation: the decision stays in the daemon (`Service.Recover`,
+`reconcileExternalEffects`). Without `--yes` (or in `--json` mode) it only
+reports what is needed.
+
+The JSON report is stable and script-friendly:
+
+```json
+{
+  "kind": "recovery_report",
+  "reason_code": "recovery_required",
+  "transaction_id": "tx_...",
+  "current_status": "committing",
+  "recovery_required": true,
+  "safe_to_retry": true,
+  "recommended_action": "fdif recover tx_... --yes",
+  "workspace_available": true,
+  "selection_repaired": false
+}
+```
+
+Stable `reason_code` values:
+
+```text
+no_transactions               no open changes to recover
+multiple_transactions         several open changes; select one first
+selection_transaction_missing stored selection no longer exists
+stale_selection               selection points at a different repository
+terminal_selection            the change is already finished
+invalid_selection_file        selection file is corrupt or unsafe
+workspace_missing             safe working copy is gone
+workspace_identity_mismatch   path exists but is not the recorded worktree
+recovery_required             canonical recovery should run (needs --yes)
+recovery_ambiguous            manual inspection required
+daemon_unavailable            daemon is not running
+no_recovery_needed            nothing to do; the change is healthy
+recovered                     canonical recovery finished
+```
+
+Behavior guarantees:
+
+- The guided CLI never silently picks a different change, silently aborts,
+  silently recreates a workspace, or deletes evidence.
+- The selection pointer is only ever cleared explicitly (`fdif use --clear`)
+  or as the reported result of `fdif recover --yes`.
+- Risky recovery actions require `--yes`; `--json` mode never prompts.
 
 ## System and onboarding
 

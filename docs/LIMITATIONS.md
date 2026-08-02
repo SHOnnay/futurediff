@@ -44,6 +44,19 @@ FutureDiff canonicalizes a small set of trusted operating-system path aliases
 so normal macOS locations such as `/tmp` work. Arbitrary user-created symlink
 traversal and a home that is itself a symlink remain rejected. This is path
 hardening, not a complete filesystem sandbox.
+## Recovery and stale selections
+
+`fdif recover` reports recovery state and, only with explicit `--yes`, runs the
+daemon's canonical recovery. The guided CLI never silently picks a different
+change, silently aborts, silently recreates a deleted workspace, or deletes
+evidence. Deleted safe working copies are not recreated; the recommended
+explicit action is `fdif abort <id> --yes`.
+
+Recovery of a transaction whose provider effect is ambiguous
+(`needs_reconciliation` with unknown provider outcome) requires manual
+inspection; the guided CLI reports `recovery_ambiguous` and never retries
+blindly. See
+[`adr/ADR-098-guided-recovery-and-stale-selection.md`](adr/ADR-098-guided-recovery-and-stale-selection.md).
 
 ## GitHub
 

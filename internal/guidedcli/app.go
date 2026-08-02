@@ -158,6 +158,8 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		err = a.apply(ctx, args)
 	case "finish":
 		err = a.finish(ctx, args)
+	case "recover":
+		err = a.recoverCommand(ctx, args)
 	case "transactions", "list":
 		err = a.transactions(ctx)
 	case "use":
@@ -228,6 +230,8 @@ Advanced workflow:
   fdif publish [tx]            publish futurediff/<transaction-id> locally
   fdif transactions            list changes
   fdif use [tx]                select the current change
+  fdif recover [tx] [--yes]      recover an interrupted publish (canonical)
+  fdif use --clear               clear a stale current-change selection
   fdif events [tx]             show audit events
   fdif daemon <action>         status, start, stop, restart or logs
   fdif config [--explain]      show effective paths and their sources
@@ -470,7 +474,7 @@ func (a *App) start(ctx context.Context, args []string) error {
 }
 
 func (a *App) status(ctx context.Context, args []string) error {
-	id, err := a.resolveTransaction(ctx, firstPositional(args), false)
+	id, err := a.resolveTransaction(ctx, firstPositional(args), false, false)
 	if err != nil {
 		return err
 	}
@@ -525,7 +529,7 @@ func (a *App) status(ctx context.Context, args []string) error {
 }
 
 func (a *App) workspace(ctx context.Context, args []string) error {
-	id, err := a.resolveTransaction(ctx, firstPositional(args), false)
+	id, err := a.resolveTransaction(ctx, firstPositional(args), false, false)
 	if err != nil {
 		return err
 	}
@@ -544,7 +548,7 @@ func (a *App) workspace(ctx context.Context, args []string) error {
 }
 
 func (a *App) shell(ctx context.Context, args []string) error {
-	id, err := a.resolveTransaction(ctx, firstPositional(args), false)
+	id, err := a.resolveTransaction(ctx, firstPositional(args), false, false)
 	if err != nil {
 		return err
 	}
@@ -579,7 +583,7 @@ func userShell() (string, []string) {
 }
 
 func (a *App) review(ctx context.Context, args []string) error {
-	id, err := a.resolveTransaction(ctx, firstPositional(args), false)
+	id, err := a.resolveTransaction(ctx, firstPositional(args), false, false)
 	if err != nil {
 		return err
 	}
@@ -637,7 +641,7 @@ func (a *App) review(ctx context.Context, args []string) error {
 }
 
 func (a *App) seal(ctx context.Context, args []string) error {
-	id, err := a.resolveTransaction(ctx, firstPositional(args), false)
+	id, err := a.resolveTransaction(ctx, firstPositional(args), false, true)
 	if err != nil {
 		return err
 	}
@@ -672,7 +676,7 @@ func (a *App) seal(ctx context.Context, args []string) error {
 }
 
 func (a *App) verify(ctx context.Context, args []string) error {
-	id, err := a.resolveTransaction(ctx, firstPositional(args), false)
+	id, err := a.resolveTransaction(ctx, firstPositional(args), false, true)
 	if err != nil {
 		return err
 	}
@@ -723,7 +727,7 @@ func (a *App) verify(ctx context.Context, args []string) error {
 }
 
 func (a *App) approve(ctx context.Context, args []string) error {
-	id, err := a.resolveTransaction(ctx, firstPositional(args), false)
+	id, err := a.resolveTransaction(ctx, firstPositional(args), false, true)
 	if err != nil {
 		return err
 	}
@@ -773,7 +777,7 @@ func (a *App) approve(ctx context.Context, args []string) error {
 }
 
 func (a *App) apply(ctx context.Context, args []string) error {
-	id, err := a.resolveTransaction(ctx, firstPositional(args), false)
+	id, err := a.resolveTransaction(ctx, firstPositional(args), false, true)
 	if err != nil {
 		return err
 	}
@@ -940,7 +944,7 @@ func (a *App) finish(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	id, err := a.resolveTransaction(ctx, firstPositional(args), false)
+	id, err := a.resolveTransaction(ctx, firstPositional(args), false, true)
 	if err != nil {
 		return err
 	}
@@ -1062,10 +1066,20 @@ func (a *App) transactions(ctx context.Context) error {
 }
 
 func (a *App) use(ctx context.Context, args []string) error {
+	if contains(args, "--clear") {
+		if err := a.Store.Clear(); err != nil {
+			return err
+		}
+		if a.JSON {
+			return writeJSON(a.Out, map[string]string{"kind": "fdif-use-clear", "current_transaction_id": ""})
+		}
+		a.Renderer.success("Current change selection cleared")
+		return nil
+	}
 	id := firstPositional(args)
 	if id == "" {
 		var err error
-		id, err = a.resolveTransaction(ctx, "", true)
+		id, err = a.resolveTransaction(ctx, "", true, false)
 		if err != nil {
 			return err
 		}
@@ -1089,7 +1103,7 @@ func (a *App) use(ctx context.Context, args []string) error {
 }
 
 func (a *App) abort(ctx context.Context, args []string) error {
-	id, err := a.resolveTransaction(ctx, firstPositional(args), false)
+	id, err := a.resolveTransaction(ctx, firstPositional(args), false, true)
 	if err != nil {
 		return err
 	}
@@ -1120,7 +1134,7 @@ func (a *App) abort(ctx context.Context, args []string) error {
 }
 
 func (a *App) passthroughTransaction(ctx context.Context, command string, args []string) error {
-	id, err := a.resolveTransaction(ctx, firstPositional(args), false)
+	id, err := a.resolveTransaction(ctx, firstPositional(args), false, false)
 	if err != nil {
 		return err
 	}
@@ -1526,16 +1540,21 @@ func (a *App) runStep(fn func() error) error {
 	return fn()
 }
 
-func (a *App) resolveTransaction(ctx context.Context, explicit string, forceSelection bool) (string, error) {
+func (a *App) resolveTransaction(ctx context.Context, explicit string, forceSelection bool, strict bool) (string, error) {
 	if explicit != "" {
 		return explicit, nil
 	}
+	hadSelection := false
 	if !forceSelection {
 		if current, err := a.Store.Load(); err == nil {
+			hadSelection = true
 			if _, _, getErr := a.get(ctx, current.TransactionID); getErr == nil {
 				return current.TransactionID, nil
+			} else if strict {
+				return "", fmt.Errorf("selected change %s is not available; run fdif use or fdif recover: %w", current.TransactionID, getErr)
 			}
-			_ = a.Store.Clear()
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return "", fmt.Errorf("current-change selection is unreadable; run fdif use --clear: %w", err)
 		}
 	}
 	raw, err := a.Engine.Run(ctx, "list")
@@ -1552,8 +1571,16 @@ func (a *App) resolveTransaction(ctx context.Context, explicit string, forceSele
 			eligible = append(eligible, tx)
 		}
 	}
+	if strict && len(eligible) > 0 && len(eligible) < len(response.Transactions) {
+		return "", errors.New("multiple changes exist and the selected change is unavailable; run fdif use <transaction-id> to choose explicitly")
+	}
 	if len(eligible) == 1 {
-		_ = a.Store.Save(eligible[0].TransactionID, "")
+		if strict && !a.Interactive {
+			return "", errors.New("no current change is selected; run fdif use " + eligible[0].TransactionID)
+		}
+		if !hadSelection {
+			_ = a.Store.Save(eligible[0].TransactionID, "")
+		}
 		return eligible[0].TransactionID, nil
 	}
 	if len(eligible) == 0 {
