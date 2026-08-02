@@ -1,0 +1,19 @@
+{
+  "format_version": "1.0",
+  "kind": "github-write-recovery-cleanup",
+  "certification_date": "2026-08-02",
+  "disposable_repository": "SHOnnay/futurediff-certification-20260802143944-25328",
+  "disposable_repository_url": "https://github.com/SHOnnay/futurediff-certification-20260802143944-25328",
+  "pull_requests": [
+    {"number": 1, "final_state": "closed"},
+    {"number": 2, "final_state": "closed"}
+  ],
+  "temporary_feature_branches_deleted": ["futurediff/tx_6bffcae6e24d8c82c99e5001", "futurediff/tx_3fedb9aa401c00cce4cf35d8"],
+  "remaining_branches": ["main"],
+  "default_branch_head_at_cleanup": "0072c65a221768194be89a9b37e19c38c54220e0",
+  "disposable_repository_final_state": "archived (deletion requires the delete_repo token scope which the certification token does not have; archive satisfies the delete-or-archive cleanup requirement)",
+  "unrelated_repositories_modified": false,
+  "secrets_committed": false,
+  "credential_files_created": false,
+  "evidence_verified_before_cleanup": true
+}

@@ -1,0 +1,108 @@
+{
+  "canonical_response": {
+    "patch": {
+      "approval_material_digest": "ab22e582c3142be44eb8e8745dbf3682345b41ca5df8fe7fe98220afb1996658",
+      "changed_paths": [
+        "README.md"
+      ],
+      "generated_at": "2026-08-02T08:41:03.795143Z",
+      "patch_path": "/Users/sakibulhudaonnay/.futurediff/runtime/transactions/tx_6bffcae6e24d8c82c99e5001/artifacts/staged.patch",
+      "patch_sha256": "be5d32fda101620cfba5a35e1b294bcf02801972f9d7684f1f61923c42a549b5",
+      "patch_size_bytes": 591,
+      "staged_tree_oid": "da4f99d8708439bb1aa6b97940ee4e83023dfb79",
+      "transaction_id": "tx_6bffcae6e24d8c82c99e5001"
+    },
+    "transaction": {
+      "base_revision": "0072c65a221768194be89a9b37e19c38c54220e0",
+      "created_at": "2026-08-02T08:40:51.159183Z",
+      "material_revision": 3,
+      "mode": "cooperative",
+      "owner_principal_id": "uid:501",
+      "policy_version": "policy-0.1",
+      "protocol_version": "0.1",
+      "revision": 8,
+      "approval_digest": "a991963459841260f8aa906c1d8e29f1983c704cfd69a7b94cf4b0a09d198d0a",
+      "sealed_at": "2026-08-02T08:41:03.795143Z",
+      "status": "committed",
+      "transaction_id": "tx_6bffcae6e24d8c82c99e5001",
+      "updated_at": "2026-08-02T08:44:34.358923Z",
+      "workspace_identity": "/Users/sakibulhudaonnay/.futurediff/runtime/transactions/tx_6bffcae6e24d8c82c99e5001/workspace"
+    },
+    "workspace": {
+      "artifacts_path": "/Users/sakibulhudaonnay/.futurediff/runtime/transactions/tx_6bffcae6e24d8c82c99e5001/artifacts",
+      "base_oid": "0072c65a221768194be89a9b37e19c38c54220e0",
+      "created_at": "2026-08-02T08:40:51.159183Z",
+      "dirty_policy": "reject",
+      "git_common_dir": "/private/tmp/futurediff-cert-home/disposable-repo/.git",
+      "object_format": "sha1",
+      "repository_root": "/private/tmp/futurediff-cert-home/disposable-repo",
+      "source_head_ref": "refs/heads/main",
+      "source_status_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "transaction_id": "tx_6bffcae6e24d8c82c99e5001",
+      "workspace_path": "/Users/sakibulhudaonnay/.futurediff/runtime/transactions/tx_6bffcae6e24d8c82c99e5001/workspace"
+    },
+    "effects": [
+      {
+        "effect_id": "eff_31015b4e644c0fa8061b5bad",
+        "transaction_id": "tx_6bffcae6e24d8c82c99e5001",
+        "adapter_identity": "builtin.github.branch-publish",
+        "credential_id": "github-cert",
+        "destination": "https://github.com/SHOnnay/futurediff-certification-20260802143944-25328.git",
+        "input_json": "{\"owner\":\"SHOnnay\",\"repo\":\"futurediff-certification-20260802143944-25328\",\"branch\":\"futurediff/tx_6bffcae6e24d8c82c99e5001\",\"remote_url\":\"https://github.com/SHOnnay/futurediff-certification-20260802143944-25328.git\",\"commit_oid\":\"ca7945b7ac4f8dff082e6212f76e66901c41473d\",\"tree_oid\":\"da4f99d8708439bb1aa6b97940ee4e83023dfb79\",\"repository\":\"/private/tmp/futurediff-cert-home/disposable-repo\"}",
+        "preview_json": "{\"provider\":\"github\",\"repository\":\"SHOnnay/futurediff-certification-20260802143944-25328\",\"branch\":\"futurediff/tx_6bffcae6e24d8c82c99e5001\",\"commit_oid\":\"ca7945b7ac4f8dff082e6212f76e66901c41473d\",\"tree_oid\":\"da4f99d8708439bb1aa6b97940ee4e83023dfb79\",\"create_only\":true}",
+        "status": "committed"
+      },
+      {
+        "effect_id": "eff_c1924e2670db7db3e644087c",
+        "transaction_id": "tx_6bffcae6e24d8c82c99e5001",
+        "adapter_identity": "builtin.github.draft-pull-request",
+        "credential_id": "github-cert",
+        "destination": "https://api.github.com/repos/SHOnnay/futurediff-certification-20260802143944-25328/pulls",
+        "input_json": "{\"owner\":\"SHOnnay\",\"repo\":\"futurediff-certification-20260802143944-25328\",\"title\":\"FutureDiff change tx_6bffcae6e24d...\",\"body\":\"Reviewed and published through FutureDiff.\\n\\n- Change ID: `tx_6bffcae6e24d8c82c99e5001`\\n- Safe branch: `futurediff/tx_6bffcae6e24d8c82c99e5001`\\n- Exact change verified before approval.\",\"head\":\"futurediff/tx_6bffcae6e24d8c82c99e5001\",\"base\":\"main\",\"expected_head_sha\":\"ca7945b7ac4f8dff082e6212f76e66901c41473d\",\"depends_on_effect_id\":\"eff_31015b4e644c0fa8061b5bad\"}",
+        "preview_json": "{\"provider\":\"github\",\"repository\":\"SHOnnay/futurediff-certification-20260802143944-25328\",\"title\":\"FutureDiff change tx_6bffcae6e24d...\",\"body\":\"Reviewed and published through FutureDiff.\\n\\n- Change ID: `tx_6bffcae6e24d8c82c99e5001`\\n- Safe branch: `futurediff/tx_6bffcae6e24d8c82c99e5001`\\n- Exact change verified before approval.\\n\\n\\u003c!-- futurediff-effect:eff_c1924e2670db7db3e644087c --\\u003e\",\"head\":\"futurediff/tx_6bffcae6e24d8c82c99e5001\",\"base\":\"main\",\"expected_head_sha\":\"ca7945b7ac4f8dff082e6212f76e66901c41473d\",\"expected_base_sha\":\"0072c65a221768194be89a9b37e19c38c54220e0\",\"draft\":true,\"support_level\":\"exact_payload_with_ref_freshness_check\",\"local_patch_published\":true,\"head_binding_limitation\":\"head is bound to the exact commit published by the declared dependency\"}",
+        "status": "committed",
+        "depends_on": [
+          "eff_31015b4e644c0fa8061b5bad"
+        ]
+      }
+    ],
+    "receipts": [
+      {
+        "receipt_id": "receipt_df18f9821eccca3dc62e1499",
+        "effect_id": "eff_31015b4e644c0fa8061b5bad",
+        "provider_operation_id": "github.git.push",
+        "provider_resource_id": "github://SHOnnay/futurediff-certification-20260802143944-25328/refs/heads/futurediff/tx_6bffcae6e24d8c82c99e5001",
+        "request_digest": "bb75cd07ef51c697f838893a5f5fa835de8a89d8e64bc0d36c176d1d57b5fec5",
+        "response_digest": "a98448f3ded42f12fceb5308a8165f7bf01c129a7c0f5fa3042c631f696642f6",
+        "status_query_ref": "https://github.com/SHOnnay/futurediff-certification-20260802143944-25328.git"
+      },
+      {
+        "receipt_id": "receipt_6f7bd7833025d5b3f005661a",
+        "effect_id": "eff_c1924e2670db7db3e644087c",
+        "provider_operation_id": "github.pull_request.1",
+        "provider_resource_id": "github://SHOnnay/futurediff-certification-20260802143944-25328/pulls/1",
+        "request_digest": "8432baff3524a6f7f290dd5837fd8b0c596e7b7c70312c463ca01df95f14b6e2",
+        "response_digest": "68ddb6cfd6c10b9707cee255c310c797b5bccec10d8ff4af820faf585bd55104",
+        "status_query_ref": "https://api.github.com/repos/SHOnnay/futurediff-certification-20260802143944-25328/pulls"
+      }
+    ]
+  },
+  "commit_oid": "ca7945b7ac4f8dff082e6212f76e66901c41473d",
+  "current_branch_unchanged": true,
+  "github": {
+    "requested": true,
+    "owner": "SHOnnay",
+    "repo": "futurediff-certification-20260802143944-25328",
+    "branch": "futurediff/tx_6bffcae6e24d8c82c99e5001",
+    "base": "main",
+    "draft": true,
+    "pull_request_url": "https://github.com/SHOnnay/futurediff-certification-20260802143944-25328/pull/1",
+    "effect_id": "eff_c1924e2670db7db3e644087c",
+    "provider_resource_id": "github://SHOnnay/futurediff-certification-20260802143944-25328/pulls/1"
+  },
+  "kind": "fdif-publish",
+  "published_branch": "futurediff/tx_6bffcae6e24d8c82c99e5001",
+  "repository": "/private/tmp/futurediff-cert-home/disposable-repo",
+  "status": "committed",
+  "transaction_id": "tx_6bffcae6e24d8c82c99e5001"
+}

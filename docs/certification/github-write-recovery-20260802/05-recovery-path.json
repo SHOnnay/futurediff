@@ -1,0 +1,31 @@
+{
+  "format_version": "1.0",
+  "kind": "github-write-recovery-certification",
+  "certification_date": "2026-08-02",
+  "disposable_repository": "SHOnnay/futurediff-certification-20260802143944-25328",
+  "scenario": "controlled incomplete transaction: effects prepared while sealed, daemon interrupted before commit, then recovered",
+  "incomplete_state_detection": "transaction stayed 'ready' with 2 prepared effects; earlier empty-patch variant produced 'needs_reconciliation' which futurediff recover resolved to 'ready' with 'all unresolved effects proved absent or remain prepared'",
+  "recovery_actions": [
+    "futurediff recover <tx> -> needs_reconciliation to ready (effects proved absent)",
+    "repeated recovery safely refused (not recoverable when already ready)",
+    "resume via low-level commit with approved transaction_digest (canonical recovery command reported by the guided error)"
+  ],
+  "transaction_id": "tx_3fedb9aa401c00cce4cf35d8",
+  "safe_branch": "futurediff/tx_3fedb9aa401c00cce4cf35d8",
+  "pull_request": 2,
+  "pull_request_url": "https://github.com/SHOnnay/futurediff-certification-20260802143944-25328/pull/2",
+  "receipts": [
+    "github://SHOnnay/futurediff-certification-20260802143944-25328/refs/heads/futurediff/tx_3fedb9aa401c00cce4cf35d8",
+    "github://SHOnnay/futurediff-certification-20260802143944-25328/pulls/2"
+  ],
+  "no_duplicate_commit": true,
+  "no_duplicate_push": true,
+  "no_duplicate_pr": true,
+  "per_pr_commit_count": 1,
+  "default_branch_mutated": false,
+  "automatic_merge": false,
+  "operator_audit_valid_after_recovery": true,
+  "operator_audit_record_count_at_completion": 126,
+  "recovery_guarantee": "FutureDiff supports resume/retry and abort of incomplete transactions; it does not claim full rollback of an already-committed external effect. Incomplete transactions are detected (needs_reconciliation), reconciled to a safe state (effects proved absent -> ready; effects committed -> finalized), and retried exactly-once via idempotency keys and durable receipts.",
+  "redaction": "no secrets captured; audit records contain no secrets"
+}

@@ -226,3 +226,15 @@ fdif --json --yes finish --github
 Success produces one JSON document. Its `github` object includes the repository,
 base, safe branch, draft status, provider resource identifier and pull-request
 URL when the durable receipt contains it.
+## Real certification evidence
+
+Real GitHub write-and-recovery certification was completed on 2026-08-02 against
+the disposable repository `SHOnnay/futurediff-certification-20260802143944-25328`
+using the guided workflow in this document. See
+`docs/certification/GITHUB_WRITE_RECOVERY_2026-08-02.md` and
+`docs/certification/github-write-recovery-20260802/` for the report, the denial
+paths (publish without approval, dirty worktree, detached HEAD, shallow
+admission, direct default-branch mutation, unknown credential, empty patch,
+duplicate operations), and the recovery drill (interrupted finish →
+`needs_reconciliation` → `futurediff recover` → exactly-once resume).
+`scripts/certify-github-write-recovery.sh` records the exact sequence.
