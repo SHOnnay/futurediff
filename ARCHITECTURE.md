@@ -41,6 +41,7 @@ agent intent
 - SQLite-backed durable ledger
 - approvals, attempts, receipts, and audit chains
 - evidence export, integrity checkpoints, retention, restore, and closure tooling
+- local operator audit trail for security-sensitive daemon/API actions, separate from ordinary diagnostics
 
 ### Local authorization
 - kernel-derived local principal identity
@@ -50,6 +51,7 @@ agent intent
 ### Interface layer
 - canonical Go daemon and CLI commands
 - optional clean terminal wrapper with JSON-safe passthrough
+- `futurediff-audit --operator-events` verifies the tamper-evident local operator audit trail
 - shell completion assets for Bash, Zsh, and Fish
 
 ### Assurance layer

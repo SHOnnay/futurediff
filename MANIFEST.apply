@@ -619,6 +619,8 @@ internal/api/e2e_test.go
 internal/api/external_effects_e2e_test.go
 internal/api/idempotency.go
 internal/api/maintenance_test.go
+internal/api/operator_audit.go
+internal/api/operator_audit_test.go
 internal/api/rate_limit_test.go
 internal/api/request_id.go
 internal/api/request_id_test.go
@@ -786,6 +788,10 @@ internal/operatorapproval/approval_test.go
 internal/operatorapproval/detached.go
 internal/operatorapproval/quorum.go
 internal/operatorapproval/quorum_test.go
+internal/operatoraudit/lock_other.go
+internal/operatoraudit/lock_unix.go
+internal/operatoraudit/trail.go
+internal/operatoraudit/trail_test.go
 internal/operatorreceipt/receipt.go
 internal/operatorreceipt/receipt_test.go
 internal/peerauth/identity.go

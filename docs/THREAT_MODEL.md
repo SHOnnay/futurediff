@@ -19,6 +19,7 @@ policy configuration, local path configuration, and the local ledger.
 6. CI runners and external providers are outside the local trust boundary.
 7. Release artifacts are trusted only after checksum, provenance, content, and
    version verification.
+8. The local operator audit trail is a tamper-evident record inside the local trust boundary. It detects ordinary modification, deletion, insertion, reordering, and truncation, but it does not claim protection against a fully privileged host administrator.
 
 ## Local path boundary
 
@@ -55,6 +56,7 @@ editor or agent can access through the user's ordinary OS permissions.
 | Duplicate external effect | Idempotency keys, durable attempts, receipts, and reconciliation |
 | Unknown provider outcome | Persist unknown state; block dependent effects until reconciliation |
 | Evidence tampering | SHA-256 manifests, deterministic bundles, provenance, and optional signatures |
+| Operator action dispute or silent local policy denial | Separate operator audit trail with deterministic redaction, crash-safe append, and hash-chain verification |
 | CI dependency compromise | Pin workflow actions to reviewed major or immutable commit references |
 | Backup corruption | Embedded manifest, safe extraction, and full restore verification |
 | Policy weakening | Versioned policies, reviewable diffs, readiness gate, and release-candidate evidence |

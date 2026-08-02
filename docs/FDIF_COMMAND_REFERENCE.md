@@ -137,10 +137,15 @@ See [`FDIF_GITHUB_PUBLICATION.md`](FDIF_GITHUB_PUBLICATION.md).
 fdif events [transaction-id]
 fdif abort [transaction-id] [--yes]
 fdif discard [transaction-id] [--yes]
+futurediff-audit --root ~/.futurediff
+futurediff-audit --root ~/.futurediff --operator-events
 ```
 
-`discard` is an alias of `abort`.
+`fdif events` shows the per-transaction ledger event stream.
 
+`futurediff-audit` verifies durable local evidence. `--operator-events` verifies the separate tamper-evident operator audit trail for security-sensitive daemon/API actions.
+
+`discard` is an alias of `abort`.
 ## Daemon
 
 ```bash

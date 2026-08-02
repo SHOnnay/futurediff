@@ -220,3 +220,9 @@ fdif demo --yes              run the disposable automated demo
 - `fdif` does not duplicate transaction business logic;
 - publication creates `futurediff/<transaction-id>` and never switches or
   mutates the current branch.
+
+Security-sensitive daemon/API actions triggered by the guided flow are also recorded in the local operator audit trail. Verify it separately with:
+
+```bash
+futurediff-audit --root ~/.futurediff --operator-events
+```

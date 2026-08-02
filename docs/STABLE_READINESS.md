@@ -1,97 +1,126 @@
-# Stable-readiness gap analysis
+# Stable-readiness status
 
-FutureDiff `v0.1.0-alpha.3` is credible as a local-first alpha, but it is not yet stable-release ready. The current supported product remains:
+FutureDiff `v0.1.0-alpha.3` is credible as a local-first alpha, but it is not yet ready for a stable release. The supported product remains:
 
 - one local user on one machine;
 - local Git repositories;
-- Linux AMD64/ARM64 and macOS AMD64/ARM64 packaged runtimes;
-- manual edit / manual approval / manual publish;
+- Linux AMD64, Linux ARM64, macOS AMD64, and macOS ARM64 packaged runtimes;
+- manual edit, manual approval, and manual publish;
 - local-only daemon socket;
 - optional GitHub draft-PR publication;
 - no Windows runtime or installer support claim.
 
-## Architecture readout
+## Completed
 
-The current architecture already has strong foundations:
+### Git repository mutation boundary hardening
 
-- exact Git-tree staging and source-pin checks in `internal/staging`;
-- durable SQLite state and recovery flows in `internal/ledger` and `internal/app`;
-- kernel-authenticated local peer checks in `internal/peerauth` and `internal/api`;
-- least-privilege credential brokering and exact destination scoping in `internal/credentials` and the provider adapters;
-- release checksums, attestations, and prerelease packaging in `.github/workflows/public-alpha-release.yml` and `scripts/build-public-release.sh`.
+Completed in the merged `hardening/stable-readiness-git-boundary` milestone:
 
-The main remaining work is hardening the edges around that core: guided-CLI subprocess boundaries, repository-admission policy depth, crash and corruption drills, release operations, and externally witnessed evidence.
+- guided Git helper subprocesses ignore ambient `GIT_DIR` and `GIT_WORK_TREE`;
+- guided helper subprocesses ignore hostile global/system Git config, pager, hooks, external diff, fsmonitor, and credential prompting;
+- guided entry rejects bare repositories and detached `HEAD` states before transaction creation;
+- repository paths with spaces and shell metacharacters remain supported because Git execution stays argument-safe and shell-free.
 
-## Gap analysis
+### Protected-branch safeguards
 
-### 1. Security hardening
+These protections are enforced today:
 
-- **Command and argument injection:** Go subprocess calls avoid shell interpolation, but some guided-CLI Git calls were still inheriting ambient Git environment and config before this milestone.
-- **Path traversal and symlink attacks:** the alpha already rejects unsafe home/state symlinks and checks release archives, but repository-content policy coverage is still narrower than a stable product should require.
-- **Unsafe temporary files:** state writes are atomic and private; more corruption and disk-pressure drills are still needed.
-- **Secret and credential leakage:** brokered credentials are scoped and redacted, but stable needs stronger end-to-end proof that local tooling, logs, and support bundles never re-expose them.
-- **Malicious repository content / prompt injection:** cooperative mode intentionally is not a sandbox. Stable should add stronger repository-admission defaults and clearer redaction / allowlist rules for agent-visible artifacts.
-- **Subprocess isolation:** staging and provider Git paths are hardened; guided-CLI helper Git paths needed the same treatment and are addressed by this branch.
-- **Least-privilege filesystem access:** the local daemon root is private, but stable still needs more explicit policy and tests for what may be read, copied, exported, or attached.
-- **Authentication and local peer verification:** Linux/macOS peer auth is in place; Windows remains unsupported.
-- **Audit logging:** the ledger is strong, but the user-facing guided wrapper still needs a clearer immutable action trail for operator commands and cancellations.
-- **Dependency and supply-chain risk:** attestations and checksums exist; stable should additionally publish signed artifacts and SBOM assets by default.
-- **Rollback and recovery behavior:** lower layers have recovery concepts, but stable needs rehearsed guided-CLI recovery and corruption procedures.
+- publication creates `refs/heads/futurediff/<transaction-id>` instead of mutating the current branch;
+- guided flow re-checks exact approval material immediately before mutation;
+- direct protected-branch mutation is not part of the supported guided workflow;
+- commit, push, draft-PR, and merge remain explicit operator decisions.
 
-### 2. Reliability
+### Explicit approval requirements
 
-- interrupted transactions, unknown provider outcomes, and stale source refs already fail closed;
-- corrupted guided state, partial workspace cleanup, stale user selections, and disk-exhaustion scenarios need deeper automated coverage;
-- concurrent execution and stale lock handling exist at daemon level, but stable needs stronger operator guidance and tests around multi-terminal guided usage;
-- retries and idempotency are good for external effects, but stable needs more explicit retry surfaces in the guided UX;
-- provider timeouts and network failures are modeled, but still need real disposable-repo certification evidence.
+These are deliberate safeguards, not missing features:
 
-### 3. Safe automation boundaries
+- no implicit agent launch;
+- no automatic merge;
+- no direct protected-branch mutation;
+- no approval bypass through the guided wrapper.
 
-- explicit approval before mutation, commit, push, PR, and merge remains a deliberate safeguard and should stay;
-- protected-branch mutation is already avoided by design because publication creates `futurediff/<transaction-id>` instead of mutating the source branch;
-- dry-run / plan-only behavior exists in lower layers and release tooling, but guided preview and audit surfaces still need expansion;
-- immutable audit trail and emergency-stop ergonomics are incomplete from the top-level user workflow.
+### Recovery behavior covered so far
 
-### 4. Platform readiness
+Current completed coverage includes:
 
-- Linux AMD64, Linux ARM64, macOS ARM64, and macOS Intel are the only release targets with real packaging and hosted validation;
-- Windows still needs native daemon peer-auth design, secure path handling, runtime validation, packaging, installer validation, and hosted native certification before any support claim.
+- stale source ref invalidation before release;
+- durable lower-layer reconciliation for ambiguous external effects;
+- durable abort/recover flows in the transaction kernel;
+- guided rejection of unsupported repository shapes before work begins.
 
-### 5. Stable release operations
+### Tests and platform coverage achieved
 
-- prerelease packaging, checksums, GitHub attestations, and release automation are working;
-- stable still needs default signed artifacts, published SBOMs, reproducibility checks, clean-machine install/upgrade/uninstall evidence, rollback evidence, and a documented compatibility/deprecation policy.
+Current automated evidence includes:
 
-### 6. Product limitations
+- local unit and integration tests for guided Git-boundary hardening;
+- hosted Linux, macOS, and Windows CI for the repository as a whole;
+- native packaged-release validation only for Linux AMD64, Linux ARM64, macOS AMD64, and macOS ARM64;
+- authenticated macOS peer-validation coverage.
 
-Some alpha limitations should remain deliberate product safeguards:
+Windows remains unsupported because no native Windows runtime, peer-auth, installer, or hosted release validation has been completed.
+
+## Current milestone
+
+### Immutable operator audit trail
+
+This milestone adds a separate local operator audit trail for security-sensitive daemon/API actions.
+
+Required properties:
+
+- append-only JSONL storage with hash chaining;
+- deterministic redaction and no secret logging;
+- crash-safe append and concurrent-writer protection;
+- explicit verification command distinct from ordinary diagnostics;
+- honest local trust-boundary documentation.
+
+This trail is intended to be tamper-evident, not tamper-proof. It does not claim protection against a fully privileged host administrator.
+
+## Required before beta
+
+- real disposable GitHub write-and-recovery certification evidence;
+- guided recovery for stale selections, deleted workspaces, and interrupted top-level flows;
+- broader stable-default repository admission for hostile repository content and unsupported repository shapes;
+- corruption, stale-lock, and disk-pressure drills with operator guidance;
+- concrete provider-integration evidence for every supported provider surface.
+
+## Required before stable
+
+- immutable operator audit trail with verification tooling and recovery guidance;
+- signed release artifacts;
+- published SBOM assets;
+- reproducibility evidence for packaged releases;
+- clean-machine install, upgrade, and uninstall evidence on supported platforms;
+- compatibility and deprecation policy;
+- external security review or authoritative external validation.
+
+## Permanent safeguards
+
+These should remain product safeguards even in stable releases:
 
 - no automatic merge;
 - no direct protected-branch mutation;
 - no implicit agent launch;
-- no network-exposed daemon;
-- no unsupported Windows support claim.
+- no Windows support claim without real native validation.
 
-Those are safety boundaries, not merely missing features.
+## Prioritized roadmap
 
-## Prioritized implementation plan
+### Critical
 
-| Priority | Item | Current behavior | Risk | Proposed design | Affected components | Required tests | Completion criteria | Blocks beta | Blocks stable |
-|---|---|---|---|---|---|---|---|---|---|
-| Critical | Harden guided Git subprocess boundary | `fdif` helper Git calls existed outside the hardened staging/provider path | Global/system/repo Git config could trigger fsmonitor, pager, helper, or env-driven surprises | Run guided Git commands with minimized environment, disabled hooks/fsmonitor/pager/external diff, no credential prompting, no inherited `GIT_DIR` / `GIT_WORK_TREE`, and guided rejection of bare or detached repositories | `internal/guidedcli` docs/threat model | malicious global config, ambient `GIT_DIR`, detached HEAD, bare repo, review/start/demo regressions | guided helper Git paths are deterministic and guided start fails closed on unsupported repository shapes | yes | yes |
-| Critical | Expand repository-admission policy from “strict alpha” to “stable default” | strict checks reject tracked symlinks, submodules, and filters, but do not yet fully classify other hostile repository shapes | malicious repository content can confuse operators or agents | add stronger default repository policy plus explicit deny reasons surfaced through `doctor` / `start` | `internal/staging`, `internal/repoadmission`, guided CLI, docs | nested metadata, unsafe attributes, huge/binary policy, negative admission cases | stable default blocks unsupported repository structures before transaction creation | yes | yes |
-| Critical | Guided recovery and stale-selection hardening | state file is atomic, but stale selections and partial cleanup need better top-level recovery UX | confusion after crashes or deleted workspaces | add guided recovery / reconcile command and clearer stale-state detection | `internal/guidedcli`, `internal/app`, docs | interrupted flow, missing workspace, stale source, concurrent session regression | user can recover or safely clear every interrupted guided state | yes | yes |
-| High | Structured operator audit trail | durable ledger exists, but top-level operator actions are not summarized as a user-facing immutable trail | hard incident reconstruction and support | append hash-bound guided action receipts with tx/repo/outcome metadata | guided CLI, ledger/evidence docs | action logging, redaction, replay ordering | every guided mutation/cancel/publish action leaves a durable reviewable trace | no | yes |
-| High | Corruption, stale-lock, and disk-pressure drills | daemon lock and ledger checks exist; guidance is thinner than stable needs | partial writes and support pain under host failure | add explicit drills and failure tests for full home, corrupt state, stale lock, missing runtime paths | guided CLI, doctor, maintenance scripts | disk-full, lock recovery, corrupt JSON/SQLite handling | deterministic operator guidance for local failure modes | yes | yes |
-| High | Stable release evidence set | prerelease release flow produces checksums and GitHub attestations | insufficient stable supply-chain evidence | publish signed archives, SBOM assets, reproducibility evidence, clean-machine install evidence | workflows, release scripts, docs | SBOM generation, signature verify, reproducibility compare, install/upgrade/uninstall | stable release assets are signed, attestable, and reproducible | no | yes |
-| High | Real hosted GitHub write/recovery certification | adapters have strong local tests | provider-edge regressions may still hide in real GitHub behavior | certify push/create/status/recovery on disposable repositories and bind evidence to release SHA | adapters, operations docs, hosted workflows | disposable repo write/recovery drills | exact release candidate has real provider evidence | yes | yes |
-| Medium | Supported-platform upgrade/uninstall contract | install path is clear; upgrade/uninstall guarantees are informal | user breakage across prerelease iterations | define compatibility promises and uninstall cleanup expectations | installer scripts, docs | upgrade from prior prerelease, uninstall cleanup | documented and tested upgrade/uninstall path for supported platforms | no | yes |
-| Medium | Enforced OCI graduation | OCI path is experimental | false expectation of sandboxing | either harden and certify rootless OCI, or keep it explicitly non-public | `internal/runtimeoci`, docs | real rootless docker/podman certification | evidence-backed decision on OCI support level | no | yes |
-| Deferred | Windows runtime and installer support | build/test fragments exist but no secure supported runtime | false support claims and security holes | native peer-auth, path, packaging, installer, and hosted validation workstream | daemon, installer, workflows, docs | native Windows end-to-end validation | Windows stays unsupported until native secure validation passes | no | no |
+1. stable-default repository admission hardening;
+2. guided recovery and stale-selection hardening.
 
-## Milestone selected for this branch
+### High
 
-**Critical:** harden the guided Git subprocess boundary.
+1. immutable operator audit trail;
+2. corruption, stale-lock, and disk-pressure drills;
+3. stable release evidence set: signatures, SBOMs, reproducibility, install/upgrade/uninstall evidence;
+4. real hosted GitHub write/recovery certification.
 
-This milestone was selected first because it closes a concrete security and reliability gap without weakening any manual approval control or changing supported-platform scope.
+### Medium
+
+1. supported-platform compatibility and uninstall contract;
+2. decide whether enforced OCI graduates from experimental status.
+
+### Deferred
+
+1. Windows runtime and installer support.
