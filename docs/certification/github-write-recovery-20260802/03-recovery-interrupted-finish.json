@@ -1,0 +1,5 @@
+{
+  "error": "this change already contains a different GitHub pull-request effect; use the low-level CLI to inspect or restart the change",
+  "exit_code": 1,
+  "ok": false
+}

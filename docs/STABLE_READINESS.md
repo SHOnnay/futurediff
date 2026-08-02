@@ -82,9 +82,21 @@ Completed in this milestone:
 - policy files must be bounded regular files and cannot be symlinks or group/world-writable on POSIX systems;
 - decisions include stable reason codes and inspected repository facts for operator guidance and tests.
 
+### Real GitHub write-and-recovery certification
+
+Completed on 2026-08-02 against the disposable repository `SHOnnay/futurediff-certification-20260802143944-25328`:
+
+- success path through the supported guided workflow (`fdif start` → workspace edit → `fdif finish --github`: seal, prepare GitHub effects, verify, approve, local `futurediff/*` branch, push, draft PR) with remote state independently verified via the GitHub API;
+- denial paths certified before mutation: publish without approval, dirty worktree, detached HEAD, shallow-repository admission, direct default-branch mutation, unknown credential, empty-patch commit, and duplicate operations (idempotency);
+- recovery drill: a controlled incomplete transaction (`needs_reconciliation` with prepared effects) was detected, recovered to a safe state, and resumed exactly once with no duplicate commit, push, or PR;
+- default branch never mutated, no force push, no automatic merge;
+- tamper-evident operator audit trail verified after certification (`valid: true`, 126 records);
+- disposable repository archived after evidence verification; no unrelated repository touched; no secrets captured.
+
+Evidence and the full report live in `docs/certification/GITHUB_WRITE_RECOVERY_2026-08-02.md` with machine-readable artifacts under `docs/certification/github-write-recovery-20260802/`. The exact sequence is recorded in `scripts/certify-github-write-recovery.sh`.
+
 ## Required before beta
 
-- real disposable GitHub write-and-recovery certification evidence;
 - guided recovery for stale selections, deleted workspaces, and interrupted top-level flows;
 - corruption, stale-lock, and disk-pressure drills with operator guidance;
 - concrete provider-integration evidence for every supported provider surface.
@@ -117,7 +129,7 @@ These should remain product safeguards even in stable releases:
 
 1. corruption, stale-lock, and disk-pressure drills;
 2. stable release evidence set: signatures, SBOMs, reproducibility, install/upgrade/uninstall evidence;
-3. real hosted GitHub write/recovery certification.
+3. real hosted GitHub write/recovery certification — **completed 2026-08-02** (see `docs/certification/GITHUB_WRITE_RECOVERY_2026-08-02.md`).
 
 ### Medium
 

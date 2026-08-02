@@ -1,0 +1,73 @@
+{
+  "format_version": "1.0",
+  "kind": "github-write-recovery-denial-paths",
+  "certification_date": "2026-08-02",
+  "disposable_repository": "SHOnnay/futurediff-certification-20260802143944-25328",
+  "denial_cases": [
+    {
+      "id": "publish_without_approval",
+      "category": "approval_required",
+      "result": "denied",
+      "detail": "fdif publish after seal+verify but before approve -> 'change passed checks but is not approved; run fdif approve'",
+      "remote_mutation": false
+    },
+    {
+      "id": "dirty_worktree",
+      "category": "worktree_safety",
+      "result": "denied",
+      "detail": "fdif start on repo with uncommitted change -> 'repository is dirty; use stage_from_head explicitly'",
+      "remote_mutation": false
+    },
+    {
+      "id": "detached_head",
+      "category": "repository_shape",
+      "result": "denied",
+      "detail": "fdif start on detached HEAD -> 'has a detached HEAD; checkout a branch before running fdif start'",
+      "remote_mutation": false
+    },
+    {
+      "id": "shallow_repository_admission",
+      "category": "repository_admission",
+      "result": "denied",
+      "detail": "fdif start on shallow clone -> 'repository admission rejected by stable-default-v0.2: shallow_repository_not_allowed'",
+      "remote_mutation": false
+    },
+    {
+      "id": "direct_default_branch_mutation",
+      "category": "protected_branch",
+      "result": "denied",
+      "detail": "prepare-github-branch with branch 'main' -> 'branch must be a safe futurediff/* branch'; adapter Input.Normalize also requires futurediff/ prefix",
+      "remote_mutation": false
+    },
+    {
+      "id": "unknown_credential_authorization",
+      "category": "authorization",
+      "result": "denied",
+      "detail": "prepare-github-branch with unknown credential -> 'credential access denied: credential is unknown or disabled'",
+      "remote_mutation": false
+    },
+    {
+      "id": "empty_patch_rejection",
+      "category": "commit_safety",
+      "result": "denied",
+      "detail": "finish on transaction with no patch -> commit refused: 'No valid patches in input'",
+      "remote_mutation": false
+    },
+    {
+      "id": "duplicate_operation_idempotency",
+      "category": "idempotency",
+      "result": "no_duplicate",
+      "detail": "re-running fdif finish --github on committed tx returned the same PR #1 and commit; remote branch count and PR count unchanged (1 PR, 2 branches before and after)",
+      "remote_mutation": false
+    },
+    {
+      "id": "daemon_interruption_before_commit",
+      "category": "interruption",
+      "result": "detected_and_recoverable",
+      "detail": "daemon stopped after effects prepared, before commit; transaction remained 'ready' with 2 prepared effects; no remote branch/PR created; resume via low-level commit completed exactly once",
+      "remote_mutation": false
+    }
+  ],
+  "summary": "all unsafe actions denied before mutation; no force push; no default-branch mutation; no automatic merge; no duplicate commit/push/PR; denials audited in the operator trail",
+  "redaction": "no secrets captured; token values never printed or stored"
+}

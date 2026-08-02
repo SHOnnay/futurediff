@@ -1,0 +1,32 @@
+{
+  "format_version": "1.0",
+  "kind": "github-write-recovery-certification",
+  "certification_date": "2026-08-02",
+  "disposable_repository": "SHOnnay/futurediff-certification-20260802143944-25328",
+  "disposable_repository_url": "https://github.com/SHOnnay/futurediff-certification-20260802143944-25328",
+  "disposable_repository_created_at": "2026-08-02T08:39:45Z",
+  "workflow": "fdif guided CLI (fdif start -> workspace edit -> fdif finish --github)",
+  "transaction_id": "tx_6bffcae6e24d8c82c99e5001",
+  "safe_branch": "futurediff/tx_6bffcae6e24d8c82c99e5001",
+  "commit_sha": "ca7945b7ac4f8dff082e6212f76e66901c41473d",
+  "pull_request": 1,
+  "pull_request_url": "https://github.com/SHOnnay/futurediff-certification-20260802143944-25328/pull/1",
+  "pull_request_state": "open",
+  "pull_request_draft": true,
+  "default_branch": "main",
+  "default_branch_head_before": "0072c65a221768194be89a9b37e19c38c54220e0",
+  "default_branch_head_after": "0072c65a221768194be89a9b37e19c38c54220e0",
+  "default_branch_mutated": false,
+  "automatic_merge": false,
+  "source_repository_unchanged": true,
+  "current_branch_unchanged": true,
+  "operator_audit_verified": true,
+  "operator_audit_record_count": 10,
+  "operator_audit_head_hash": "54f7c8fc34103a095eded19807017fa7bc9b161b3b07de0c1fec3b1ff5d5ea7b",
+  "operator_audit_records": ["POST /v1/transactions/tx_6bffcae6e24d8c82c99e5001/effects/github/* (x4 prepare)", "POST /v1/transactions/tx_6bffcae6e24d8c82c99e5001/verify", "POST /v1/transactions/tx_6bffcae6e24d8c82c99e5001/approve", "POST /v1/transactions/tx_6bffcae6e24d8c82c99e5001/commit"],
+  "redaction": "no tokens, cookies, authorization headers, environment dumps, or credential-helper files captured; audit records contain no secrets",
+  "evidence": {
+    "finish_json": "captured in this directory as 01-finish.json",
+    "remote_state_verified_via_gh_api": true
+  }
+}
