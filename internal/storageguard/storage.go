@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/SHOnnay/futurediff/internal/durablewrite"
 )
 
 const Version = "0.1"
@@ -39,7 +41,22 @@ type Status struct {
 type Probe interface {
 	Inspect(root, ledgerPath, runtimePath string) (Filesystem, int64, int64, error)
 }
-type OSProbe struct{}
+
+// OSProbe inspects the real filesystem. Injector is a test-only deterministic
+// durable-write fault-injection seam (ADR-099); production callers leave it
+// nil and every method behaves exactly as before. There is no user-facing
+// fault-injection mechanism: nothing outside tests constructs an injector.
+type OSProbe struct {
+	Injector durablewrite.Injector
+}
+
+// WriteDurable writes data durably at dest through the shared atomic
+// durable-write helper, consulting the probe's injector (nil in production).
+// It is the storageguard boundary for create/write/short_write/file_sync/
+// rename/directory_sync fault injection.
+func (p OSProbe) WriteDurable(dest string, data []byte, perm os.FileMode) error {
+	return durablewrite.ReplaceFile(dest, data, perm, p.Injector)
+}
 
 func (OSProbe) Inspect(root, ledgerPath, runtimePath string) (Filesystem, int64, int64, error) {
 	fs, e := filesystem(root)
