@@ -146,9 +146,20 @@ futurediff-audit --root ~/.futurediff --operator-events
 
 `fdif events` shows the per-transaction ledger event stream.
 
-`futurediff-audit` verifies durable local evidence. `--operator-events` verifies the separate tamper-evident operator audit trail for security-sensitive daemon/API actions.
+`fdif cleanup-lock` removes a proved-stale daemon lock (dead PID, PID reuse, or
+previous boot) and its stale socket, records `event_type: lock_cleanup` in the
+operator audit trail, and reports `action: cleaned` (`none` when already
+cleaned). It refuses — with JSON `action: refused` and exit code 2 — when the
+lock is held by a live reachable daemon (`lock_owner_alive`), the owner is
+ambiguous (`lock_owner_ambiguous`), permissions are unsafe, the file is
+oversized, or `--yes` is missing in non-interactive/`--json` mode
+(`confirmation_required`). A corrupt (unparseable) lock with safe `0600`
+permissions is eligible for cleanup; the audit write is made durable before any
+removal, and each path removal is individually race-safe (flock + inode
+verification) — never an atomic pair.
 
-`discard` is an alias of `abort`.
+`futurediff-audit` verifies durable local evidence. `--operator-events` verifies the separate tamper-evident operator audit trail for security-sensitive daemon/API actions. `discard` is an alias of `abort`.
+
 ## Daemon
 
 ```bash
@@ -228,6 +239,11 @@ fdif version
 fdif completion bash|zsh|fish|powershell
 ```
 
+`fdif doctor` checks requirements and the effective home, then runs bounded
+integrity diagnostics: `ledger_integrity` (a present-but-corrupt ledger reports
+`fail`, a missing ledger reports `warn`), `ledger_event_chains` (hash-chain
+validation), `daemon_lock` (a corrupt or unsafe lock reports `fail` with the
+inspection reason), `storage`, `audit_chain`, and `backup_catalog`.
 The demo proves that the current branch stays unchanged and the published safe
 branch contains the staged change. It performs no GitHub mutation.
 

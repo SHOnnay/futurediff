@@ -196,8 +196,33 @@ fdif config --explain        explain effective paths and sources
 fdif recover                 report or run canonical recovery for the current change
 fdif use --clear             remove the current-change selection without touching evidence
 fdif doctor                  check requirements and effective home
+fdif cleanup-lock --yes      remove a proved-stale daemon lock (and socket)
 fdif demo --yes              run the disposable automated demo
 ```
+
+## Lock cleanup
+
+`fdif cleanup-lock` removes the daemon lock file and, when it is not owned by a
+live listener, the daemon socket. It never removes anything without explicit
+confirmation, and it never removes the lock of a live, reachable daemon:
+
+- **Refusals** (exit code 2): lock held by a live reachable daemon
+  (`lock_owner_alive`), ambiguous owner (`lock_owner_ambiguous`), unsafe
+  permissions, oversized file, or missing `--yes` in non-interactive/`--json`
+  mode (`confirmation_required`).
+- **Cleanup allowed**: proved-stale owner (dead PID, PID reuse, or previous
+  boot), or a corrupt/trailing-data lock file. Corrupt locks written by a crash
+  keep the daemon's `0600` permissions and are eligible; a corrupt lock with
+  broad permissions is refused.
+- The removal is race-safe: the lock file is re-flocked and inode-verified
+  immediately before unlink (`RemoveIfUnheld`), so a daemon that starts between
+  inspection and removal cannot be displaced.
+- Every removal records an `event_type: lock_cleanup` entry in the operator
+  audit trail (`$FDIF_HOME/audit/operator-events.jsonl`); if that audit write
+  cannot be made durable, the cleanup refuses before mutating anything.
+- The lock file and socket are two independent filesystem paths; each removal
+  is individually safe, but the pair is never described as an atomic operation.
+- Repeated invocation after a successful cleanup reports `action: none`.
 
 ## Cooperative-mode boundary
 

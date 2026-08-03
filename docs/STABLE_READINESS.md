@@ -106,10 +106,23 @@ Completed on 2026-08-02 with a fully local drill (`scripts/certify-guided-recove
 
 Evidence lives in `docs/certification/guided-recovery-20260802-144845/` (`SUMMARY.json` plus per-scenario artifacts).
 
+### Corruption, stale-lock, and disk-pressure certification
+
+Completed 2026-08-03 with a fully local drill (`scripts/certify-corruption-lock-disk-pressure.sh`, no network, no tokens):
+
+- live daemon → `fdif cleanup-lock --yes --json` refuses (`action: refused`, reason `lock_owner_alive`) and the lock is preserved;
+- proved-stale lock (dead PID, previous boot) → cleanup removes the lock file and socket and records `event_type: lock_cleanup` in the operator audit trail; a repeated invocation is a no-op;
+- corrupt (unparseable) lock → `fdif doctor --json` reports `daemon_lock` as `fail`, and `fdif cleanup-lock --yes` removes it;
+- corrupt ledger → `fdif doctor --json` reports `ledger_integrity` as `fail` (distinct from the `warn` for a missing ledger) and runs event-chain validation;
+- ledger restore refuses a backup older than the live ledger (`futurediff-restore` exits non-zero citing "older than the live ledger"); `--allow-stale-backup` overrides and applies with a pre-restore backup recorded;
+- ledger restore refuses to run over a corrupt live ledger (fail-closed; the corrupt original is preserved) and applies cleanly into a fresh root;
+- storage classification surfaced by `fdif doctor`.
+
+Evidence lives in `docs/certification/corruption-lock-20260803-132704/` (`SUMMARY.json` plus per-scenario artifacts). Restore gating is also covered by deterministic Go tests in `internal/ledgerrestore/restore_test.go`; lock identity and cleanup semantics by `internal/daemonlock/lock_unix_test.go` and `internal/guidedcli/cleanup_lock_test.go`.
 ## Required before beta
 
 - guided recovery for stale selections, deleted workspaces, and interrupted top-level flows — **completed 2026-08-02** (see the guided-recovery certification above);
-- corruption, stale-lock, and disk-pressure drills with operator guidance;
+- corruption, stale-lock, and disk-pressure drills with operator guidance — **completed 2026-08-03** for live-lock refusal, stale/corrupt cleanup with audit evidence, corrupt-ledger diagnosis, stale-backup restore refusal and override, and fail-closed restore over a corrupt ledger (see the certification above; ambiguous-ownership, audit-corruption, and ENOSPC-before-mutation drills remain);
 - concrete provider-integration evidence for every supported provider surface.
 
 ## Required before stable
@@ -138,7 +151,7 @@ These should remain product safeguards even in stable releases:
 
 ### High
 
-1. corruption, stale-lock, and disk-pressure drills;
+1. corruption, stale-lock, and disk-pressure drills — **core drill completed 2026-08-03** (see the certification above); remaining sub-drills listed under "Required before beta".
 2. stable release evidence set: signatures, SBOMs, reproducibility, install/upgrade/uninstall evidence;
 3. real hosted GitHub write/recovery certification — **completed 2026-08-02** (see `docs/certification/GITHUB_WRITE_RECOVERY_2026-08-02.md`).
 

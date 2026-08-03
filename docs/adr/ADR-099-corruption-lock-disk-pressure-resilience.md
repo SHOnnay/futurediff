@@ -106,6 +106,26 @@ Extend existing entry points (`fdif doctor`, `futurediff-integrity-checkpoint`, 
 - Point-in-time recovery unless actually implemented and demonstrated (not in scope).
 - SQLite `integrity_check` "ok" proves provider receipt consistency (it does not).
 
+### Implementation Status (hardening milestone, PR #16)
+
+Implemented and demonstrated in this milestone (pointers into the tree):
+
+| Area | Status | Evidence |
+|------|--------|----------|
+| Lock owner identity | Implemented | `internal/daemonlock/lock_unix.go` — `Acquire` records process-start identity (`started_at_ns` from `/proc/<pid>/stat` on Linux, `KERN_PROC_PID` on macOS) plus `boot_id`; `isProcessAlive` rejects PID reuse and previous-boot owners on both platforms. Tests: `internal/daemonlock/lock_unix_test.go` (`TestProcessIdentity*`, `TestBootID*`, `TestPIDReuse*`). |
+| Race-safe cleanup | Implemented | `RemoveIfUnheld` (flock + inode-verified unlink, `ErrLockHeld` fail-closed). Cleanup revalidates immediately before removal; see `internal/guidedcli/app.go` `cleanupLock` and `internal/guidedcli/cleanup_lock_test.go` (11 tests). |
+| Corrupt lock handling | Implemented | Corrupt/trailing-data locks report a diagnostics error **and** a status with `AutomaticCleanupAllowed=true`; `fdif cleanup-lock --yes` removes them. Unsafe permissions / oversized / symlink locks fail closed. |
+| Restore stale-backup gate | Implemented | `internal/ledgerrestore/restore.go` compares live `EventChainHeads` per chain against the backup and refuses older backups ("older than the live ledger"); `AllowStaleBackup` overrides; `futurediff-restore --allow-stale-backup`. Tests: `restore_test.go` `TestRestore`, `TestRestore_CurrentBackupAllowed`. |
+| Restore vs live daemon | Implemented | Apply refuses while the daemon flock is held by a live owner (`alive` or `ambiguous`); `TestRestore_LiveDaemonLockRefused`. |
+| Durable audit writes | Implemented | `internal/operatoraudit/trail.go` `Record` propagates the directory-sync error (first-write durability of the directory entry). |
+| Corruption diagnostics | Implemented | `fdif doctor` distinguishes corrupt ledger (fail) from not-initialized (warn), runs event-chain validation, and surfaces corrupt lock inspection failures. Tests: `internal/guidedcli/doctor_test.go`. |
+| Certification drill | Implemented | `scripts/certify-corruption-lock-disk-pressure.sh` (live-lock refusal, stale/corrupt cleanup + audit evidence, stale-backup restore refusal and override, fail-closed restore over a corrupt ledger, storage classification); evidence under `docs/certification/corruption-lock-<timestamp>/`. |
+
+Not yet implemented (deferred; do not claim): startup `--require-integrity`
+gate, WAL/SHM corruption reason codes, git write-path fault injection,
+ENOSPC/EIO classification at every critical write path, atomic restore
+replacement across all components, and post-restore external-effects
+reconciliation commands.
 ### New Stable Reason Codes
 
 | Code | Layer | Meaning |
@@ -174,14 +194,14 @@ Extend existing entry points (`fdif doctor`, `futurediff-integrity-checkpoint`, 
 
 All of the following must be implemented, tested, and demonstrated:
 
-- [ ] Bounded integrity diagnostics with stable reason codes
-- [ ] Stale-lock/stale-socket hardening with PID/StartTime/BootID proof
-- [ ] Lock cleanup command with preview, `--yes`, JSON refusal, audit event
-- [ ] Disk-pressure audit of all critical writes + error propagation
-- [ ] Filesystem fault-injection seams + deterministic test cases
-- [ ] Corruption restore with corrupt preservation, backup verification, external-effects reconciliation, atomic replacement
-- [ ] Restore refusal when backup stale with newer external effects
-- [ ] Real local drills for A–G (stale lock, ambiguous ownership, ledger corruption, audit corruption, disk pressure before mutation, disk pressure around external effects, filesystem durability failures)
+- [x] Bounded integrity diagnostics with stable reason codes (`fdif doctor`, doctor_test.go)
+- [x] Stale-lock/stale-socket hardening with PID/StartTime/BootID proof (lock_unix.go + tests)
+- [x] Lock cleanup command with preview, `--yes`, JSON refusal, audit event (cleanup_lock_test.go)
+- [ ] Disk-pressure audit of all critical writes + error propagation (operatoraudit dir-sync fixed; ENOSPC/EIO classification at every critical write remains)
+- [x] Filesystem fault-injection seams + deterministic test cases (ledger faultcheck, storageguard Probe, audit-append boundary)
+- [ ] Corruption restore with corrupt preservation, backup verification, external-effects reconciliation, atomic replacement (preservation + verification done; reconciliation commands and cross-component atomic replacement remain)
+- [x] Restore refusal when backup stale with newer external effects (restore.go + TestRestore)
+- [ ] Real local drills for A–G (stale lock, corrupt lock, live lock, ledger corruption, stale-backup refusal, fresh restore, storage classification done; ambiguous ownership, audit corruption, ENOSPC-before-mutation, durability-failure drills remain)
 - [ ] Complete validation suite passes
 - [ ] Packaging for linux-amd64, linux-arm64, darwin-arm64, darwin-amd64 (no Windows)
 - [ ] ADR-099 accepted, docs + MANIFEST.sha256 updated
@@ -189,8 +209,8 @@ All of the following must be implemented, tested, and demonstrated:
 ## Consequences
 
 - Startup integrity gate adds ~50–200 ms latency (quick_check) — opt-in via `--require-integrity` flag.
-- Lock file format changes: adds `started_at_ns`, `boot_id` fields (backward compatible: missing fields → ambiguous).
-- Lock cleanup requires explicit operator action; no automatic cleanup on daemon start.
+- Lock file format changed: metadata now carries `pid`, `uid`, `started_at`, `started_at_ns`, `boot_id`, `root`, `hostname`, `daemon_version` (backward compatible: missing fields → `lock_owner_ambiguous`, never stale).
+- Lock cleanup requires explicit operator action (`fdif cleanup-lock --yes`); no automatic cleanup on daemon start. Corrupt/trailing-data locks are eligible for cleanup; a live reachable daemon always wins; ambiguous owners fail closed.
 - Corrupt evidence preserved by default; disk usage may increase during incidents.
 - No automatic "repair everything" commands; all recovery requires operator intent.
 - Windows remains unsupported; PID/StartTime/BootID proofs are Linux/macOS-specific with honest fallback to ambiguous.
