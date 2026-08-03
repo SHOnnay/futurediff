@@ -14,6 +14,7 @@ import (
 
 	"github.com/SHOnnay/futurediff/internal/daemonlock"
 	"github.com/SHOnnay/futurediff/internal/domain"
+	"github.com/SHOnnay/futurediff/internal/durablewrite"
 	"github.com/SHOnnay/futurediff/internal/ledger"
 	"github.com/SHOnnay/futurediff/internal/operatorapproval"
 	"github.com/SHOnnay/futurediff/internal/operatorreceipt"
@@ -77,7 +78,22 @@ func fileDigest(path string) (string, int64, error) {
 	s := sha256.Sum256(b)
 	return hex.EncodeToString(s[:]), int64(len(b)), nil
 }
+
+// Create generates and durably persists a signed integrity checkpoint at
+// output: a verified ledger backup (backupPath) and the checkpoint JSON, both
+// written through the shared durable-write helper (temp create -> write ->
+// fsync -> rename -> parent-directory fsync). The previous checkpoint at
+// output is preserved unless the full sequence succeeds.
 func Create(root, output, privatePath, keyringPath, receiptDir string, now time.Time) (Checkpoint, error) {
+	return CreateWithInjector(root, output, privatePath, keyringPath, receiptDir, now, nil)
+}
+
+// CreateWithInjector is Create with a test-only durable-write fault injector
+// (ADR-099). Production callers use Create; nothing outside tests constructs
+// an injector. The injector is consulted at the create, write, short_write,
+// file_sync, rename, and directory_sync boundaries of both the ledger backup
+// file and the checkpoint JSON write.
+func CreateWithInjector(root, output, privatePath, keyringPath, receiptDir string, now time.Time, inject durablewrite.Injector) (Checkpoint, error) {
 	if !filepath.IsAbs(root) || !filepath.IsAbs(output) {
 		return Checkpoint{}, errors.New("root and output must be absolute")
 	}
@@ -111,7 +127,7 @@ func Create(root, output, privatePath, keyringPath, receiptDir string, now time.
 	}
 	base := strings.TrimSuffix(output, filepath.Ext(output))
 	backupPath := base + ".ledger.db"
-	backup, err := repo.Backup(backupPath)
+	backup, err := repo.BackupWithInjector(backupPath, inject)
 	if err != nil {
 		return Checkpoint{}, err
 	}
@@ -159,11 +175,7 @@ func Create(root, output, privatePath, keyringPath, receiptDir string, now time.
 	if err := os.MkdirAll(filepath.Dir(output), 0o700); err != nil {
 		return Checkpoint{}, err
 	}
-	tmp := output + ".tmp"
-	if err := os.WriteFile(tmp, append(b, '\n'), 0o600); err != nil {
-		return Checkpoint{}, err
-	}
-	if err := os.Rename(tmp, output); err != nil {
+	if err := durablewrite.ReplaceFile(output, append(b, '\n'), 0o600, inject); err != nil {
 		return Checkpoint{}, err
 	}
 	return cp, nil

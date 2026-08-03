@@ -121,6 +121,23 @@ func wrapFault(op, path string, err error) error {
 // crash. Concurrent calls are safe: each uses its own temporary file and the
 // final rename is atomic.
 func ReplaceFile(dest string, data []byte, perm os.FileMode, inject Injector) error {
+	return ReplaceFileVia(dest, perm, inject, func(path string) error {
+		return os.WriteFile(path, data, 0o600)
+	})
+}
+
+// ReplaceFileVia atomically and durably replaces dest, producing the content
+// through produce, which receives the path of the temporary file and must
+// write the authoritative content into it. produce may open the file itself
+// (for example through the SQLite online backup API); all durability
+// boundaries — create, write (including short_write), file_sync, rename,
+// directory_sync — are owned by this function and consult inject.
+//
+// The guarantee is identical to ReplaceFile: the previous authoritative file
+// is never touched before rename, a failed write never becomes authoritative,
+// temporary files are cleaned up, and a directory-sync failure after a
+// completed rename is reported without a false success.
+func ReplaceFileVia(dest string, perm os.FileMode, inject Injector, produce func(path string) error) error {
 	if dest == "" {
 		return errors.New("durablewrite: destination path required")
 	}
@@ -145,36 +162,39 @@ func ReplaceFile(dest string, data []byte, perm os.FileMode, inject Injector) er
 			return wrapFault(OpWrite, dest, err)
 		}
 	}
+	var shortWriteErr error
 	if inject != nil {
-		if err := inject.Before(OpShortWrite); err != nil {
-			// Simulate a partial write, then fail: the temporary file is
-			// incomplete and must never become authoritative.
-			if half := len(data) / 2; half > 0 {
-				_, _ = tmp.Write(data[:half])
-			}
-			_ = tmp.Close()
-			return wrapFault(OpShortWrite, dest, err)
+		shortWriteErr = inject.Before(OpShortWrite)
+	}
+	if err := tmp.Close(); err != nil {
+		return wrapFault(OpWrite, dest, err)
+	}
+	if produce != nil {
+		if err := produce(tmpName); err != nil {
+			return wrapFault(OpWrite, dest, err)
 		}
 	}
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
-		return wrapFault(OpWrite, dest, err)
+	if shortWriteErr != nil {
+		// Simulate a partial write: truncate the produced file to a prefix,
+		// then fail. The truncated temporary file is removed by the deferred
+		// cleanup and never becomes authoritative.
+		if f, err := os.OpenFile(tmpName, os.O_RDWR, 0); err == nil {
+			if st, serr := f.Stat(); serr == nil && st.Size() > 1 {
+				_ = f.Truncate(st.Size() / 2)
+			}
+			_ = f.Close()
+		}
+		return wrapFault(OpShortWrite, dest, shortWriteErr)
 	}
 	if inject != nil {
 		if err := inject.Before(OpFileSync); err != nil {
-			_ = tmp.Close()
 			return wrapFault(OpFileSync, dest, err)
 		}
 	}
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
+	if err := syncFile(tmpName); err != nil {
 		return wrapFault(OpFileSync, dest, err)
 	}
-	if err := tmp.Chmod(perm); err != nil {
-		_ = tmp.Close()
-		return wrapFault(OpFileSync, dest, err)
-	}
-	if err := tmp.Close(); err != nil {
+	if err := os.Chmod(tmpName, perm); err != nil {
 		return wrapFault(OpFileSync, dest, err)
 	}
 	if inject != nil {
@@ -194,6 +214,15 @@ func ReplaceFile(dest string, data []byte, perm os.FileMode, inject Injector) er
 		return wrapFault(OpDirectorySync, dest, err)
 	}
 	return nil
+}
+
+func syncFile(path string) error {
+	f, err := os.OpenFile(path, os.O_RDWR, 0)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return f.Sync()
 }
 
 func syncDir(dir string) error {
