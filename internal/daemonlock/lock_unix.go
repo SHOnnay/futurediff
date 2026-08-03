@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"syscall"
 	"time"
+	"unsafe"
 
 	"github.com/SHOnnay/futurediff/internal/buildinfo"
 )
@@ -88,12 +89,63 @@ func getProcessStartTimeNs(pid int) int64 {
 				return int64(starttime) * (1_000_000_000 / int64(clkTck))
 			}
 		}
+		return 0
+	}
+	if runtime.GOOS == "darwin" {
+		return darwinProcessStartTimeNs(pid)
 	}
 	return 0
 }
 
+// darwin sysctl identifiers (from <sys/sysctl.h>).
+const (
+	darwinCTLKern      = 1
+	darwinKernProc     = 14
+	darwinKernProcPID  = 1
+	darwinSysctlCallNo = 202 // SYS_sysctl on macOS (amd64 and arm64)
+)
+
+// darwinProcessStartTimeNs returns the wall-clock process start time in
+// nanoseconds for pid via sysctl(KERN_PROC_PID). The kinfo_proc structure
+// begins with struct extern_proc, whose first member is the p_un union whose
+// p_starttime is a struct timeval {tv_sec int64; tv_usec int32}. Returns 0
+// when the identity cannot be read (callers must fail closed to ambiguous).
+func darwinProcessStartTimeNs(pid int) int64 {
+	if pid <= 0 {
+		return 0
+	}
+	mib := [4]int32{darwinCTLKern, darwinKernProc, darwinKernProcPID, int32(pid)}
+	buf := make([]byte, 4096)
+	length := uintptr(len(buf))
+	_, _, errno := syscall.Syscall6(uintptr(darwinSysctlCallNo),
+		uintptr(unsafe.Pointer(&mib[0])),
+		uintptr(len(mib)),
+		uintptr(unsafe.Pointer(&buf[0])),
+		uintptr(unsafe.Pointer(&length)),
+		0, 0)
+	if errno != 0 {
+		return 0
+	}
+	if length < 16 {
+		return 0
+	}
+	tv := *(*struct {
+		Sec  int64
+		Usec int32
+	})(unsafe.Pointer(&buf[0]))
+	if tv.Sec <= 0 {
+		return 0
+	}
+	return tv.Sec*1e9 + int64(tv.Usec)*1e3
+}
+
 func isProcessAlive(pid int, startedAtNs int64, bootID string) (bool, error) {
 	if pid <= 0 {
+		return false, nil
+	}
+	// A boot-id mismatch means the lock predates a reboot; the recorded
+	// process cannot be alive as the same identity.
+	if bootID != "" && getBootID() != "" && bootID != getBootID() {
 		return false, nil
 	}
 	if runtime.GOOS == "linux" {
@@ -108,19 +160,21 @@ func isProcessAlive(pid int, startedAtNs int64, bootID string) (bool, error) {
 		return false, nil
 	}
 	if runtime.GOOS == "darwin" {
-		// macOS: use kill(pid, 0) to check existence
 		err := syscall.Kill(pid, 0)
-		if err == nil {
-			return true, nil
-		}
 		if errors.Is(err, syscall.ESRCH) {
 			return false, nil
 		}
-		if errors.Is(err, syscall.EPERM) {
-			// Process exists but we can't signal it
-			return true, nil
+		if err != nil && !errors.Is(err, syscall.EPERM) {
+			return false, err
 		}
-		return false, err
+		// Process exists; verify start time to defeat PID reuse.
+		if startedAtNs > 0 {
+			startNs := getProcessStartTimeNs(pid)
+			if startNs > 0 && startNs != startedAtNs {
+				return false, nil // PID reused
+			}
+		}
+		return true, nil
 	}
 	return false, nil
 }
@@ -166,7 +220,7 @@ func Acquire(path, root string, now time.Time) (*Lock, error) {
 		StartedAt:     now.UTC(),
 		Root:          root,
 		Hostname:      hostname,
-		StartedAtNs:   now.UnixNano(),
+		StartedAtNs:   getProcessStartTimeNs(os.Getpid()),
 		BootID:        bootID,
 		DaemonVersion: getDaemonVersion(),
 	}
@@ -212,6 +266,56 @@ func (l *Lock) Release() error {
 		return unlockErr
 	}
 	return closeErr
+}
+
+// ErrLockHeld is returned by RemoveIfUnheld when another process currently
+// holds the exclusive flock on the lock file.
+var ErrLockHeld = errors.New("daemon lock is currently held")
+
+// RemoveIfUnheld removes path only when no process holds an exclusive flock on
+// it. It acquires the flock itself, verifies the path still refers to the same
+// inode it locked (so a concurrently re-created lock file is never removed),
+// then unlinks while still holding the flock. A daemon that starts between the
+// check and the unlink cannot acquire the lock, because its flock attempt fails
+// while ours is held. The two removal steps in a cleanup (lock file and socket)
+// are intentionally separate; this helper makes each individual removal safe.
+func RemoveIfUnheld(path string) error {
+	if path == "" || !filepath.IsAbs(path) {
+		return errors.New("daemon lock path must be absolute")
+	}
+	f, err := os.OpenFile(path, os.O_RDWR, 0)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil // already gone; idempotent
+		}
+		return err
+	}
+	defer f.Close()
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		if errors.Is(err, syscall.EWOULDBLOCK) || errors.Is(err, syscall.EAGAIN) {
+			return ErrLockHeld
+		}
+		return fmt.Errorf("flock lock file: %w", err)
+	}
+	defer func() { _ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN) }()
+	pathInfo, pathErr := os.Lstat(path)
+	fdInfo, fdErr := f.Stat()
+	if pathErr != nil {
+		if os.IsNotExist(pathErr) {
+			return nil // already removed; idempotent
+		}
+		return pathErr
+	}
+	if fdErr != nil {
+		return fdErr
+	}
+	if !os.SameFile(pathInfo, fdInfo) {
+		return errors.New("lock file was replaced during cleanup; refusing to remove")
+	}
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove lock file: %w", err)
+	}
+	return nil
 }
 
 func readLockFileBounded(path string) ([]byte, error) {

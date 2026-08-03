@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -194,7 +195,22 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	return 0
 }
 
+// reportedError is returned by commands that have already emitted their
+// structured response to Out (for example a JSON refusal). fail() returns its
+// exit code without writing a second response, so scripters get one JSON
+// document and a reliable non-zero exit code.
+type reportedError struct {
+	code int
+	msg  string
+}
+
+func (e *reportedError) Error() string { return e.msg }
+
 func (a *App) fail(err error) int {
+	var reported *reportedError
+	if errors.As(err, &reported) {
+		return reported.code
+	}
 	code := 1
 	var commandErr *CommandError
 	if errors.As(err, &commandErr) && commandErr.ExitCode > 0 {
@@ -1390,8 +1406,30 @@ func (a *App) cleanupLock(ctx context.Context, args []string) error {
 	}
 	lockPath := filepath.Join(a.Paths.Home.Path, "daemon.lock")
 	socketPath := filepath.Join(a.Paths.Home.Path, "futurediff.sock")
+
+	refuse := func(reasonCode, message string) error {
+		if a.JSON {
+			_ = writeJSON(a.Out, map[string]any{
+				"kind":              "cleanup_lock",
+				"lock_path":         lockPath,
+				"socket_path":       socketPath,
+				"action":            "refused",
+				"reason_code":       reasonCode,
+				"message":           message,
+				"automatic_cleanup": false,
+			})
+			return &reportedError{code: 2, msg: message}
+		}
+		a.Renderer.warning(message)
+		return errors.New(message)
+	}
+
 	status, err := daemonlock.Inspect(lockPath, time.Now())
-	if err != nil {
+	// Inspect returns a diagnostics error for corrupt/oversized/symlink/permission
+	// cases while still populating the status. Only a status that cannot guide a
+	// decision is a hard failure; corrupt and trailing-data locks are still
+	// eligible for cleanup (AutomaticCleanupAllowed=true).
+	if err != nil && status.ReasonCode == "" && !status.AutomaticCleanupAllowed {
 		return fmt.Errorf("inspect lock: %w", err)
 	}
 	if !status.Held && status.LockStatus == "released" && status.ReasonCode == "no_lock" {
@@ -1409,48 +1447,13 @@ func (a *App) cleanupLock(ctx context.Context, args []string) error {
 		return nil
 	}
 	if status.LockStatus == "held" && status.OwnerStatus == "alive" && status.DaemonReachable {
-		if a.JSON {
-			return writeJSON(a.Out, map[string]any{
-				"kind":              "cleanup_lock",
-				"lock_path":         lockPath,
-				"socket_path":       socketPath,
-				"action":            "refused",
-				"reason_code":       status.ReasonCode,
-				"message":           "lock is held by a live, reachable daemon; cannot clean",
-				"automatic_cleanup": false,
-			})
-		}
-		a.Renderer.warning(fmt.Sprintf("Lock held by live daemon (pid=%d); cannot clean", status.Metadata.PID))
-		return errors.New("lock held by live daemon; cannot clean")
+		return refuse(status.ReasonCode, "lock is held by a live, reachable daemon; cannot clean")
 	}
 	if !status.AutomaticCleanupAllowed {
-		if a.JSON {
-			return writeJSON(a.Out, map[string]any{
-				"kind":              "cleanup_lock",
-				"lock_path":         lockPath,
-				"socket_path":       socketPath,
-				"action":            "refused",
-				"reason_code":       status.ReasonCode,
-				"message":           "automatic cleanup not allowed for this lock state",
-				"automatic_cleanup": false,
-			})
-		}
-		a.Renderer.warning(fmt.Sprintf("Automatic cleanup not allowed: %s", status.ReasonCode))
-		return errors.New("automatic cleanup not allowed for this lock state")
+		return refuse(status.ReasonCode, "automatic cleanup not allowed for this lock state")
 	}
 	if !yes && !a.Interactive {
-		if a.JSON {
-			return writeJSON(a.Out, map[string]any{
-				"kind":              "cleanup_lock",
-				"lock_path":         lockPath,
-				"socket_path":       socketPath,
-				"action":            "refused",
-				"reason_code":       "confirmation_required",
-				"message":           "cleanup requires explicit --yes or interactive confirmation",
-				"automatic_cleanup": false,
-			})
-		}
-		return errors.New("cleanup requires explicit --yes or interactive confirmation")
+		return refuse("confirmation_required", "cleanup requires explicit --yes or interactive confirmation")
 	}
 	if a.Interactive && !yes {
 		confirmed, err := a.confirm(fmt.Sprintf("Remove stale lock at %s and socket at %s?", lockPath, socketPath), "CLEANUP LOCK")
@@ -1461,11 +1464,52 @@ func (a *App) cleanupLock(ctx context.Context, args []string) error {
 			return errors.New("cleanup declined")
 		}
 	}
+
+	// Pre-mutation audit: fail closed if the audit event cannot be recorded.
+	// The mutation must not start when pre-mutation audit recording fails.
+	auditStore := operatoraudit.Store{Root: a.Paths.Home.Path}
+	if _, auditErr := auditStore.Record(operatoraudit.Input{
+		OperationID:    "cleanup-lock",
+		Actor:          operatoraudit.Actor{Source: "local"},
+		Context:        operatoraudit.ExecutionContext{Component: "fdif"},
+		EventType:      "lock_cleanup",
+		Target:         operatoraudit.Target{ResourceType: "daemon_lock", ResourceID: lockPath},
+		Result:         operatoraudit.ResultSucceeded,
+		PolicyDecision: operatoraudit.PolicyAllow,
+		Metadata:       map[string]string{"lock_path": lockPath, "socket_path": socketPath},
+	}); auditErr != nil {
+		return refuse("audit_write_failed", fmt.Sprintf("cannot record cleanup audit event; refusing cleanup: %v", auditErr))
+	}
+
+	// Race-safe removal: RemoveIfUnheld acquires the flock and verifies the path
+	// still refers to the same inode before unlinking. If a daemon re-acquired
+	// the lock after our inspection, this fails closed and nothing is removed.
 	var cleanupErrs []error
-	if _, err := os.Lstat(lockPath); err == nil {
-		if err := os.Remove(lockPath); err != nil && !os.IsNotExist(err) {
-			cleanupErrs = append(cleanupErrs, fmt.Errorf("remove lock: %w", err))
+	if err := daemonlock.RemoveIfUnheld(lockPath); err != nil {
+		if errors.Is(err, daemonlock.ErrLockHeld) {
+			return refuse("lock_reacquired", "lock was re-acquired during cleanup; refusing to remove")
 		}
+		cleanupErrs = append(cleanupErrs, fmt.Errorf("remove lock: %w", err))
+	}
+	// The socket is removed separately and only when nothing is listening on it.
+	// The two removals are independent filesystem paths and are not atomic with
+	// respect to each other; each is individually verified and safe.
+	if conn, dialErr := net.DialTimeout("unix", socketPath, 300*time.Millisecond); dialErr == nil {
+		_ = conn.Close()
+		// Something is listening; keep the socket and report it.
+		if a.JSON {
+			return writeJSON(a.Out, map[string]any{
+				"kind":              "cleanup_lock",
+				"lock_path":         lockPath,
+				"socket_path":       socketPath,
+				"action":            "partial",
+				"reason_code":       "stale_socket_live_listener",
+				"message":           "stale lock removed; socket left in place because a listener is active",
+				"automatic_cleanup": true,
+			})
+		}
+		a.Renderer.warning("Stale lock removed; socket left in place (listener active)")
+		return nil
 	}
 	if _, err := os.Lstat(socketPath); err == nil {
 		if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
@@ -1475,18 +1519,6 @@ func (a *App) cleanupLock(ctx context.Context, args []string) error {
 	if len(cleanupErrs) > 0 {
 		return fmt.Errorf("cleanup failed: %v", cleanupErrs)
 	}
-	// Record audit event
-	auditStore := operatoraudit.Store{Root: a.Paths.Home.Path}
-	_, _ = auditStore.Record(operatoraudit.Input{
-		OperationID:    "cleanup-lock",
-		Actor:          operatoraudit.Actor{Source: "local"},
-		Context:        operatoraudit.ExecutionContext{Component: "fdif"},
-		EventType:      "lock_cleanup",
-		Target:         operatoraudit.Target{ResourceType: "daemon_lock", ResourceID: lockPath},
-		Result:         operatoraudit.ResultSucceeded,
-		PolicyDecision: operatoraudit.PolicyAllow,
-		Metadata:       map[string]string{"lock_path": lockPath, "socket_path": socketPath},
-	})
 	if a.JSON {
 		return writeJSON(a.Out, map[string]any{
 			"kind":              "cleanup_lock",
