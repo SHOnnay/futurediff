@@ -174,7 +174,11 @@ func (s *Store) Record(input Input) (Event, error) {
 		if err := f.Sync(); err != nil {
 			return err
 		}
-		_ = syncParentDir(s.Path())
+		// The audit event must be durable: both the file content and the
+		// directory entry (first creation) must survive a crash.
+		if err := syncParentDir(s.Path()); err != nil {
+			return err
+		}
 		recorded = event
 		return nil
 	})

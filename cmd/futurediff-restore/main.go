@@ -17,13 +17,14 @@ func main() {
 	pre := flag.String("pre-restore-backup", "", "optional pre-restore backup path")
 	apply := flag.Bool("apply", false, "apply restore after validation")
 	confirm := flag.String("confirm", "", "required confirmation phrase when applying")
+	allowStale := flag.Bool("allow-stale-backup", false, "allow applying a backup older than the live ledger")
 	version := flag.Bool("version", false, "print build information")
 	flag.Parse()
 	if *version {
 		fmt.Printf("%+v\n", buildinfo.Current())
 		return
 	}
-	r, e := ledgerrestore.Run(ledgerrestore.Options{LivePath: filepath.Join(*root, "ledger.db"), BackupPath: *backup, ExpectedSHA256: *expected, SocketPath: filepath.Join(*root, "futurediff.sock"), PreRestoreBackupPath: *pre, Apply: *apply, Confirmation: *confirm})
+	r, e := ledgerrestore.Run(ledgerrestore.Options{LivePath: filepath.Join(*root, "ledger.db"), BackupPath: *backup, ExpectedSHA256: *expected, SocketPath: filepath.Join(*root, "futurediff.sock"), LockPath: filepath.Join(*root, "daemon.lock"), PreRestoreBackupPath: *pre, Apply: *apply, Confirmation: *confirm, AllowStaleBackup: *allowStale})
 	if e != nil {
 		fail(e)
 	}

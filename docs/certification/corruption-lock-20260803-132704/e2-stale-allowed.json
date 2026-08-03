@@ -1,0 +1,22 @@
+{
+  "live_path": "/tmp/futurediff-corruption-lock.GpfZy9/home/ledger.db",
+  "backup_path": "/tmp/futurediff-corruption-lock.GpfZy9/backup-one.db",
+  "backup_sha256": "6f157d70383341dae409cae2a765284c698a3396f9c9ac5c4e033c631d18d172",
+  "pre_restore_backup": {
+    "backup_id": "backup_d438c752f1e5ccfd40eda6ff",
+    "path": "/tmp/futurediff-corruption-lock.GpfZy9/home/ledger.pre-restore.20260803T132710Z.db",
+    "sha256": "f2e9fc42f15f8395a28dca28d32181218012bdd94af64f504eb19d9e9a246625",
+    "size_bytes": 462848,
+    "created_at": "2026-08-03T13:27:10.991267Z"
+  },
+  "health": {
+    "integrity_ok": true,
+    "migration_count": 16,
+    "transaction_count": 1,
+    "unresolved_transaction_count": 0
+  },
+  "audit_healthy": true,
+  "event_chain_valid": true,
+  "applied": true,
+  "completed_at": "2026-08-03T13:27:10.998519Z"
+}

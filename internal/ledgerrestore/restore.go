@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SHOnnay/futurediff/internal/daemonlock"
 	"github.com/SHOnnay/futurediff/internal/ledger"
 )
 
@@ -21,9 +22,14 @@ type Options struct {
 	BackupPath           string
 	ExpectedSHA256       string
 	SocketPath           string
+	LockPath             string
 	PreRestoreBackupPath string
 	Apply                bool
-	Confirmation         string
+	// AllowStaleBackup permits applying a backup that is older than the live
+	// ledger (i.e. whose event chains are a strict prefix). Without it, a
+	// restore that would discard committed effects is refused.
+	AllowStaleBackup bool
+	Confirmation     string
 }
 
 type Report struct {
@@ -70,6 +76,14 @@ func Run(opts Options) (Report, error) {
 			return Report{}, statErr
 		}
 	}
+	if opts.Apply && opts.LockPath != "" {
+		status, inspectErr := daemonlock.Inspect(opts.LockPath, time.Now())
+		// Refuse while a live process holds the flock. ambiguous covers a live
+		// owner whose daemon socket is unreachable; fail closed on both.
+		if inspectErr == nil && status.LockStatus == "held" && (status.OwnerStatus == "alive" || status.OwnerStatus == "ambiguous") {
+			return Report{}, errors.New("daemon lock is held by a live owner; stop the daemon before restore")
+		}
+	}
 	dir := filepath.Dir(live)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return Report{}, err
@@ -106,6 +120,26 @@ func Run(opts Options) (Report, error) {
 	}
 	if !audit.Healthy || !chain.Valid {
 		return Report{}, errors.New("backup failed semantic validation")
+	}
+	if opts.Apply && !opts.AllowStaleBackup {
+		if _, statErr := os.Stat(live); statErr == nil {
+			// Refuse to replace a newer live ledger with an older backup:
+			// applying it would silently discard committed effects.
+			liveRepo, openErr := ledger.OpenRepository(live)
+			if openErr != nil {
+				return Report{}, fmt.Errorf("open live ledger for staleness check: %w", openErr)
+			}
+			staleErr := backupCoversLive(candidatePath, liveRepo)
+			liveCloseErr := liveRepo.Close()
+			if staleErr != nil {
+				return Report{}, staleErr
+			}
+			if liveCloseErr != nil {
+				return Report{}, liveCloseErr
+			}
+		} else if !os.IsNotExist(statErr) {
+			return Report{}, statErr
+		}
 	}
 	report := Report{LivePath: live, BackupPath: backup, BackupSHA256: digest, Health: health, AuditHealthy: audit.Healthy, EventChainValid: chain.Valid, CompletedAt: time.Now().UTC()}
 	if !opts.Apply {
@@ -216,4 +250,43 @@ func syncDir(path string) error {
 	}
 	defer d.Close()
 	return d.Sync()
+}
+
+// backupCoversLive reports whether the backup at backupPath contains every
+// event chain that the live repository has, at an equal or greater sequence.
+// A backup that is missing chains or has shorter chains is older than the live
+// ledger: applying it would discard committed effects.
+func backupCoversLive(backupPath string, live *ledger.Repository) error {
+	backupRepo, err := ledger.OpenRepository(backupPath)
+	if err != nil {
+		return fmt.Errorf("reopen backup for staleness check: %w", err)
+	}
+	defer backupRepo.Close()
+	backupHeads, err := backupRepo.EventChainHeads()
+	if err != nil {
+		return fmt.Errorf("backup event heads: %w", err)
+	}
+	liveHeads, err := live.EventChainHeads()
+	if err != nil {
+		return fmt.Errorf("live event heads: %w", err)
+	}
+	byTransaction := make(map[string]int64, len(backupHeads.Heads))
+	for _, h := range backupHeads.Heads {
+		byTransaction[h.TransactionID] = h.Sequence
+	}
+	var older []string
+	for _, h := range liveHeads.Heads {
+		backupSeq, ok := byTransaction[h.TransactionID]
+		if !ok {
+			older = append(older, fmt.Sprintf("%s (missing in backup)", h.TransactionID))
+			continue
+		}
+		if backupSeq < h.Sequence {
+			older = append(older, fmt.Sprintf("%s (live=%d backup=%d)", h.TransactionID, h.Sequence, backupSeq))
+		}
+	}
+	if len(older) > 0 {
+		return fmt.Errorf("backup is older than the live ledger for %d chain(s): %s; restoring would discard committed effects (pass AllowStaleBackup to override)", len(older), strings.Join(older, ", "))
+	}
+	return nil
 }

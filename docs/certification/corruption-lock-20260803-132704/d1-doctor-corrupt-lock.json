@@ -1,0 +1,70 @@
+{
+  "checks": [
+    {
+      "ID": "futurediff_binary",
+      "Status": "pass",
+      "Detail": "/tmp/futurediff-corruption-lock.GpfZy9/futurediff"
+    },
+    {
+      "ID": "futurediffd_binary",
+      "Status": "pass",
+      "Detail": "/tmp/futurediff-corruption-lock.GpfZy9/futurediffd"
+    },
+    {
+      "ID": "git",
+      "Status": "pass",
+      "Detail": "/usr/bin/git"
+    },
+    {
+      "ID": "futurediff_home",
+      "Status": "pass",
+      "Detail": "/private/tmp/futurediff-corruption-lock.GpfZy9/home"
+    },
+    {
+      "ID": "safe_workspaces",
+      "Status": "pass",
+      "Detail": "/private/tmp/futurediff-corruption-lock.GpfZy9/home/runtime"
+    },
+    {
+      "ID": "daemon",
+      "Status": "warn",
+      "Detail": "not running"
+    },
+    {
+      "ID": "ledger_integrity",
+      "Status": "pass",
+      "Detail": "ok (txn=1 unresolved=0)"
+    },
+    {
+      "ID": "ledger_event_chains",
+      "Status": "pass",
+      "Detail": "transactions=1 events=2"
+    },
+    {
+      "ID": "daemon_lock",
+      "Status": "fail",
+      "Detail": "lock inspection failed: decode lock metadata: invalid character 'c' looking for beginning of object key string (lock_invalid_json)"
+    },
+    {
+      "ID": "storage",
+      "Status": "warn",
+      "Detail": "unsupported storage policy version \"\""
+    },
+    {
+      "ID": "audit_chain",
+      "Status": "pass",
+      "Detail": "valid=true count=5"
+    },
+    {
+      "ID": "backup_catalog",
+      "Status": "pass",
+      "Detail": "count=0"
+    },
+    {
+      "ID": "github_credentials",
+      "Status": "warn",
+      "Detail": "not configured; local publication remains available"
+    }
+  ],
+  "kind": "fdif-doctor"
+}

@@ -1276,29 +1276,52 @@ func (a *App) doctor(ctx context.Context) error {
 	// Comprehensive integrity diagnostics
 	if a.Paths.Home.Path != "" {
 		home := a.Paths.Home.Path
-		// Ledger integrity
+		// Ledger integrity: distinguish a missing ledger (not initialized)
+		// from a present-but-corrupt one. HealthCheck runs PRAGMA
+		// integrity_check before reporting semantic counters.
 		ledgerPath := filepath.Join(home, "ledger.db")
-		if repo, err := ledger.OpenRepository(ledgerPath); err == nil {
-			if health, err := repo.HealthCheck(); err == nil {
-				checks = append(checks, check{"ledger_integrity", "pass", fmt.Sprintf("ok (txn=%d unresolved=%d)", health.TransactionCount, health.UnresolvedCount)})
-			} else {
-				checks = append(checks, check{"ledger_integrity", "fail", err.Error()})
-			}
-			_ = repo.Close()
-		} else {
+		if _, statErr := os.Lstat(ledgerPath); os.IsNotExist(statErr) {
 			checks = append(checks, check{"ledger_integrity", "warn", "ledger not initialized"})
+		} else {
+			repo, openErr := ledger.OpenRepository(ledgerPath)
+			if openErr != nil {
+				checks = append(checks, check{"ledger_integrity", "fail", fmt.Sprintf("ledger is corrupt or unreadable: %v", openErr)})
+			} else {
+				health, healthErr := repo.HealthCheck()
+				if healthErr != nil {
+					checks = append(checks, check{"ledger_integrity", "fail", fmt.Sprintf("ledger failed integrity check: %v", healthErr)})
+				} else {
+					checks = append(checks, check{"ledger_integrity", "pass", fmt.Sprintf("ok (txn=%d unresolved=%d)", health.TransactionCount, health.UnresolvedCount)})
+				}
+				// Event-chain hash validation (committed-effects proof).
+				if chain, chainErr := repo.VerifyEventChains(); chainErr != nil {
+					checks = append(checks, check{"ledger_event_chains", "fail", chainErr.Error()})
+				} else if !chain.Valid {
+					checks = append(checks, check{"ledger_event_chains", "fail", "event-chain digests are inconsistent"})
+				} else {
+					checks = append(checks, check{"ledger_event_chains", "pass", fmt.Sprintf("transactions=%d events=%d", chain.Transactions, chain.Events)})
+				}
+				_ = repo.Close()
+			}
 		}
 
-		// Lock inspection
+		// Lock inspection: Inspect reports both a status and a diagnostics
+		// error (corrupt JSON, trailing data, oversized, symlink, unsafe
+		// permissions). Surface corruption explicitly as a failure.
 		lockPath := filepath.Join(home, "daemon.lock")
-		if status, err := daemonlock.Inspect(lockPath, time.Now()); err == nil {
+		status, inspectErr := daemonlock.Inspect(lockPath, time.Now())
+		if inspectErr != nil {
+			detail := fmt.Sprintf("lock inspection failed: %v", inspectErr)
+			if status.ReasonCode != "" {
+				detail += " (" + status.ReasonCode + ")"
+			}
+			checks = append(checks, check{"daemon_lock", "fail", detail})
+		} else {
 			detail := fmt.Sprintf("held=%v owner_status=%s lock_status=%s", status.Held, status.OwnerStatus, status.LockStatus)
 			if status.ReasonCode != "" {
 				detail += " (" + status.ReasonCode + ")"
 			}
 			checks = append(checks, check{"daemon_lock", "pass", detail})
-		} else {
-			checks = append(checks, check{"daemon_lock", "warn", err.Error()})
 		}
 
 		// Storage guard
@@ -1393,7 +1416,9 @@ func pathOr(explicit, found string) string {
 }
 
 func (a *App) cleanupLock(ctx context.Context, args []string) error {
-	yes := false
+	// The CLI parser folds a leading --yes into a.Yes; direct calls may pass
+	// it through args. Accept both.
+	yes := a.Yes
 	for _, arg := range args {
 		if arg == "--yes" {
 			yes = true
