@@ -15,6 +15,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/SHOnnay/futurediff/internal/daemonlock"
+	"github.com/SHOnnay/futurediff/internal/ledger"
+	"github.com/SHOnnay/futurediff/internal/operatoraudit"
+	"github.com/SHOnnay/futurediff/internal/storageguard"
 )
 
 const defaultVerificationPolicy = `{
@@ -172,6 +177,8 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		err = a.daemon(ctx, args)
 	case "doctor":
 		err = a.doctor(ctx)
+	case "cleanup-lock":
+		err = a.cleanupLock(ctx, args)
 	case "config":
 		err = a.config(args)
 	case "demo":
@@ -1249,6 +1256,73 @@ func (a *App) doctor(ctx context.Context) error {
 	} else {
 		checks = append(checks, check{"daemon", "warn", "not running"})
 	}
+
+	// Comprehensive integrity diagnostics
+	if a.Paths.Home.Path != "" {
+		home := a.Paths.Home.Path
+		// Ledger integrity
+		ledgerPath := filepath.Join(home, "ledger.db")
+		if repo, err := ledger.OpenRepository(ledgerPath); err == nil {
+			if health, err := repo.HealthCheck(); err == nil {
+				checks = append(checks, check{"ledger_integrity", "pass", fmt.Sprintf("ok (txn=%d unresolved=%d)", health.TransactionCount, health.UnresolvedCount)})
+			} else {
+				checks = append(checks, check{"ledger_integrity", "fail", err.Error()})
+			}
+			_ = repo.Close()
+		} else {
+			checks = append(checks, check{"ledger_integrity", "warn", "ledger not initialized"})
+		}
+
+		// Lock inspection
+		lockPath := filepath.Join(home, "daemon.lock")
+		if status, err := daemonlock.Inspect(lockPath, time.Now()); err == nil {
+			detail := fmt.Sprintf("held=%v owner_status=%s lock_status=%s", status.Held, status.OwnerStatus, status.LockStatus)
+			if status.ReasonCode != "" {
+				detail += " (" + status.ReasonCode + ")"
+			}
+			checks = append(checks, check{"daemon_lock", "pass", detail})
+		} else {
+			checks = append(checks, check{"daemon_lock", "warn", err.Error()})
+		}
+
+		// Storage guard
+		if guard, err := storageguard.Evaluate(home, storageguard.Policy{}, storageguard.OSProbe{}, time.Now()); err == nil {
+			detail := fmt.Sprintf("free=%.1f%% healthy=%v", guard.Filesystem.FreePercent, guard.Healthy)
+			if !guard.Healthy {
+				checks = append(checks, check{"storage", "warn", detail})
+			} else {
+				checks = append(checks, check{"storage", "pass", detail})
+			}
+		} else {
+			checks = append(checks, check{"storage", "warn", err.Error()})
+		}
+
+		// Audit chain
+		auditStore := operatoraudit.Store{Root: home}
+		if report, err := auditStore.Verify(); err == nil {
+			detail := fmt.Sprintf("valid=%v count=%d", report.Valid, report.Count)
+			if !report.Valid {
+				checks = append(checks, check{"audit_chain", "fail", detail + " " + strings.Join(report.Findings, "; ")})
+			} else {
+				checks = append(checks, check{"audit_chain", "pass", detail})
+			}
+		} else {
+			checks = append(checks, check{"audit_chain", "warn", err.Error()})
+		}
+
+		// Backup catalog
+		if repo, err := ledger.OpenRepository(filepath.Join(home, "ledger.db")); err == nil {
+			if backups, err := repo.Backups(); err == nil {
+				checks = append(checks, check{"backup_catalog", "pass", fmt.Sprintf("count=%d", len(backups))})
+			} else {
+				checks = append(checks, check{"backup_catalog", "warn", err.Error()})
+			}
+			_ = repo.Close()
+		} else {
+			checks = append(checks, check{"backup_catalog", "warn", "ledger not available"})
+		}
+	}
+
 	if a.CredentialConfig == "" {
 		checks = append(checks, check{"github_credentials", "warn", "not configured; local publication remains available"})
 	} else if info, err := os.Lstat(a.CredentialConfig); err != nil {
@@ -1260,7 +1334,6 @@ func (a *App) doctor(ctx context.Context) error {
 	} else if a.GitHubCredentialID == "" {
 		checks = append(checks, check{"github_credentials", "warn", "config file is present but no GitHub credential ID is selected"})
 	} else {
-		checks = append(checks, check{"github_credentials", "pass", "configured as " + a.GitHubCredentialID})
 	}
 	if a.JSON {
 		return writeJSON(a.Out, map[string]any{"kind": "fdif-doctor", "checks": checks})
@@ -1301,6 +1374,131 @@ func pathOr(explicit, found string) string {
 		return found
 	}
 	return explicit
+}
+
+func (a *App) cleanupLock(ctx context.Context, args []string) error {
+	yes := false
+	for _, arg := range args {
+		if arg == "--yes" {
+			yes = true
+		} else {
+			return fmt.Errorf("unknown cleanup-lock option %q", arg)
+		}
+	}
+	if a.Paths.Home.Path == "" {
+		return errors.New("futurediff home not configured")
+	}
+	lockPath := filepath.Join(a.Paths.Home.Path, "daemon.lock")
+	socketPath := filepath.Join(a.Paths.Home.Path, "futurediff.sock")
+	status, err := daemonlock.Inspect(lockPath, time.Now())
+	if err != nil {
+		return fmt.Errorf("inspect lock: %w", err)
+	}
+	if !status.Held && status.LockStatus == "released" && status.ReasonCode == "no_lock" {
+		if a.JSON {
+			return writeJSON(a.Out, map[string]any{
+				"kind":              "cleanup_lock",
+				"lock_path":         lockPath,
+				"socket_path":       socketPath,
+				"action":            "none",
+				"message":           "no lock present; nothing to clean",
+				"automatic_cleanup": false,
+			})
+		}
+		a.Renderer.success("No lock present; nothing to clean")
+		return nil
+	}
+	if status.LockStatus == "held" && status.OwnerStatus == "alive" && status.DaemonReachable {
+		if a.JSON {
+			return writeJSON(a.Out, map[string]any{
+				"kind":              "cleanup_lock",
+				"lock_path":         lockPath,
+				"socket_path":       socketPath,
+				"action":            "refused",
+				"reason_code":       status.ReasonCode,
+				"message":           "lock is held by a live, reachable daemon; cannot clean",
+				"automatic_cleanup": false,
+			})
+		}
+		a.Renderer.warning(fmt.Sprintf("Lock held by live daemon (pid=%d); cannot clean", status.Metadata.PID))
+		return errors.New("lock held by live daemon; cannot clean")
+	}
+	if !status.AutomaticCleanupAllowed {
+		if a.JSON {
+			return writeJSON(a.Out, map[string]any{
+				"kind":              "cleanup_lock",
+				"lock_path":         lockPath,
+				"socket_path":       socketPath,
+				"action":            "refused",
+				"reason_code":       status.ReasonCode,
+				"message":           "automatic cleanup not allowed for this lock state",
+				"automatic_cleanup": false,
+			})
+		}
+		a.Renderer.warning(fmt.Sprintf("Automatic cleanup not allowed: %s", status.ReasonCode))
+		return errors.New("automatic cleanup not allowed for this lock state")
+	}
+	if !yes && !a.Interactive {
+		if a.JSON {
+			return writeJSON(a.Out, map[string]any{
+				"kind":              "cleanup_lock",
+				"lock_path":         lockPath,
+				"socket_path":       socketPath,
+				"action":            "refused",
+				"reason_code":       "confirmation_required",
+				"message":           "cleanup requires explicit --yes or interactive confirmation",
+				"automatic_cleanup": false,
+			})
+		}
+		return errors.New("cleanup requires explicit --yes or interactive confirmation")
+	}
+	if a.Interactive && !yes {
+		confirmed, err := a.confirm(fmt.Sprintf("Remove stale lock at %s and socket at %s?", lockPath, socketPath), "CLEANUP LOCK")
+		if err != nil {
+			return err
+		}
+		if !confirmed {
+			return errors.New("cleanup declined")
+		}
+	}
+	var cleanupErrs []error
+	if _, err := os.Lstat(lockPath); err == nil {
+		if err := os.Remove(lockPath); err != nil && !os.IsNotExist(err) {
+			cleanupErrs = append(cleanupErrs, fmt.Errorf("remove lock: %w", err))
+		}
+	}
+	if _, err := os.Lstat(socketPath); err == nil {
+		if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
+			cleanupErrs = append(cleanupErrs, fmt.Errorf("remove socket: %w", err))
+		}
+	}
+	if len(cleanupErrs) > 0 {
+		return fmt.Errorf("cleanup failed: %v", cleanupErrs)
+	}
+	// Record audit event
+	auditStore := operatoraudit.Store{Root: a.Paths.Home.Path}
+	_, _ = auditStore.Record(operatoraudit.Input{
+		OperationID:    "cleanup-lock",
+		Actor:          operatoraudit.Actor{Source: "local"},
+		Context:        operatoraudit.ExecutionContext{Component: "fdif"},
+		EventType:      "lock_cleanup",
+		Target:         operatoraudit.Target{ResourceType: "daemon_lock", ResourceID: lockPath},
+		Result:         operatoraudit.ResultSucceeded,
+		PolicyDecision: operatoraudit.PolicyAllow,
+		Metadata:       map[string]string{"lock_path": lockPath, "socket_path": socketPath},
+	})
+	if a.JSON {
+		return writeJSON(a.Out, map[string]any{
+			"kind":              "cleanup_lock",
+			"lock_path":         lockPath,
+			"socket_path":       socketPath,
+			"action":            "cleaned",
+			"message":           "stale lock and socket removed",
+			"automatic_cleanup": true,
+		})
+	}
+	a.Renderer.success("Stale lock and socket removed")
+	return nil
 }
 
 func (a *App) config(args []string) error {
@@ -1504,7 +1702,6 @@ func (a *App) completion(args []string) error {
 	_, err = io.WriteString(a.Out, script)
 	return err
 }
-
 func (a *App) version(ctx context.Context) error {
 	raw, err := a.Engine.Run(ctx, "version")
 	if err != nil {
