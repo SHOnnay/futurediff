@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/SHOnnay/futurediff/internal/domain"
+	"github.com/SHOnnay/futurediff/internal/durablewrite"
 )
 
 const Version = "0.1"
@@ -93,8 +94,20 @@ type Report struct {
 type Store struct {
 	Root string
 	Now  func() time.Time
-	mu   sync.Mutex
+	// Injector is a test-only deterministic durable-write fault-injection seam
+	// (ADR-099). Production callers leave it nil and every method behaves
+	// exactly as before; nothing outside tests constructs an injector.
+	Injector durablewrite.Injector
+	mu       sync.Mutex
 }
+
+// uncertainMarker is written next to the trail when an append may be partially
+// visible without confirmed durability (a sync or directory-sync failure after
+// bytes were written). Verification then reports the chain as uncertain and
+// appends fail closed until an operator inspects the trail and removes the
+// marker. The marker is how an ambiguous append is distinguished from a record
+// that never existed.
+const uncertainMarker = ".operator-events.uncertain"
 
 type metadataEntry struct {
 	Key   string `json:"key"`
@@ -160,24 +173,78 @@ func (s *Store) Record(input Input) (Event, error) {
 		if err != nil {
 			return err
 		}
+		_, statErr := os.Stat(s.Path())
+		created := os.IsNotExist(statErr)
+		if statErr != nil && !created {
+			return fmt.Errorf("operator audit append: stat: %w", statErr)
+		}
+		if s.Injector != nil {
+			if err := s.Injector.Before(durablewrite.OpCreate); err != nil {
+				// Nothing has been written yet; the state is unchanged and a
+				// retry is safe.
+				return fmt.Errorf("operator audit append: create/open: %w", err)
+			}
+		}
 		f, err := os.OpenFile(s.Path(), os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o600)
 		if err != nil {
-			return err
+			return fmt.Errorf("operator audit append: open: %w", err)
 		}
 		defer f.Close()
 		if err := ensurePrivateRegularFile(s.Path()); err != nil {
-			return err
+			return fmt.Errorf("operator audit append: %w", err)
 		}
-		if _, err := f.Write(append(line, '\n')); err != nil {
-			return err
+		if s.Injector != nil {
+			if err := s.Injector.Before(durablewrite.OpWrite); err != nil {
+				// Nothing has been written yet; the state is unchanged and a
+				// retry is safe.
+				return fmt.Errorf("operator audit append: write: %w", err)
+			}
+		}
+		payload := append(line, '\n')
+		if s.Injector != nil {
+			if err := s.Injector.Before(durablewrite.OpShortWrite); err != nil {
+				// Simulate a short write: a prefix of the line is visible, then
+				// the append fails. The partial bytes are preserved as evidence;
+				// the next verification detects the trailing partial line and
+				// the trail fails closed until an operator truncates it. This is
+				// an ambiguous append, not a clean no-op.
+				if half := len(payload) / 2; half > 0 {
+					_, _ = f.Write(payload[:half])
+				}
+				return fmt.Errorf("operator audit append: short write: %w", err)
+			}
+		}
+		if _, err := f.Write(payload); err != nil {
+			// A short or failed write may leave some bytes visible; preserve
+			// them as evidence. Verification detects a trailing partial line
+			// and the trail fails closed.
+			return fmt.Errorf("operator audit append: write: %w", err)
+		}
+		if s.Injector != nil {
+			if err := s.Injector.Before(durablewrite.OpFileSync); err != nil {
+				// The full line is visible but durability is unconfirmed:
+				// report the chain as uncertain and fail closed.
+				_ = s.markUncertain(dir)
+				return fmt.Errorf("operator audit append: file sync: %w", err)
+			}
 		}
 		if err := f.Sync(); err != nil {
-			return err
+			_ = s.markUncertain(dir)
+			return fmt.Errorf("operator audit append: file sync: %w", err)
 		}
 		// The audit event must be durable: both the file content and the
-		// directory entry (first creation) must survive a crash.
+		// directory entry (first creation) must survive a crash. The fault
+		// boundary for directory sync applies only when the file is newly
+		// created; for later appends the directory entry already exists.
+		if created && s.Injector != nil {
+			if err := s.Injector.Before(durablewrite.OpDirectorySync); err != nil {
+				_ = s.markUncertain(dir)
+				return fmt.Errorf("operator audit append: directory sync: %w", err)
+			}
+		}
 		if err := syncParentDir(s.Path()); err != nil {
-			return err
+			_ = s.markUncertain(dir)
+			return fmt.Errorf("operator audit append: directory sync: %w", err)
 		}
 		recorded = event
 		return nil
@@ -186,6 +253,15 @@ func (s *Store) Record(input Input) (Event, error) {
 		return Event{}, err
 	}
 	return recorded, nil
+}
+
+// markUncertain records that an append may be partially visible without
+// confirmed durability, so subsequent verification reports the chain as
+// uncertain and appends fail closed until an operator inspects the trail and
+// removes the marker. Best-effort: if the marker itself cannot be written the
+// original error is still returned and the trail file remains the evidence.
+func (s *Store) markUncertain(dir string) error {
+	return os.WriteFile(filepath.Join(dir, uncertainMarker), []byte("operator audit chain durability uncertain: an append failed after bytes were written; inspect the trail and remove this marker before appending again\n"), 0o600)
 }
 
 func (s *Store) verifyLocked() (Report, error) {
@@ -287,6 +363,14 @@ func verifyTrailFile(path string, now time.Time) (Report, []Event, error) {
 	if err := verifyPrivatePath(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 		report.Valid = false
 		report.Findings = append(report.Findings, err.Error())
+	}
+	// An ambiguous append (sync/directory-sync failure after bytes were
+	// written) marks the chain uncertain: the trail may look complete, but
+	// durability of the last record is unconfirmed. Fail closed until an
+	// operator inspects the trail and removes the marker.
+	if _, err := os.Stat(filepath.Join(filepath.Dir(path), uncertainMarker)); err == nil {
+		report.Valid = false
+		report.Findings = append(report.Findings, "audit chain durability uncertain: a previous append failed after bytes were written; inspect the trail and remove "+uncertainMarker+" before appending")
 	}
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
