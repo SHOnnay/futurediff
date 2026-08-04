@@ -425,10 +425,20 @@ func (r *Repository) EffectReceipt(effectID string) (domain.EffectReceipt, error
 	return domain.EffectReceipt{ReceiptID: String(row, "receipt_id"), EffectID: String(row, "effect_id"), ProviderOperationID: String(row, "provider_operation_id"), ProviderResourceID: String(row, "provider_resource_id"), RequestDigest: String(row, "request_digest"), ResponseDigest: String(row, "response_digest"), StatusQueryRef: String(row, "status_query_ref"), FencingToken: Int64(row, "fencing_token"), CommittedAt: committed, CreatedAt: created}, nil
 }
 
+// OpMaterializedRef names the test-only fault boundary consulted before the
+// durable record of a completed local Git materialization is persisted.
+const OpMaterializedRef = "materialized_ref"
+
 func (r *Repository) RecordMaterializedRef(id string, ref domain.MaterializedRef) error {
 	now := ref.MaterializedAt.UTC()
 	if now.IsZero() {
 		now = time.Now().UTC()
+	}
+	// The local Git effect (commit object and safe branch) already exists in
+	// the repository; persisting its durable record must fail closed so the
+	// transaction enters reconciliation instead of reporting success.
+	if err := r.injectorFaults(OpMaterializedRef); err != nil {
+		return err
 	}
 	return r.db.WithTx(func(tx *Tx) error {
 		row, err := tx.QueryOne("SELECT status FROM transactions WHERE transaction_id=?", id)
@@ -594,16 +604,17 @@ func (r *Repository) VerificationMaterial(transactionID string) (string, error) 
 }
 
 // injectorFaults consults the test-only durable-write fault injector at the
-// named receipt-lifecycle boundaries, in order. A nil injector (production)
-// never fires. Errors are wrapped with the boundary name and preserve
-// errors.Is so durablewrite.Classify keeps working on the sentinels.
+// named persistence boundaries (external-effect receipts and the local Git
+// materialization record), in order. A nil injector (production) never fires.
+// Errors are wrapped with the boundary name and preserve errors.Is so
+// durablewrite.Classify keeps working on the sentinels.
 func (r *Repository) injectorFaults(ops ...string) error {
 	if r.Injector == nil {
 		return nil
 	}
 	for _, op := range ops {
 		if err := r.Injector.Before(op); err != nil {
-			return fmt.Errorf("external effect receipt %s: %w", op, err)
+			return fmt.Errorf("durable persistence %s: %w", op, err)
 		}
 	}
 	return nil

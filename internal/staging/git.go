@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/SHOnnay/futurediff/internal/domain"
+	"github.com/SHOnnay/futurediff/internal/durablewrite"
 )
 
 type DirtyPolicy string
@@ -22,7 +23,39 @@ const (
 	StageFromHead DirtyPolicy = "stage_from_head"
 )
 
-type Manager struct{ RuntimeRoot string }
+// Test-only deterministic Git-materialization fault boundaries. They are
+// consulted on Injector.Before before the named local Git operation, so a
+// fault simulates that operation failing without modifying any repository.
+// Nothing outside tests constructs an injector.
+const (
+	OpWorktreeAdd = "worktree_add"
+	OpGitAdd      = "git_add"
+	OpWriteTree   = "write_tree"
+	OpCommitTree  = "commit_tree"
+	OpApplyIndex  = "apply_index"
+	OpUpdateRef   = "update_ref"
+)
+
+type Manager struct {
+	RuntimeRoot string
+	// Injector is a test-only deterministic fault-injection seam for local
+	// Git materialization (ADR-099). Production callers leave it nil and
+	// every method behaves exactly as before.
+	Injector durablewrite.Injector
+}
+
+// fault consults the test-only fault injector at a local Git boundary. A nil
+// injector (production) never fires. Errors are wrapped with the boundary
+// name and preserve errors.Is so durablewrite.Classify keeps working.
+func (m Manager) fault(op string) error {
+	if m.Injector == nil {
+		return nil
+	}
+	if err := m.Injector.Before(op); err != nil {
+		return fmt.Errorf("git %s: %w", op, err)
+	}
+	return nil
+}
 
 type InspectResult struct {
 	RepositoryRoot string
@@ -147,6 +180,10 @@ func (m Manager) Create(transactionID string, inspect InspectResult, policy Dirt
 	if _, err := os.Stat(root); err == nil {
 		return domain.Workspace{}, errors.New("transaction runtime path already exists")
 	}
+	if err := m.fault(OpWorktreeAdd); err != nil {
+		_ = os.RemoveAll(root)
+		return domain.Workspace{}, err
+	}
 	if err := os.MkdirAll(artifacts, 0o700); err != nil {
 		return domain.Workspace{}, err
 	}
@@ -158,11 +195,17 @@ func (m Manager) Create(transactionID string, inspect InspectResult, policy Dirt
 }
 
 func (m Manager) Capture(workspace domain.Workspace) (domain.Patch, error) {
+	if err := m.fault(OpGitAdd); err != nil {
+		return domain.Patch{}, err
+	}
 	if _, err := runGit(workspace.WorkspacePath, "add", "-A"); err != nil {
 		return domain.Patch{}, err
 	}
 	patch, err := runGit(workspace.WorkspacePath, "diff", "--cached", "--binary", "--full-index", "--no-ext-diff")
 	if err != nil {
+		return domain.Patch{}, err
+	}
+	if err := m.fault(OpWriteTree); err != nil {
 		return domain.Patch{}, err
 	}
 	tree, err := gitText(workspace.WorkspacePath, "write-tree")
@@ -234,6 +277,9 @@ func (m Manager) PredictMaterializedRef(workspace domain.Workspace, patch domain
 	if domain.SHA256Bytes(raw) != patch.PatchSHA256 {
 		return domain.MaterializedRef{}, errors.New("stored patch digest mismatch")
 	}
+	if err := m.fault(OpCommitTree); err != nil {
+		return domain.MaterializedRef{}, fmt.Errorf("git commit-tree: %w", err)
+	}
 	args := []string{"commit-tree", patch.StagedTreeOID, "-p", workspace.BaseOID, "-m", "FutureDiff transaction " + workspace.TransactionID}
 	cmd := gitCommand(workspace.RepositoryRoot, materializedCommitEnvironment(patch.GeneratedAt), args...)
 	out, err := cmd.CombinedOutput()
@@ -263,6 +309,9 @@ func (m Manager) Materialize(workspace domain.Workspace, patch domain.Patch, app
 	}
 	integrationRoot := filepath.Join(m.RuntimeRoot, "integrations", workspace.TransactionID)
 	integration := filepath.Join(integrationRoot, "workspace")
+	if err := m.fault(OpWorktreeAdd); err != nil {
+		return domain.MaterializedRef{}, err
+	}
 	if err := os.MkdirAll(integrationRoot, 0o700); err != nil {
 		return domain.MaterializedRef{}, err
 	}
@@ -274,7 +323,13 @@ func (m Manager) Materialize(workspace domain.Workspace, patch domain.Patch, app
 		_, _ = runGit(workspace.RepositoryRoot, "worktree", "remove", "--force", integration)
 		_, _ = runGit(workspace.RepositoryRoot, "worktree", "prune", "--expire", "now")
 	}()
+	if err := m.fault(OpApplyIndex); err != nil {
+		return domain.MaterializedRef{}, err
+	}
 	if _, err := runGit(integration, "apply", "--index", "--binary", "--whitespace=nowarn", patch.PatchPath); err != nil {
+		return domain.MaterializedRef{}, err
+	}
+	if err := m.fault(OpWriteTree); err != nil {
 		return domain.MaterializedRef{}, err
 	}
 	tree, err := gitText(integration, "write-tree")
@@ -292,6 +347,9 @@ func (m Manager) Materialize(workspace domain.Workspace, patch domain.Patch, app
 		return domain.MaterializedRef{}, fmt.Errorf("predicted commit tree mismatch: %s != %s", verifiedTree, patch.StagedTreeOID)
 	}
 	zero := strings.Repeat("0", len(predicted.CommitOID))
+	if err := m.fault(OpUpdateRef); err != nil {
+		return domain.MaterializedRef{}, err
+	}
 	if _, err := runGit(workspace.RepositoryRoot, "update-ref", predicted.RefName, predicted.CommitOID, zero); err != nil {
 		return domain.MaterializedRef{}, err
 	}

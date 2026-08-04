@@ -3,6 +3,7 @@ package ledger
 import (
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -318,5 +319,34 @@ func TestRecordEffectCommittedRetryAfterFaultSucceeds(t *testing.T) {
 	stored, _ := repo.ExternalEffect(effect.EffectID)
 	if stored.Status != domain.EffectCommitted {
 		t.Fatalf("effect status=%s", stored.Status)
+	}
+}
+
+func TestRecordMaterializedRefFaultFailsClosed(t *testing.T) {
+	repo, effect, _ := receiptFixture(t, nil)
+	ref := domain.MaterializedRef{TransactionID: effect.TransactionID, RefName: "refs/heads/futurediff/" + effect.TransactionID, CommitOID: strings.Repeat("c", 40), ResultingTreeOID: strings.Repeat("t", 40), MaterializedAt: time.Now().UTC()}
+	repo.Injector = durablewrite.NewOneShot(map[string]error{OpMaterializedRef: durablewrite.ErrIO})
+	if err := repo.RecordMaterializedRef(ref.TransactionID, ref); err == nil {
+		t.Fatal("expected materialized_ref fault")
+	} else if !errors.Is(err, durablewrite.ErrIO) {
+		t.Fatalf("errors.Is(ErrIO) failed: %v", err)
+	}
+	rows, err := repo.db.Query("SELECT COUNT(*) AS c FROM materialized_repository_refs WHERE transaction_id=?", ref.TransactionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if Int64(rows[0], "c") != 0 {
+		t.Fatalf("materialized ref row written despite fault: %d", Int64(rows[0], "c"))
+	}
+	// The fault fired before any state change: retry records exactly once.
+	if err := repo.RecordMaterializedRef(ref.TransactionID, ref); err != nil {
+		t.Fatalf("retry failed: %v", err)
+	}
+	rows, err = repo.db.Query("SELECT COUNT(*) AS c FROM materialized_repository_refs WHERE transaction_id=?", ref.TransactionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if Int64(rows[0], "c") != 1 {
+		t.Fatalf("materialized ref rows=%d", Int64(rows[0], "c"))
 	}
 }
