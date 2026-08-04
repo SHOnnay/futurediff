@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/SHOnnay/futurediff/internal/domain"
+	"github.com/SHOnnay/futurediff/internal/durablewrite"
 )
 
 type PrepareExternalEffectInput struct {
@@ -239,6 +240,12 @@ func (r *Repository) BeginEffectAttempt(effectID, phase, requestDigest string, f
 		return domain.EffectAttempt{}, errors.New("request digest and fencing token are required")
 	}
 	attempt := domain.EffectAttempt{AttemptID: domain.NewID("attempt"), EffectID: effectID, Phase: phase, RequestDigest: requestDigest, FencingToken: fencingToken, Outcome: "intent", StartedAt: time.Now().UTC()}
+	// The write-ahead intent (the pre-effect receipt) must be durably recorded
+	// before the external effect starts. A failure at the create or write
+	// boundary leaves the effect verified and never starts the provider call.
+	if err := r.injectorFaults(durablewrite.OpCreate, durablewrite.OpWrite); err != nil {
+		return domain.EffectAttempt{}, err
+	}
 	err := r.db.WithTx(func(tx *Tx) error {
 		row, err := tx.QueryOne("SELECT transaction_id,status,revision FROM effects WHERE effect_id=?", effectID)
 		if err != nil {
@@ -333,6 +340,15 @@ func (r *Repository) RecordEffectCommitted(attempt domain.EffectAttempt, receipt
 		receipt.ReceiptID = domain.NewID("receipt")
 	}
 	receipt.EffectID, receipt.FencingToken, receipt.CreatedAt = attempt.EffectID, attempt.FencingToken, now
+	// The completed-outcome receipt must be durably proven before success is
+	// reported. SQLite rows have no separate temp/rename/directory-entry
+	// stages: statement and transaction atomicity mean a fault at any boundary
+	// here fails closed before any state changes, and no partial receipt can
+	// become authoritative. The true commit/fsync boundary is additionally
+	// injectable through the SQL FaultInjector "commit" operation.
+	if err := r.injectorFaults(durablewrite.OpCreate, durablewrite.OpWrite, durablewrite.OpShortWrite, durablewrite.OpFileSync, durablewrite.OpRename, durablewrite.OpDirectorySync); err != nil {
+		return domain.ExternalEffect{}, err
+	}
 	err := r.db.WithTx(func(tx *Tx) error {
 		if err := validateFencing(tx, attempt.TransactionID, attempt.FencingToken); err != nil {
 			return err
@@ -575,4 +591,20 @@ func (r *Repository) VerificationMaterial(transactionID string) (string, error) 
 		})
 	}
 	return domain.Digest(map[string]any{"format_version": "0.2", "transaction_id": transactionID, "patch_approval_material_digest": patch.ApprovalMaterialDigest, "patch_sha256": patch.PatchSHA256, "staged_tree_oid": patch.StagedTreeOID, "external_effects": materialEffects})
+}
+
+// injectorFaults consults the test-only durable-write fault injector at the
+// named receipt-lifecycle boundaries, in order. A nil injector (production)
+// never fires. Errors are wrapped with the boundary name and preserve
+// errors.Is so durablewrite.Classify keeps working on the sentinels.
+func (r *Repository) injectorFaults(ops ...string) error {
+	if r.Injector == nil {
+		return nil
+	}
+	for _, op := range ops {
+		if err := r.Injector.Before(op); err != nil {
+			return fmt.Errorf("external effect receipt %s: %w", op, err)
+		}
+	}
+	return nil
 }
