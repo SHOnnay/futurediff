@@ -83,8 +83,12 @@ func dirEntries(t *testing.T, dir string) map[string]bool {
 
 const diagnosePrefix = "futurediff-diagnose-"
 
-func countDiagnosticTempDirs() int {
-	entries, err := os.ReadDir(os.TempDir())
+// countDiagnoseDirs counts futurediff-diagnose-* directories inside parent
+// only. It never scans the shared system temporary directory, so directories
+// legitimately created by concurrently running test binaries in other
+// packages can never pollute the count.
+func countDiagnoseDirs(parent string) int {
+	entries, err := os.ReadDir(parent)
 	if err != nil {
 		return -1
 	}
@@ -95,6 +99,18 @@ func countDiagnosticTempDirs() int {
 		}
 	}
 	return n
+}
+
+// diagnoseParent returns a test-owned parent directory and a builder that
+// pins every diagnosis in the test to it, so cleanup and leak assertions are
+// scoped strictly to directories this test created.
+func diagnoseParent(t *testing.T) (string, func(DiagnoseOptions) DiagnoseOptions) {
+	t.Helper()
+	parent := t.TempDir()
+	return parent, func(o DiagnoseOptions) DiagnoseOptions {
+		o.SnapshotTempDir = parent
+		return o
+	}
 }
 
 func TestDiagnose_MissingDatabaseIsNotInitialized(t *testing.T) {
@@ -505,18 +521,19 @@ func TestDiagnose_RepeatedDiagnosisIsIdempotent(t *testing.T) {
 }
 
 func TestDiagnose_TemporarySnapshotCleanup(t *testing.T) {
-	before := countDiagnosticTempDirs()
+	parent, with := diagnoseParent(t)
+	before := countDiagnoseDirs(parent)
 
 	r, path := fixtureRepo(t, true)
 	defer r.Close()
-	if _, err := Diagnose(path, DiagnoseOptions{Quiescent: true}); err != nil {
+	if _, err := Diagnose(path, with(DiagnoseOptions{Quiescent: true})); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Diagnose(path, DiagnoseOptions{Quiescent: true}); err != nil {
+	if _, err := Diagnose(path, with(DiagnoseOptions{Quiescent: true})); err != nil {
 		t.Fatal(err)
 	}
 
-	after := countDiagnosticTempDirs()
+	after := countDiagnoseDirs(parent)
 	if after != before {
 		t.Fatalf("diagnostic temp directories leaked: before=%d after=%d", before, after)
 	}
@@ -618,12 +635,12 @@ func setSnapshotHook(t *testing.T, hook func(stage snapshotCopyStage, snap *diag
 	t.Cleanup(func() { testSnapshotHook = old })
 }
 
-// assertNoSnapshotLeak fails the test if any futurediff-diagnose-* temporary
-// directory was created (and not removed) since the recorded count.
-func assertNoSnapshotLeak(t *testing.T, before int) {
+// assertParentClean fails the test if any futurediff-diagnose-* directory was
+// created (and not removed) inside parent since the recorded count.
+func assertParentClean(t *testing.T, parent string, before int) {
 	t.Helper()
-	if after := countDiagnosticTempDirs(); after != before {
-		t.Fatalf("diagnostic temp directories leaked: before=%d after=%d", before, after)
+	if after := countDiagnoseDirs(parent); after != before {
+		t.Fatalf("diagnostic temp directories leaked in %s: before=%d after=%d", parent, before, after)
 	}
 }
 
@@ -633,8 +650,9 @@ func TestDiagnose_QuiescentFalseFailsClosed(t *testing.T) {
 
 	// Quiescent defaults to false: the caller has not proven the ledger is
 	// idle, so no authoritative file may be read or copied.
-	before := countDiagnosticTempDirs()
-	d, err := Diagnose(path, DiagnoseOptions{})
+	parent, with := diagnoseParent(t)
+	before := countDiagnoseDirs(parent)
+	d, err := Diagnose(path, with(DiagnoseOptions{}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -647,12 +665,12 @@ func TestDiagnose_QuiescentFalseFailsClosed(t *testing.T) {
 	if d.WALPresent || d.SHMPresent {
 		t.Fatal("Quiescent=false must not even inspect the sidecars")
 	}
-	assertNoSnapshotLeak(t, before)
+	assertParentClean(t, parent, before)
 
 	// Even a missing database fails closed when quiescence is not asserted;
 	// database_not_initialized is only claimed under the quiescent contract.
 	missing := filepath.Join(t.TempDir(), "ledger.db")
-	dm, err := Diagnose(missing, DiagnoseOptions{})
+	dm, err := Diagnose(missing, with(DiagnoseOptions{}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -689,15 +707,16 @@ func TestDiagnose_DatabaseSymlinkFailsClosed(t *testing.T) {
 	}
 	targetHash := sha256File(t, target)
 
-	before := countDiagnosticTempDirs()
-	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	parent, with := diagnoseParent(t)
+	before := countDiagnoseDirs(parent)
+	d, err := Diagnose(path, with(DiagnoseOptions{Quiescent: true}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if d.State != DiagnosisInconclusive {
 		t.Fatalf("database symlink must be diagnosis_inconclusive, got %s (%s)", d.State, d.Message)
 	}
-	assertNoSnapshotLeak(t, before)
+	assertParentClean(t, parent, before)
 	if got := sha256File(t, target); got != targetHash {
 		t.Fatal("symlink target must not be copied or modified")
 	}
@@ -718,15 +737,16 @@ func TestDiagnose_WALSymlinkFailsClosed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	before := countDiagnosticTempDirs()
-	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	parent, with := diagnoseParent(t)
+	before := countDiagnoseDirs(parent)
+	d, err := Diagnose(path, with(DiagnoseOptions{Quiescent: true}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if d.State != DiagnosisInconclusive {
 		t.Fatalf("WAL symlink must be diagnosis_inconclusive, got %s (%s)", d.State, d.Message)
 	}
-	assertNoSnapshotLeak(t, before)
+	assertParentClean(t, parent, before)
 }
 
 func TestDiagnose_SHMSymlinkFailsClosed(t *testing.T) {
@@ -744,15 +764,16 @@ func TestDiagnose_SHMSymlinkFailsClosed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	before := countDiagnosticTempDirs()
-	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	parent, with := diagnoseParent(t)
+	before := countDiagnoseDirs(parent)
+	d, err := Diagnose(path, with(DiagnoseOptions{Quiescent: true}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if d.State != DiagnosisInconclusive {
 		t.Fatalf("SHM symlink must be diagnosis_inconclusive, got %s (%s)", d.State, d.Message)
 	}
-	assertNoSnapshotLeak(t, before)
+	assertParentClean(t, parent, before)
 }
 
 func TestDiagnose_DirectoryAtAuthoritativePath(t *testing.T) {
@@ -762,15 +783,16 @@ func TestDiagnose_DirectoryAtAuthoritativePath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	before := countDiagnosticTempDirs()
-	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	parent, with := diagnoseParent(t)
+	before := countDiagnoseDirs(parent)
+	d, err := Diagnose(path, with(DiagnoseOptions{Quiescent: true}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if d.State != DiagnosisInconclusive {
 		t.Fatalf("directory at the database path must be diagnosis_inconclusive, got %s (%s)", d.State, d.Message)
 	}
-	assertNoSnapshotLeak(t, before)
+	assertParentClean(t, parent, before)
 }
 
 func TestDiagnose_FIFOAtAuthoritativePath(t *testing.T) {
@@ -782,15 +804,16 @@ func TestDiagnose_FIFOAtAuthoritativePath(t *testing.T) {
 
 	// The Lstat-first rejection must prevent any open of the FIFO: an open
 	// would block waiting for a writer.
-	before := countDiagnosticTempDirs()
-	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	parent, with := diagnoseParent(t)
+	before := countDiagnoseDirs(parent)
+	d, err := Diagnose(path, with(DiagnoseOptions{Quiescent: true}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if d.State != DiagnosisInconclusive {
 		t.Fatalf("FIFO at the database path must be diagnosis_inconclusive, got %s (%s)", d.State, d.Message)
 	}
-	assertNoSnapshotLeak(t, before)
+	assertParentClean(t, parent, before)
 }
 
 func TestDiagnose_DatabaseReplacedDuringCopy(t *testing.T) {
@@ -810,15 +833,16 @@ func TestDiagnose_DatabaseReplacedDuringCopy(t *testing.T) {
 		}
 	})
 
-	before := countDiagnosticTempDirs()
-	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	parent, with := diagnoseParent(t)
+	before := countDiagnoseDirs(parent)
+	d, err := Diagnose(path, with(DiagnoseOptions{Quiescent: true}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if d.State != DiagnosisInconclusive {
 		t.Fatalf("database replaced during copy must be diagnosis_inconclusive, never healthy or corrupt; got %s (%s)", d.State, d.Message)
 	}
-	assertNoSnapshotLeak(t, before)
+	assertParentClean(t, parent, before)
 }
 
 func TestDiagnose_WALReplacedDuringCopy(t *testing.T) {
@@ -838,15 +862,16 @@ func TestDiagnose_WALReplacedDuringCopy(t *testing.T) {
 		}
 	})
 
-	before := countDiagnosticTempDirs()
-	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	parent, with := diagnoseParent(t)
+	before := countDiagnoseDirs(parent)
+	d, err := Diagnose(path, with(DiagnoseOptions{Quiescent: true}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if d.State != DiagnosisInconclusive {
 		t.Fatalf("WAL replaced during copy must be diagnosis_inconclusive, never healthy or corrupt; got %s (%s)", d.State, d.Message)
 	}
-	assertNoSnapshotLeak(t, before)
+	assertParentClean(t, parent, before)
 }
 
 func TestDiagnose_SHMAttachedDuringCopy(t *testing.T) {
@@ -864,15 +889,16 @@ func TestDiagnose_SHMAttachedDuringCopy(t *testing.T) {
 		}
 	})
 
-	before := countDiagnosticTempDirs()
-	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	parent, with := diagnoseParent(t)
+	before := countDiagnoseDirs(parent)
+	d, err := Diagnose(path, with(DiagnoseOptions{Quiescent: true}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if d.State != DiagnosisInconclusive {
 		t.Fatalf("SHM appearing during copy must be diagnosis_inconclusive, never healthy or corrupt; got %s (%s)", d.State, d.Message)
 	}
-	assertNoSnapshotLeak(t, before)
+	assertParentClean(t, parent, before)
 }
 
 func TestDiagnose_SHMRemovedDuringCopy(t *testing.T) {
@@ -888,15 +914,16 @@ func TestDiagnose_SHMRemovedDuringCopy(t *testing.T) {
 		}
 	})
 
-	before := countDiagnosticTempDirs()
-	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	parent, with := diagnoseParent(t)
+	before := countDiagnoseDirs(parent)
+	d, err := Diagnose(path, with(DiagnoseOptions{Quiescent: true}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if d.State != DiagnosisInconclusive {
 		t.Fatalf("SHM disappearing during copy must be diagnosis_inconclusive, never healthy or corrupt; got %s (%s)", d.State, d.Message)
 	}
-	assertNoSnapshotLeak(t, before)
+	assertParentClean(t, parent, before)
 }
 
 func TestDiagnose_SameSizeContentModification(t *testing.T) {
@@ -918,15 +945,16 @@ func TestDiagnose_SameSizeContentModification(t *testing.T) {
 		}
 	})
 
-	before := countDiagnosticTempDirs()
-	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	parent, with := diagnoseParent(t)
+	before := countDiagnoseDirs(parent)
+	d, err := Diagnose(path, with(DiagnoseOptions{Quiescent: true}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if d.State != DiagnosisInconclusive {
 		t.Fatalf("same-size modification during copy must be diagnosis_inconclusive, never healthy or corrupt; got %s (%s)", d.State, d.Message)
 	}
-	assertNoSnapshotLeak(t, before)
+	assertParentClean(t, parent, before)
 }
 
 func TestDiagnose_ContentModificationWithRestoredMtime(t *testing.T) {
@@ -958,15 +986,16 @@ func TestDiagnose_ContentModificationWithRestoredMtime(t *testing.T) {
 		}
 	})
 
-	before := countDiagnosticTempDirs()
-	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	parent, with := diagnoseParent(t)
+	before := countDiagnoseDirs(parent)
+	d, err := Diagnose(path, with(DiagnoseOptions{Quiescent: true}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if d.State != DiagnosisInconclusive {
 		t.Fatalf("modification with restored mtime must be diagnosis_inconclusive, never healthy or corrupt; got %s (%s)", d.State, d.Message)
 	}
-	assertNoSnapshotLeak(t, before)
+	assertParentClean(t, parent, before)
 }
 
 func TestDiagnose_SourceCopyHashMismatch(t *testing.T) {
@@ -989,15 +1018,16 @@ func TestDiagnose_SourceCopyHashMismatch(t *testing.T) {
 		}
 	})
 
-	before := countDiagnosticTempDirs()
-	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	parent, with := diagnoseParent(t)
+	before := countDiagnoseDirs(parent)
+	d, err := Diagnose(path, with(DiagnoseOptions{Quiescent: true}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if d.State != DiagnosisInconclusive {
 		t.Fatalf("source/copy hash mismatch must be diagnosis_inconclusive, never healthy or corrupt; got %s (%s)", d.State, d.Message)
 	}
-	assertNoSnapshotLeak(t, before)
+	assertParentClean(t, parent, before)
 }
 
 func TestDiagnose_TotalSnapshotSizeBound(t *testing.T) {
@@ -1018,8 +1048,9 @@ func TestDiagnose_TotalSnapshotSizeBound(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	before := countDiagnosticTempDirs()
-	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	parent, with := diagnoseParent(t)
+	before := countDiagnoseDirs(parent)
+	d, err := Diagnose(path, with(DiagnoseOptions{Quiescent: true}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1029,7 +1060,7 @@ func TestDiagnose_TotalSnapshotSizeBound(t *testing.T) {
 	if !strings.Contains(d.Message, "total") {
 		t.Fatalf("message must name the total bound: %q", d.Message)
 	}
-	assertNoSnapshotLeak(t, before)
+	assertParentClean(t, parent, before)
 }
 
 func TestDiagnose_TemporarySnapshotCleanupAfterFailures(t *testing.T) {
@@ -1051,11 +1082,12 @@ func TestDiagnose_TemporarySnapshotCleanupAfterFailures(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	before := countDiagnosticTempDirs()
-	if _, err := Diagnose(path, DiagnoseOptions{Quiescent: true}); err != nil {
+	parent, with := diagnoseParent(t)
+	before := countDiagnoseDirs(parent)
+	if _, err := Diagnose(path, with(DiagnoseOptions{Quiescent: true})); err != nil {
 		t.Fatal(err)
 	}
-	assertNoSnapshotLeak(t, before)
+	assertParentClean(t, parent, before)
 
 	// A rejection before the copy path (directory at the database path)
 	// must not create a snapshot either.
@@ -1064,10 +1096,10 @@ func TestDiagnose_TemporarySnapshotCleanupAfterFailures(t *testing.T) {
 	if err := os.Mkdir(bad, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Diagnose(bad, DiagnoseOptions{Quiescent: true}); err != nil {
+	if _, err := Diagnose(bad, with(DiagnoseOptions{Quiescent: true})); err != nil {
 		t.Fatal(err)
 	}
-	assertNoSnapshotLeak(t, before)
+	assertParentClean(t, parent, before)
 }
 
 // buildIndexInconsistentDB creates a database whose unique-index content no
@@ -1275,5 +1307,167 @@ func TestDiagnose_FullIntegrityStillRequiresQuiescence(t *testing.T) {
 	}
 	if d.State != DiagnosisInconclusive {
 		t.Fatalf("FullIntegrity without Quiescent must fail closed, got %s", d.State)
+	}
+}
+
+// TestDiagnose_LeavesTestParentEmpty pins the snapshot to a test-owned parent
+// and asserts the parent is completely empty after a normal diagnosis: every
+// snapshot directory created by the diagnosis is removed on success.
+func TestDiagnose_LeavesTestParentEmpty(t *testing.T) {
+	parent, with := diagnoseParent(t)
+	r, path := fixtureRepo(t, true)
+	defer r.Close()
+
+	if _, err := Diagnose(path, with(DiagnoseOptions{Quiescent: true})); err != nil {
+		t.Fatal(err)
+	}
+
+	entries, err := os.ReadDir(parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		var names []string
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		t.Fatalf("test-owned parent not empty after diagnosis: %v", names)
+	}
+}
+
+// TestDiagnose_DefaultSnapshotParentIsSystemTemp verifies that leaving
+// SnapshotTempDir empty keeps the production default: the private snapshot
+// directory is created directly under the system temporary directory with
+// 0700 permissions, and it is removed when the diagnosis finishes.
+func TestDiagnose_DefaultSnapshotParentIsSystemTemp(t *testing.T) {
+	r, path := fixtureRepo(t, true)
+	defer r.Close()
+
+	var captured string
+	var capturedMode os.FileMode
+	setSnapshotHook(t, func(stage snapshotCopyStage, snap *diagnosticSnapshot) {
+		if stage != stageAfterCopyDB {
+			return
+		}
+		captured = snap.dir
+		fi, err := os.Lstat(snap.dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		capturedMode = fi.Mode().Perm()
+	})
+
+	if _, err := Diagnose(path, DiagnoseOptions{Quiescent: true}); err != nil {
+		t.Fatal(err)
+	}
+	if captured == "" {
+		t.Fatal("snapshot hook never fired")
+	}
+	if filepath.Dir(captured) != filepath.Clean(os.TempDir()) {
+		t.Fatalf("default snapshot parent %s, want system temp %s", filepath.Dir(captured), filepath.Clean(os.TempDir()))
+	}
+	if capturedMode != 0o700 {
+		t.Fatalf("snapshot directory permissions %#o, want 0700", capturedMode)
+	}
+	if _, err := os.Lstat(captured); !os.IsNotExist(err) {
+		t.Fatalf("default snapshot directory not cleaned up after diagnosis: %v", err)
+	}
+}
+
+// TestDiagnose_ForeignDiagnosisDirNotCountedOrRemoved plants a
+// futurediff-diagnose-* directory in the test-owned parent (as another test
+// or process would legitimately create) and proves a diagnosis neither
+// removes it nor trips the parent-scoped leak assertion.
+func TestDiagnose_ForeignDiagnosisDirNotCountedOrRemoved(t *testing.T) {
+	parent, with := diagnoseParent(t)
+	foreign := filepath.Join(parent, "futurediff-diagnose-foreign")
+	if err := os.Mkdir(foreign, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(foreign, "marker")
+	if err := os.WriteFile(marker, []byte("keep"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	before := countDiagnoseDirs(parent)
+	r, path := fixtureRepo(t, true)
+	defer r.Close()
+	d, err := Diagnose(path, with(DiagnoseOptions{Quiescent: true}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.State != Healthy {
+		t.Fatalf("expected healthy, got %s (%s)", d.State, d.Message)
+	}
+	assertParentClean(t, parent, before)
+
+	if _, err := os.Lstat(foreign); err != nil {
+		t.Fatalf("foreign diagnosis directory was removed: %v", err)
+	}
+	if b, err := os.ReadFile(marker); err != nil || string(b) != "keep" {
+		t.Fatalf("foreign diagnosis contents changed: %q %v", b, err)
+	}
+}
+
+// TestDiagnose_ConcurrentSeparateParents runs concurrent diagnoses, each
+// pinned to its own test-owned parent, and asserts each parent stays clean:
+// a diagnosis in one parent can never interfere with another parent's leak
+// assertion.
+func TestDiagnose_ConcurrentSeparateParents(t *testing.T) {
+	for i := 0; i < 4; i++ {
+		t.Run(fmt.Sprintf("parent-%d", i), func(t *testing.T) {
+			t.Parallel()
+			parent, with := diagnoseParent(t)
+			r, path := fixtureRepo(t, true)
+			defer r.Close()
+
+			before := countDiagnoseDirs(parent)
+			if _, err := Diagnose(path, with(DiagnoseOptions{Quiescent: true})); err != nil {
+				t.Fatal(err)
+			}
+			assertParentClean(t, parent, before)
+		})
+	}
+}
+
+// TestDiagnose_ConcurrentSharedParent runs concurrent diagnoses sharing one
+// test-owned parent and proves each cleans only its own children: after all
+// finish, the only remaining entry is the foreign directory planted to
+// represent another test's legitimate snapshot.
+func TestDiagnose_ConcurrentSharedParent(t *testing.T) {
+	parent := t.TempDir()
+	foreign := filepath.Join(parent, "futurediff-diagnose-foreign")
+	if err := os.Mkdir(foreign, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	with := func(o DiagnoseOptions) DiagnoseOptions {
+		o.SnapshotTempDir = parent
+		return o
+	}
+
+	for i := 0; i < 4; i++ {
+		t.Run(fmt.Sprintf("child-%d", i), func(t *testing.T) {
+			t.Parallel()
+			r, path := fixtureRepo(t, true)
+			defer r.Close()
+			if _, err := Diagnose(path, with(DiagnoseOptions{Quiescent: true})); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+
+	entries, err := os.ReadDir(parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+		if strings.HasPrefix(e.Name(), diagnosePrefix) && e.Name() != "futurediff-diagnose-foreign" {
+			t.Fatalf("diagnosis child directory leaked in shared parent: %s", e.Name())
+		}
+	}
+	if len(names) != 1 {
+		t.Fatalf("expected only the planted foreign directory, got %v", names)
 	}
 }

@@ -129,6 +129,16 @@ type DiagnoseOptions struct {
 	// check always runs against the snapshot copy, never the authoritative
 	// files.
 	FullIntegrity bool
+	// SnapshotTempDir, when non-empty, is the parent directory under which
+	// the private diagnostic snapshot directory is created. Production
+	// callers leave it empty: the snapshot is created with a unique private
+	// 0700 name directly under the system temporary directory. Tests use it
+	// to confine snapshot directories to a test-owned parent so cleanup and
+	// leak assertions can never observe directories belonging to another
+	// test, package, or process. It is purely a placement control for the
+	// disposable snapshot; it never affects which authoritative files are
+	// inspected, how they are copied, or what the diagnosis may touch.
+	SnapshotTempDir string
 }
 
 // Diagnose performs a bounded, non-mutating integrity diagnosis of a ledger
@@ -193,7 +203,7 @@ func Diagnose(path string, opts DiagnoseOptions) (Diagnosis, error) {
 		return inconclusive("ledger snapshot exceeds bounded total size", sqliteVersion), nil
 	}
 
-	snap, err := createDiagnosticSnapshot(path, before)
+	snap, err := createDiagnosticSnapshot(path, before, opts.SnapshotTempDir)
 	if err != nil {
 		if isStorageError(err) {
 			return storageFailure(fmt.Errorf("create diagnostic snapshot: %w", err), sqliteVersion)
@@ -407,8 +417,16 @@ type diagnosticSnapshot struct {
 	totalBytes int64
 }
 
-func createDiagnosticSnapshot(path string, before authoritativeState) (*diagnosticSnapshot, error) {
-	dir, err := os.MkdirTemp("", "futurediff-diagnose-")
+// createDiagnosticSnapshot copies the authoritative ledger files into a
+// private disposable directory. tempParent is the parent for that directory;
+// an empty tempParent selects the system temporary directory (the production
+// default). The directory is always created with a unique 0700 name, and it
+// is removed on every error path by fail and on success by snap.cleanup.
+func createDiagnosticSnapshot(path string, before authoritativeState, tempParent string) (*diagnosticSnapshot, error) {
+	if tempParent == "" {
+		tempParent = os.TempDir()
+	}
+	dir, err := os.MkdirTemp(tempParent, "futurediff-diagnose-")
 	if err != nil {
 		return nil, err
 	}

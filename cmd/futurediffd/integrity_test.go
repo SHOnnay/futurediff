@@ -672,3 +672,43 @@ func assertNoStartupArtifacts(t *testing.T, root, ledgerPath string) {
 		}
 	}
 }
+
+func TestOpenLedgerForStartup_NoDiagnosisDirAfterRefusal(t *testing.T) {
+	// The real offline diagnosis runs through the gate on a corrupted
+	// ledger; the snapshot is confined to a test-owned parent and must be
+	// gone once the gate refuses startup.
+	root := newStartupRoot(t)
+	path := writeLedgerFixture(t, root)
+	corruptMiddlePage(t, path)
+	parent := t.TempDir()
+	realDiagnose := daemonDiagnose
+	calls := setDaemonDiagnose(t, func(p string, opts ledger.DiagnoseOptions) (ledger.Diagnosis, error) {
+		opts.SnapshotTempDir = parent
+		return realDiagnose(p, opts)
+	})
+
+	lock, repo, err := openLedgerForStartup(root, lockPathFor(root), true)
+	if err == nil {
+		_ = repo.Close()
+		_ = lock.Release()
+		t.Fatal("integrity failure must refuse startup")
+	}
+	g := gateError(t, err)
+	if g.ReasonCode != "ledger_integrity_failed" {
+		t.Fatalf("expected reason_code=ledger_integrity_failed, got %s", g.ReasonCode)
+	}
+	if *calls != 1 {
+		t.Fatalf("expected one diagnosis call, got %d", *calls)
+	}
+	entries, err := os.ReadDir(parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		var names []string
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		t.Fatalf("diagnosis directories remain after gate refusal: %v", names)
+	}
+}
