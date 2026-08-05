@@ -10,6 +10,8 @@ static const char* fd_sqlite_errmsg(sqlite3 *db) { return sqlite3_errmsg(db); }
 import "C"
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -26,9 +28,45 @@ import (
 // than being streamed.
 const maxDiagnoseBytes = 256 << 20
 
+// maxDiagnoseTotalBytes bounds the aggregate size of the diagnostic snapshot
+// (ledger.db plus any -wal/-shm sidecars). Each file is additionally bounded
+// by maxDiagnoseBytes; the total bound protects the temporary filesystem from
+// a quiescent but enormous ledger.
+const maxDiagnoseTotalBytes = 256 << 20
+
 const (
 	diagnoseFileMode = 0o600
 )
+
+// Snapshot-establishment failures that are not storage I/O failures. They are
+// reported as diagnosis_inconclusive with a nil error; only storage errors
+// (errors.Is against ENOSPC/EDQUOT/EROFS/os.ErrPermission/EIO) are wrapped
+// and returned so callers can classify them without parsing messages.
+var (
+	errSnapshotNonRegular     = errors.New("authoritative ledger file is not a regular file")
+	errSnapshotOversized      = errors.New("file exceeds bounded diagnostic size")
+	errSnapshotTotalTooLarge  = errors.New("ledger snapshot exceeds bounded total size")
+	errSnapshotContentChanged = errors.New("authoritative ledger content changed during snapshot establishment")
+	errSnapshotReplaced       = errors.New("authoritative ledger file was replaced during snapshot establishment")
+	errSnapshotSetChanged     = errors.New("authoritative ledger file set changed during snapshot establishment")
+)
+
+// snapshotCopyStage identifies which authoritative file's copy is being
+// verified when the narrow test hook fires.
+type snapshotCopyStage int
+
+const (
+	stageAfterCopyDB snapshotCopyStage = iota
+	stageAfterCopyWAL
+	stageAfterCopySHM
+)
+
+// testSnapshotHook is a test-only hook invoked inside snapshot establishment
+// after an authoritative file's bytes have been copied to the snapshot but
+// before its stability verification completes. Tests use it to mutate the
+// authoritative file set (or the copy) at a deterministic stage — never a
+// timing-only race. It is nil in production.
+var testSnapshotHook func(stage snapshotCopyStage, snap *diagnosticSnapshot)
 
 // DiagnosisState is the stable classification of a non-mutating ledger
 // diagnosis. It is intentionally conservative: anything that cannot be
@@ -72,28 +110,49 @@ type Diagnosis struct {
 	IntegrityErrors []string       `json:"integrity_errors,omitempty"`
 }
 
+// DiagnoseOptions carries the caller's contract for a diagnosis.
+type DiagnoseOptions struct {
+	// Quiescent must be true only after the caller has proven that the
+	// ledger daemon is stopped or the ledger is otherwise quiescent: no
+	// writer may be active on the authoritative ledger.db, -wal, or -shm
+	// files for the duration of the diagnosis. Diagnose itself performs no
+	// liveness check and never claims to have proven quiescence. With
+	// Quiescent=false, Diagnose fails closed as diagnosis_inconclusive
+	// before reading or copying any authoritative file.
+	Quiescent bool
+}
+
 // Diagnose performs a bounded, non-mutating integrity diagnosis of a ledger
 // database without going through the normal read-write repository path.
 //
 // The authoritative ledger.db, -wal, and -shm files are never created,
 // deleted, renamed, truncated, checkpointed, or repaired. Diagnosis runs
 // against a private snapshot copy in a temporary directory, which is removed
-// before returning. The originals are stat-compared before and after; if they
-// changed mid-diagnosis the result fails closed as diagnosis_inconclusive.
+// before returning. Snapshot establishment is the caller-facing contract: it
+// refuses symlinks and every non-regular file kind, copies through a
+// descriptor opened without following symlinks, verifies the recorded file
+// identity and a source-before == copied == source-after hash chain, and
+// revalidates the authoritative file set (appear, disappear, replace)
+// afterwards. Any violation fails closed as diagnosis_inconclusive.
 //
-// A missing ledger.db is DatabaseNotInitialized, never corruption. A missing
-// -wal or -shm sidecar is never corruption on its own: SHM is transient
-// WAL-index state, not authoritative durable state. Storage-capacity,
-// permission, quota, and I/O errors are StorageIOFailure, never corruption.
-// Anything that cannot be established conclusively fails closed.
+// The caller must assert quiescence through DiagnoseOptions; the function
+// does not prove it and never claims to have. A missing ledger.db is
+// DatabaseNotInitialized, never corruption. A missing -wal or -shm sidecar
+// is never corruption on its own: SHM is transient WAL-index state, not
+// authoritative durable state. Storage-capacity, permission, quota, and I/O
+// errors are StorageIOFailure, never corruption. Anything that cannot be
+// established conclusively fails closed.
 //
 // The returned error is non-nil only for storage I/O failures (wrapped so
 // errors.Is works) or snapshot-cleanup failures; all other outcomes are
 // expressed through Diagnosis.State.
-func Diagnose(path string) (Diagnosis, error) {
+func Diagnose(path string, opts DiagnoseOptions) (Diagnosis, error) {
 	sqliteVersion := SQLiteVersion()
 	if path == "" {
 		return inconclusive("database path required", sqliteVersion), nil
+	}
+	if !opts.Quiescent {
+		return inconclusive("caller must establish ledger quiescence (daemon stopped or ledger otherwise idle) before diagnosis; Quiescent was not set", sqliteVersion), nil
 	}
 
 	before, err := statAuthoritative(path)
@@ -104,21 +163,25 @@ func Diagnose(path string) (Diagnosis, error) {
 		return notInitialized(before, sqliteVersion), nil
 	}
 	if !before.db.regular {
-		return Diagnosis{
-			State:         StorageIOFailure,
-			ReasonCode:    reasonCode(StorageIOFailure),
-			Message:       "ledger database path is not a regular file",
-			SQLiteVersion: sqliteVersion,
-		}, nil
+		return inconclusive("authoritative ledger database is not a regular file", sqliteVersion), nil
 	}
 	if before.db.size > maxDiagnoseBytes {
 		return inconclusive("database exceeds bounded diagnostic size", sqliteVersion), nil
 	}
+	if before.wal.exists && !before.wal.regular {
+		return inconclusive("authoritative ledger WAL is not a regular file", sqliteVersion), nil
+	}
 	if before.wal.exists && before.wal.size > maxDiagnoseBytes {
 		return inconclusive("WAL exceeds bounded diagnostic size", sqliteVersion), nil
 	}
+	if before.shm.exists && !before.shm.regular {
+		return inconclusive("authoritative ledger SHM is not a regular file", sqliteVersion), nil
+	}
 	if before.shm.exists && before.shm.size > maxDiagnoseBytes {
 		return inconclusive("SHM exceeds bounded diagnostic size", sqliteVersion), nil
+	}
+	if before.db.size+before.wal.size+before.shm.size > maxDiagnoseTotalBytes {
+		return inconclusive("ledger snapshot exceeds bounded total size", sqliteVersion), nil
 	}
 
 	snap, err := createDiagnosticSnapshot(path, before)
@@ -126,12 +189,7 @@ func Diagnose(path string) (Diagnosis, error) {
 		if isStorageError(err) {
 			return storageFailure(fmt.Errorf("create diagnostic snapshot: %w", err), sqliteVersion)
 		}
-		return Diagnosis{
-			State:         DiagnosisInconclusive,
-			ReasonCode:    reasonCode(DiagnosisInconclusive),
-			Message:       "cannot establish a coherent diagnostic snapshot",
-			SQLiteVersion: sqliteVersion,
-		}, err
+		return inconclusive(snapshotFailureMessage(err), sqliteVersion), nil
 	}
 
 	d := diagnoseSnapshot(snap, sqliteVersion)
@@ -232,12 +290,42 @@ func isStorageError(err error) bool {
 		errors.Is(err, syscall.EIO)
 }
 
+// snapshotFailureMessage maps a snapshot-establishment failure to a
+// caller-facing message. Storage errors never reach here; they are classified
+// by isStorageError and returned wrapped.
+func snapshotFailureMessage(err error) string {
+	switch {
+	case errors.Is(err, errSnapshotNonRegular):
+		return "authoritative ledger file is not a regular file"
+	case errors.Is(err, errSnapshotOversized):
+		return "file exceeds bounded diagnostic size"
+	case errors.Is(err, errSnapshotTotalTooLarge):
+		return "ledger snapshot exceeds bounded total size"
+	case errors.Is(err, errSnapshotContentChanged):
+		return "authoritative ledger content changed while establishing the snapshot"
+	case errors.Is(err, errSnapshotReplaced):
+		return "authoritative ledger file was replaced while establishing the snapshot"
+	case errors.Is(err, errSnapshotSetChanged):
+		return "authoritative ledger file set changed while establishing the snapshot"
+	default:
+		return "cannot establish a coherent diagnostic snapshot"
+	}
+}
+
+// fileIdentity is the stable (device, inode) identity of an authoritative
+// file, recorded before snapshot establishment and revalidated afterwards.
+type fileIdentity struct {
+	dev uint64
+	ino uint64
+}
+
 // authoritativeFile is the stat view of one authoritative ledger file.
 type authoritativeFile struct {
 	exists  bool
 	regular bool
 	size    int64
 	modTime time.Time
+	ident   fileIdentity
 }
 
 type authoritativeState struct {
@@ -257,6 +345,7 @@ func statFile(p string) (authoritativeFile, error) {
 		regular: fi.Mode().IsRegular(),
 		size:    fi.Size(),
 		modTime: fi.ModTime(),
+		ident:   statIdentity(fi),
 	}, nil
 }
 
@@ -279,15 +368,34 @@ func (a authoritativeState) sameAs(b authoritativeState) bool {
 	return a.db == b.db && a.wal == b.wal && a.shm == b.shm
 }
 
+// setEquals reports whether the authoritative file set is unchanged: every
+// path has the same presence, and every file that existed still points at
+// the same regular inode of the same size. Any difference means a file
+// appeared, disappeared, or was replaced during snapshot establishment.
+func (a authoritativeState) setEquals(b authoritativeState) bool {
+	return sameSetFile(a.db, b.db) && sameSetFile(a.wal, b.wal) && sameSetFile(a.shm, b.shm)
+}
+
+func sameSetFile(a, b authoritativeFile) bool {
+	if a.exists != b.exists {
+		return false
+	}
+	if !a.exists {
+		return true
+	}
+	return a.regular == b.regular && a.ident == b.ident && a.size == b.size
+}
+
 // diagnosticSnapshot is a private, disposable copy of the authoritative
 // ledger files. SQLite diagnosis runs exclusively against these copies.
 type diagnosticSnapshot struct {
-	dir       string
-	dbPath    string
-	walPath   string
-	shmPath   string
-	walExists bool
-	shmExists bool
+	dir        string
+	dbPath     string
+	walPath    string
+	shmPath    string
+	walExists  bool
+	shmExists  bool
+	totalBytes int64
 }
 
 func createDiagnosticSnapshot(path string, before authoritativeState) (*diagnosticSnapshot, error) {
@@ -305,63 +413,189 @@ func createDiagnosticSnapshot(path string, before authoritativeState) (*diagnost
 		_ = os.RemoveAll(dir)
 		return nil, err
 	}
-	if err := copyBounded(path, snap.dbPath); err != nil {
+
+	if err := snap.copyAuthoritative(path, snap.dbPath, stageAfterCopyDB); err != nil {
 		return fail(err)
 	}
 	if before.wal.exists {
-		if err := copySidecar(path+"-wal", snap.walPath); err != nil {
+		if err := snap.copyAuthoritative(path+"-wal", snap.walPath, stageAfterCopyWAL); err != nil {
 			return fail(err)
 		}
 		snap.walExists = true
 	}
 	if before.shm.exists {
-		if err := copySidecar(path+"-shm", snap.shmPath); err != nil {
+		if err := snap.copyAuthoritative(path+"-shm", snap.shmPath, stageAfterCopySHM); err != nil {
 			return fail(err)
 		}
 		snap.shmExists = true
 	}
+
+	// The authoritative file set must be unchanged: nothing appeared,
+	// disappeared, or was replaced while we copied.
+	after, err := statAuthoritative(path)
+	if err != nil {
+		return fail(err)
+	}
+	if !before.setEquals(after) {
+		return fail(errSnapshotSetChanged)
+	}
 	return snap, nil
 }
 
-func copyBounded(src, dst string) error {
-	in, err := os.Open(src)
+// copyAuthoritative copies one authoritative file into the snapshot without
+// following symlinks, verifying that the source is a stable regular file
+// before, during, and after the copy. The recorded identity and the hash
+// chain source-before == copied == source-after must all hold; any violation
+// fails the snapshot. The stage hook (if any) fires after the bytes are
+// copied and before stability verification, giving tests a deterministic
+// point at which to mutate the authoritative file set.
+func (s *diagnosticSnapshot) copyAuthoritative(src, dst string, stage snapshotCopyStage) error {
+	// Lstat first: reject anything that is not a regular file before any
+	// open, so a FIFO or device can never block the open or be read.
+	fi, err := os.Lstat(src)
+	if err != nil {
+		return err
+	}
+	if !fi.Mode().IsRegular() {
+		return errSnapshotNonRegular
+	}
+	if fi.Size() > maxDiagnoseBytes {
+		return errSnapshotOversized
+	}
+	if s.totalBytes+fi.Size() > maxDiagnoseTotalBytes {
+		return errSnapshotTotalTooLarge
+	}
+
+	// Open without following symlinks. The Lstat already rejected symlinks,
+	// but a concurrent swap to a symlink would otherwise be followed here;
+	// O_NOFOLLOW makes the open fail instead. O_NONBLOCK keeps a swapped-in
+	// FIFO from blocking the open; the descriptor is verified below.
+	in, err := openNoFollow(src)
 	if err != nil {
 		return err
 	}
 	defer in.Close()
+
+	// The descriptor must still be a regular file: the path may have been
+	// swapped for a non-symlink kind between Lstat and open.
+	if dfi, err := in.Stat(); err != nil {
+		return err
+	} else if !dfi.Mode().IsRegular() {
+		return errSnapshotNonRegular
+	}
+
+	// Hash the source content before copying.
+	if _, err := in.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	beforeHash, err := hashReader(in)
+	if err != nil {
+		return err
+	}
+
+	// Copy through the opened descriptor.
 	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, diagnoseFileMode)
 	if err != nil {
 		return err
 	}
 	defer out.Close()
+	if _, err := in.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
 	n, err := io.Copy(out, io.LimitReader(in, maxDiagnoseBytes+1))
 	if err != nil {
 		return err
 	}
+	if err := out.Close(); err != nil {
+		return err
+	}
 	if n > maxDiagnoseBytes {
-		return errors.New("file exceeds bounded diagnostic size")
+		return errSnapshotOversized
+	}
+	s.totalBytes += n
+	if s.totalBytes > maxDiagnoseTotalBytes {
+		return errSnapshotTotalTooLarge
+	}
+
+	// Narrow test hook: deterministic mutation point for tests.
+	if testSnapshotHook != nil {
+		testSnapshotHook(stage, s)
+	}
+
+	// Hash the copied file.
+	copiedHash, err := hashFile(dst)
+	if err != nil {
+		return err
+	}
+
+	// Re-read and hash the source after copying.
+	if _, err := in.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	afterHash, err := hashReader(in)
+	if err != nil {
+		return err
+	}
+
+	// Require source-before == copied == source-after.
+	if beforeHash != copiedHash || copiedHash != afterHash {
+		return errSnapshotContentChanged
+	}
+
+	// Revalidate the path identity after copying: the path must still point
+	// at the same regular inode we opened, or the file was replaced.
+	fiAfter, err := os.Lstat(src)
+	if err != nil {
+		return err
+	}
+	if !fiAfter.Mode().IsRegular() || statIdentity(fiAfter) != statIdentity(fi) {
+		return errSnapshotReplaced
 	}
 	return nil
 }
 
-// copySidecar replicates a transient sidecar into the snapshot. Regular files
-// are copied byte-for-byte; directories are replicated as directories so that
-// SQLite's own open/check behavior (SQLITE_CANTOPEN) becomes the evidence.
-// Other non-regular kinds (symlinks, fifos, sockets) are left absent so the
-// main database remains diagnosable.
-func copySidecar(src, dst string) error {
-	fi, err := os.Lstat(src)
+// openNoFollow opens a path without following a final symlink and without
+// blocking on a non-regular file kind.
+func openNoFollow(path string) (*os.File, error) {
+	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	switch {
-	case fi.Mode().IsRegular():
-		return copyBounded(src, dst)
-	case fi.IsDir():
-		return os.Mkdir(dst, diagnoseFileMode)
-	default:
-		return nil
+	return os.NewFile(uintptr(fd), path), nil
+}
+
+// statIdentity extracts the stable (device, inode) identity from a FileInfo
+// produced by Lstat.
+func statIdentity(fi os.FileInfo) fileIdentity {
+	if st, ok := fi.Sys().(*syscall.Stat_t); ok {
+		return fileIdentity{dev: uint64(st.Dev), ino: uint64(st.Ino)}
 	}
+	return fileIdentity{}
+}
+
+// hashFile returns the SHA-256 of a file's content, bounded by
+// maxDiagnoseBytes.
+func hashFile(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	return hashReader(f)
+}
+
+// hashReader returns the SHA-256 of up to maxDiagnoseBytes+1 bytes read from
+// r, failing closed when the content exceeds the bound.
+func hashReader(r io.Reader) (string, error) {
+	h := sha256.New()
+	n, err := io.Copy(h, io.LimitReader(r, maxDiagnoseBytes+1))
+	if err != nil {
+		return "", err
+	}
+	if n > maxDiagnoseBytes {
+		return "", errSnapshotOversized
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 func (s *diagnosticSnapshot) cleanup() error {

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -98,7 +99,7 @@ func TestDiagnose_MissingDatabaseIsNotInitialized(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ledger.db")
 
-	d, err := Diagnose(path)
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +114,7 @@ func TestDiagnose_MissingDatabaseIsNotInitialized(t *testing.T) {
 	if err := os.WriteFile(path+"-wal", []byte("stray"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	d2, err := Diagnose(path)
+	d2, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +137,7 @@ func TestDiagnose_HealthyDatabaseNoSidecars(t *testing.T) {
 		t.Fatalf("fixture must have no SHM: %v", err)
 	}
 
-	d, err := Diagnose(path)
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +166,7 @@ func TestDiagnose_HealthyWALSnapshot(t *testing.T) {
 		t.Fatalf("fixture must have an SHM: %v", err)
 	}
 
-	d, err := Diagnose(path)
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +188,7 @@ func TestDiagnose_WALPresentSHMAbsent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d, err := Diagnose(path)
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +217,7 @@ func TestDiagnose_SHMPresentWALAbsent(t *testing.T) {
 		t.Fatalf("fixture must have an SHM: %v", err)
 	}
 
-	d, err := Diagnose(path)
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +236,7 @@ func TestDiagnose_InvalidDatabaseHeader(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d, err := Diagnose(path)
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,7 +260,7 @@ func TestDiagnose_TruncatedDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d, err := Diagnose(path)
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -268,13 +269,16 @@ func TestDiagnose_TruncatedDatabase(t *testing.T) {
 	}
 }
 
-func TestDiagnose_WALUnusableIsWALInconsistent(t *testing.T) {
+func TestDiagnose_NonRegularWALFailsClosed(t *testing.T) {
 	r, path := fixtureRepo(t, true)
 	defer r.Close()
 
-	// Replace the WAL file with a directory. SQLite cannot open it, and that
-	// open evidence — combined with a healthy database alone — classifies the
-	// WAL as inconsistent.
+	// A directory at the WAL path is rejected during snapshot
+	// establishment: the coherent-snapshot contract never lets a
+	// non-regular authoritative file be copied or treated as evidence.
+	// The result is diagnosis_inconclusive — never corruption, and never
+	// the wal_inconsistent claim, which is deferred to the WAL
+	// classification work.
 	if err := os.Remove(path + "-wal"); err != nil {
 		t.Fatal(err)
 	}
@@ -282,15 +286,12 @@ func TestDiagnose_WALUnusableIsWALInconsistent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d, err := Diagnose(path)
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.State != WALInconsistent {
-		t.Fatalf("unusable WAL must be wal_inconsistent, got %s (%s)", d.State, d.Message)
-	}
-	if d.ReasonCode != "wal_inconsistent" {
-		t.Fatalf("unexpected reason code %q", d.ReasonCode)
+	if d.State != DiagnosisInconclusive {
+		t.Fatalf("non-regular WAL must fail closed as diagnosis_inconclusive, got %s (%s)", d.State, d.Message)
 	}
 }
 
@@ -315,7 +316,7 @@ func TestDiagnose_CorruptWALContentToleratedBySQLite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d, err := Diagnose(path)
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -350,7 +351,7 @@ func TestDiagnose_QuickCheckFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d, err := Diagnose(path)
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -379,7 +380,7 @@ func TestDiagnose_PermissionFailureIsStorageIO(t *testing.T) {
 	}
 	defer os.Chmod(path, 0o600)
 
-	d, err := Diagnose(path)
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
 	if d.State != StorageIOFailure {
 		t.Fatalf("permission failure must be storage_io_failure, got %s", d.State)
 	}
@@ -405,7 +406,7 @@ func TestDiagnose_OversizedIsInconclusive(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d, err := Diagnose(path)
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -427,7 +428,7 @@ func TestDiagnose_OriginalsUntouched(t *testing.T) {
 	walHash := sha256File(t, path+"-wal")
 	shmHash := sha256File(t, path+"-shm")
 
-	d, err := Diagnose(path)
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -464,11 +465,11 @@ func TestDiagnose_RepeatedDiagnosisIsIdempotent(t *testing.T) {
 	r, path := fixtureRepo(t, true)
 	defer r.Close()
 
-	d1, err := Diagnose(path)
+	d1, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	d2, err := Diagnose(path)
+	d2, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -485,11 +486,11 @@ func TestDiagnose_RepeatedDiagnosisIsIdempotent(t *testing.T) {
 	if err := os.WriteFile(bad, []byte("garbage header"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	c1, err := Diagnose(bad)
+	c1, err := Diagnose(bad, DiagnoseOptions{Quiescent: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	c2, err := Diagnose(bad)
+	c2, err := Diagnose(bad, DiagnoseOptions{Quiescent: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -506,10 +507,10 @@ func TestDiagnose_TemporarySnapshotCleanup(t *testing.T) {
 
 	r, path := fixtureRepo(t, true)
 	defer r.Close()
-	if _, err := Diagnose(path); err != nil {
+	if _, err := Diagnose(path, DiagnoseOptions{Quiescent: true}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Diagnose(path); err != nil {
+	if _, err := Diagnose(path, DiagnoseOptions{Quiescent: true}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -522,7 +523,7 @@ func TestDiagnose_TemporarySnapshotCleanup(t *testing.T) {
 func TestDiagnose_StableReasonCodes(t *testing.T) {
 	r, path := fixtureRepo(t, true)
 	defer r.Close()
-	d, err := Diagnose(path)
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -553,7 +554,7 @@ func TestDiagnose_StableReasonCodes(t *testing.T) {
 				}
 			}
 			tc.mutate(t, p)
-			d, err := Diagnose(p)
+			d, err := Diagnose(p, DiagnoseOptions{Quiescent: true})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -577,7 +578,7 @@ func TestDiagnose_NoSensitiveDataInJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d, err := Diagnose(path)
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -595,4 +596,474 @@ func TestDiagnose_NoSensitiveDataInJSON(t *testing.T) {
 			t.Fatalf("Diagnosis JSON must not expose %q: %s", forbidden, j)
 		}
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Snapshot-establishment contract (batch B1a): quiescence, rejection of
+// symlinks and non-regular file kinds, identity/hash verification,
+// set-membership checks, total snapshot bound, and cleanup on every failure
+// path. The SQLite classification surface (healthy/corrupt/integrity) is
+// unchanged; all of the failures below must fail closed.
+// ---------------------------------------------------------------------------
+
+// setSnapshotHook installs the narrow snapshot-copy test hook for the
+// duration of one test. Tests never rely on timing; the hook fires at a
+// deterministic stage of snapshot establishment.
+func setSnapshotHook(t *testing.T, hook func(stage snapshotCopyStage, snap *diagnosticSnapshot)) {
+	t.Helper()
+	old := testSnapshotHook
+	testSnapshotHook = hook
+	t.Cleanup(func() { testSnapshotHook = old })
+}
+
+// assertNoSnapshotLeak fails the test if any futurediff-diagnose-* temporary
+// directory was created (and not removed) since the recorded count.
+func assertNoSnapshotLeak(t *testing.T, before int) {
+	t.Helper()
+	if after := countDiagnosticTempDirs(); after != before {
+		t.Fatalf("diagnostic temp directories leaked: before=%d after=%d", before, after)
+	}
+}
+
+func TestDiagnose_QuiescentFalseFailsClosed(t *testing.T) {
+	r, path := fixtureRepo(t, true)
+	defer r.Close()
+
+	// Quiescent defaults to false: the caller has not proven the ledger is
+	// idle, so no authoritative file may be read or copied.
+	before := countDiagnosticTempDirs()
+	d, err := Diagnose(path, DiagnoseOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.State != DiagnosisInconclusive {
+		t.Fatalf("Quiescent=false must be diagnosis_inconclusive, got %s", d.State)
+	}
+	if d.ReasonCode != "diagnosis_inconclusive" {
+		t.Fatalf("unexpected reason code %q", d.ReasonCode)
+	}
+	if d.WALPresent || d.SHMPresent {
+		t.Fatal("Quiescent=false must not even inspect the sidecars")
+	}
+	assertNoSnapshotLeak(t, before)
+
+	// Even a missing database fails closed when quiescence is not asserted;
+	// database_not_initialized is only claimed under the quiescent contract.
+	missing := filepath.Join(t.TempDir(), "ledger.db")
+	dm, err := Diagnose(missing, DiagnoseOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dm.State != DiagnosisInconclusive {
+		t.Fatalf("missing database with Quiescent=false must be diagnosis_inconclusive, got %s", dm.State)
+	}
+}
+
+func TestDiagnose_UnchangedOfflineDatabaseSucceeds(t *testing.T) {
+	r, path := fixtureRepo(t, true)
+	closeCheckpointed(t, r, path)
+
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.State != Healthy {
+		t.Fatalf("unchanged offline database must be healthy, got %s (%s)", d.State, d.Message)
+	}
+	if !d.QuickCheckOK {
+		t.Fatal("QuickCheckOK must be true")
+	}
+}
+
+func TestDiagnose_DatabaseSymlinkFailsClosed(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "real.db")
+	if err := os.WriteFile(target, []byte("SQLite format 3\x00"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "ledger.db")
+	if err := os.Symlink(target, path); err != nil {
+		t.Fatal(err)
+	}
+	targetHash := sha256File(t, target)
+
+	before := countDiagnosticTempDirs()
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.State != DiagnosisInconclusive {
+		t.Fatalf("database symlink must be diagnosis_inconclusive, got %s (%s)", d.State, d.Message)
+	}
+	assertNoSnapshotLeak(t, before)
+	if got := sha256File(t, target); got != targetHash {
+		t.Fatal("symlink target must not be copied or modified")
+	}
+}
+
+func TestDiagnose_WALSymlinkFailsClosed(t *testing.T) {
+	r, path := fixtureRepo(t, true)
+	defer r.Close()
+
+	dummy := filepath.Join(filepath.Dir(path), "dummy-wal")
+	if err := os.WriteFile(dummy, []byte("dummy wal"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(path + "-wal"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(dummy, path+"-wal"); err != nil {
+		t.Fatal(err)
+	}
+
+	before := countDiagnosticTempDirs()
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.State != DiagnosisInconclusive {
+		t.Fatalf("WAL symlink must be diagnosis_inconclusive, got %s (%s)", d.State, d.Message)
+	}
+	assertNoSnapshotLeak(t, before)
+}
+
+func TestDiagnose_SHMSymlinkFailsClosed(t *testing.T) {
+	r, path := fixtureRepo(t, true)
+	defer r.Close()
+
+	dummy := filepath.Join(filepath.Dir(path), "dummy-shm")
+	if err := os.WriteFile(dummy, []byte("dummy shm"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(path + "-shm"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(dummy, path+"-shm"); err != nil {
+		t.Fatal(err)
+	}
+
+	before := countDiagnosticTempDirs()
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.State != DiagnosisInconclusive {
+		t.Fatalf("SHM symlink must be diagnosis_inconclusive, got %s (%s)", d.State, d.Message)
+	}
+	assertNoSnapshotLeak(t, before)
+}
+
+func TestDiagnose_DirectoryAtAuthoritativePath(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ledger.db")
+	if err := os.Mkdir(path, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	before := countDiagnosticTempDirs()
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.State != DiagnosisInconclusive {
+		t.Fatalf("directory at the database path must be diagnosis_inconclusive, got %s (%s)", d.State, d.Message)
+	}
+	assertNoSnapshotLeak(t, before)
+}
+
+func TestDiagnose_FIFOAtAuthoritativePath(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ledger.db")
+	if err := syscall.Mkfifo(path, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// The Lstat-first rejection must prevent any open of the FIFO: an open
+	// would block waiting for a writer.
+	before := countDiagnosticTempDirs()
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.State != DiagnosisInconclusive {
+		t.Fatalf("FIFO at the database path must be diagnosis_inconclusive, got %s (%s)", d.State, d.Message)
+	}
+	assertNoSnapshotLeak(t, before)
+}
+
+func TestDiagnose_DatabaseReplacedDuringCopy(t *testing.T) {
+	r, path := fixtureRepo(t, true)
+	defer r.Close()
+
+	setSnapshotHook(t, func(stage snapshotCopyStage, snap *diagnosticSnapshot) {
+		if stage != stageAfterCopyDB {
+			return
+		}
+		replacement := filepath.Join(t.TempDir(), "replacement.db")
+		if err := os.WriteFile(replacement, []byte("replacement database content"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Rename(replacement, path); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	before := countDiagnosticTempDirs()
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.State != DiagnosisInconclusive {
+		t.Fatalf("database replaced during copy must be diagnosis_inconclusive, never healthy or corrupt; got %s (%s)", d.State, d.Message)
+	}
+	assertNoSnapshotLeak(t, before)
+}
+
+func TestDiagnose_WALReplacedDuringCopy(t *testing.T) {
+	r, path := fixtureRepo(t, true)
+	defer r.Close()
+
+	setSnapshotHook(t, func(stage snapshotCopyStage, snap *diagnosticSnapshot) {
+		if stage != stageAfterCopyWAL {
+			return
+		}
+		replacement := filepath.Join(t.TempDir(), "replacement-wal")
+		if err := os.WriteFile(replacement, []byte("replacement wal content"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Rename(replacement, path+"-wal"); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	before := countDiagnosticTempDirs()
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.State != DiagnosisInconclusive {
+		t.Fatalf("WAL replaced during copy must be diagnosis_inconclusive, never healthy or corrupt; got %s (%s)", d.State, d.Message)
+	}
+	assertNoSnapshotLeak(t, before)
+}
+
+func TestDiagnose_SHMAttachedDuringCopy(t *testing.T) {
+	r, path := fixtureRepo(t, true)
+	closeCheckpointed(t, r, path) // no sidecars at rest
+
+	setSnapshotHook(t, func(stage snapshotCopyStage, snap *diagnosticSnapshot) {
+		if stage != stageAfterCopyDB {
+			return
+		}
+		// A transient sidecar appears mid-establishment: the authoritative
+		// file set must be detected as changed.
+		if err := os.WriteFile(path+"-shm", []byte("shm appeared"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	before := countDiagnosticTempDirs()
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.State != DiagnosisInconclusive {
+		t.Fatalf("SHM appearing during copy must be diagnosis_inconclusive, never healthy or corrupt; got %s (%s)", d.State, d.Message)
+	}
+	assertNoSnapshotLeak(t, before)
+}
+
+func TestDiagnose_SHMRemovedDuringCopy(t *testing.T) {
+	r, path := fixtureRepo(t, true)
+	defer r.Close()
+
+	setSnapshotHook(t, func(stage snapshotCopyStage, snap *diagnosticSnapshot) {
+		if stage != stageAfterCopySHM {
+			return
+		}
+		if err := os.Remove(path + "-shm"); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	before := countDiagnosticTempDirs()
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.State != DiagnosisInconclusive {
+		t.Fatalf("SHM disappearing during copy must be diagnosis_inconclusive, never healthy or corrupt; got %s (%s)", d.State, d.Message)
+	}
+	assertNoSnapshotLeak(t, before)
+}
+
+func TestDiagnose_SameSizeContentModification(t *testing.T) {
+	r, path := fixtureRepo(t, true)
+	defer r.Close()
+
+	setSnapshotHook(t, func(stage snapshotCopyStage, snap *diagnosticSnapshot) {
+		if stage != stageAfterCopyDB {
+			return
+		}
+		// In-place, same-size write: a stat-only size check would pass.
+		b, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b[len(b)/2] ^= 0xFF
+		if err := os.WriteFile(path, b, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	before := countDiagnosticTempDirs()
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.State != DiagnosisInconclusive {
+		t.Fatalf("same-size modification during copy must be diagnosis_inconclusive, never healthy or corrupt; got %s (%s)", d.State, d.Message)
+	}
+	assertNoSnapshotLeak(t, before)
+}
+
+func TestDiagnose_ContentModificationWithRestoredMtime(t *testing.T) {
+	r, path := fixtureRepo(t, true)
+	defer r.Close()
+
+	origFi, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	origMtime := origFi.ModTime()
+
+	setSnapshotHook(t, func(stage snapshotCopyStage, snap *diagnosticSnapshot) {
+		if stage != stageAfterCopyDB {
+			return
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b[len(b)/2] ^= 0xFF
+		if err := os.WriteFile(path, b, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		// Restore the modification time: only the content hash can catch
+		// this change.
+		if err := os.Chtimes(path, origMtime, origMtime); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	before := countDiagnosticTempDirs()
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.State != DiagnosisInconclusive {
+		t.Fatalf("modification with restored mtime must be diagnosis_inconclusive, never healthy or corrupt; got %s (%s)", d.State, d.Message)
+	}
+	assertNoSnapshotLeak(t, before)
+}
+
+func TestDiagnose_SourceCopyHashMismatch(t *testing.T) {
+	r, path := fixtureRepo(t, true)
+	defer r.Close()
+
+	setSnapshotHook(t, func(stage snapshotCopyStage, snap *diagnosticSnapshot) {
+		if stage != stageAfterCopyDB {
+			return
+		}
+		// Corrupt the snapshot copy itself: the copied bytes must not
+		// diverge from the source.
+		b, err := os.ReadFile(snap.dbPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b[len(b)/2] ^= 0xFF
+		if err := os.WriteFile(snap.dbPath, b, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	before := countDiagnosticTempDirs()
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.State != DiagnosisInconclusive {
+		t.Fatalf("source/copy hash mismatch must be diagnosis_inconclusive, never healthy or corrupt; got %s (%s)", d.State, d.Message)
+	}
+	assertNoSnapshotLeak(t, before)
+}
+
+func TestDiagnose_TotalSnapshotSizeBound(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ledger.db")
+	if err := os.WriteFile(path, []byte("SQLite format 3\x00"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// Sparse files: no disk cost. Each file is under the per-file bound
+	// (maxDiagnoseBytes); together they exceed maxDiagnoseTotalBytes.
+	if err := os.Truncate(path, maxDiagnoseTotalBytes-(8<<20)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path+"-wal", []byte("wal"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Truncate(path+"-wal", 16<<20); err != nil {
+		t.Fatal(err)
+	}
+
+	before := countDiagnosticTempDirs()
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.State != DiagnosisInconclusive {
+		t.Fatalf("snapshot over the total bound must be diagnosis_inconclusive, got %s (%s)", d.State, d.Message)
+	}
+	if !strings.Contains(d.Message, "total") {
+		t.Fatalf("message must name the total bound: %q", d.Message)
+	}
+	assertNoSnapshotLeak(t, before)
+}
+
+func TestDiagnose_TemporarySnapshotCleanupAfterFailures(t *testing.T) {
+	// Failure inside the copy path (source replaced mid-copy) must remove
+	// the temporary snapshot.
+	r, path := fixtureRepo(t, true)
+	defer r.Close()
+
+	setSnapshotHook(t, func(stage snapshotCopyStage, snap *diagnosticSnapshot) {
+		if stage != stageAfterCopyDB {
+			return
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b[0] ^= 0xFF
+		if err := os.WriteFile(path, b, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	})
+	before := countDiagnosticTempDirs()
+	if _, err := Diagnose(path, DiagnoseOptions{Quiescent: true}); err != nil {
+		t.Fatal(err)
+	}
+	assertNoSnapshotLeak(t, before)
+
+	// A rejection before the copy path (directory at the database path)
+	// must not create a snapshot either.
+	dir := t.TempDir()
+	bad := filepath.Join(dir, "ledger.db")
+	if err := os.Mkdir(bad, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Diagnose(bad, DiagnoseOptions{Quiescent: true}); err != nil {
+		t.Fatal(err)
+	}
+	assertNoSnapshotLeak(t, before)
 }
