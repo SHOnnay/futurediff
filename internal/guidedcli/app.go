@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/SHOnnay/futurediff/internal/daemonlock"
-	"github.com/SHOnnay/futurediff/internal/ledger"
 	"github.com/SHOnnay/futurediff/internal/operatoraudit"
 	"github.com/SHOnnay/futurediff/internal/storageguard"
 )
@@ -1238,72 +1237,56 @@ func (a *App) daemon(ctx context.Context, args []string) error {
 }
 
 func (a *App) doctor(ctx context.Context) error {
-	type check struct{ ID, Status, Detail string }
-	checks := []check{}
+	checks := []doctorCheck{}
 	if path, err := resolveExecutable(a.Binary); err == nil {
-		checks = append(checks, check{"futurediff_binary", "pass", path})
+		checks = append(checks, doctorCheck{"futurediff_binary", "pass", path})
 	} else {
-		checks = append(checks, check{"futurediff_binary", "fail", err.Error()})
+		checks = append(checks, doctorCheck{"futurediff_binary", "fail", err.Error()})
 	}
 	if path, err := resolveExecutable(a.DaemonBinary); err == nil {
-		checks = append(checks, check{"futurediffd_binary", "pass", path})
+		checks = append(checks, doctorCheck{"futurediffd_binary", "pass", path})
 	} else {
-		checks = append(checks, check{"futurediffd_binary", "fail", err.Error()})
+		checks = append(checks, doctorCheck{"futurediffd_binary", "fail", err.Error()})
 	}
 	if path, err := exec.LookPath(a.GitBinary); err == nil {
-		checks = append(checks, check{"git", "pass", path})
+		checks = append(checks, doctorCheck{"git", "pass", path})
 	} else {
-		checks = append(checks, check{"git", "fail", err.Error()})
+		checks = append(checks, doctorCheck{"git", "fail", err.Error()})
 	}
 	if a.Paths.Home.Path != "" {
 		if _, err := os.Lstat(a.Paths.Home.Path); os.IsNotExist(err) {
-			checks = append(checks, check{"futurediff_home", "pass", a.Paths.Home.Path + " (will be created with private permissions)"})
+			checks = append(checks, doctorCheck{"futurediff_home", "pass", a.Paths.Home.Path + " (will be created with private permissions)"})
 		} else if err != nil {
-			checks = append(checks, check{"futurediff_home", "fail", err.Error()})
+			checks = append(checks, doctorCheck{"futurediff_home", "fail", err.Error()})
 		} else if err := validatePrivateDirectory(a.Paths.Home.Path); err != nil {
-			checks = append(checks, check{"futurediff_home", "fail", err.Error()})
+			checks = append(checks, doctorCheck{"futurediff_home", "fail", err.Error()})
 		} else {
-			checks = append(checks, check{"futurediff_home", "pass", a.Paths.Home.Path})
+			checks = append(checks, doctorCheck{"futurediff_home", "pass", a.Paths.Home.Path})
 		}
-		checks = append(checks, check{"safe_workspaces", "pass", a.Paths.WorkspaceRoot.Path})
+		checks = append(checks, doctorCheck{"safe_workspaces", "pass", a.Paths.WorkspaceRoot.Path})
 	}
-	if err := a.Daemon.Status(ctx); err == nil {
-		checks = append(checks, check{"daemon", "pass", "running"})
+	daemonReachable := false
+	if a.Daemon.Engine != nil {
+		daemonReachable = a.Daemon.Status(ctx) == nil
+	}
+	if daemonReachable {
+		checks = append(checks, doctorCheck{"daemon", "pass", "running"})
 	} else {
-		checks = append(checks, check{"daemon", "warn", "not running"})
+		checks = append(checks, doctorCheck{"daemon", "warn", "not running"})
 	}
 
 	// Comprehensive integrity diagnostics
+	var ledgerResult ledgerDiagnosisResult
 	if a.Paths.Home.Path != "" {
 		home := a.Paths.Home.Path
-		// Ledger integrity: distinguish a missing ledger (not initialized)
-		// from a present-but-corrupt one. HealthCheck runs PRAGMA
-		// integrity_check before reporting semantic counters.
-		ledgerPath := filepath.Join(home, "ledger.db")
-		if _, statErr := os.Lstat(ledgerPath); os.IsNotExist(statErr) {
-			checks = append(checks, check{"ledger_integrity", "warn", "ledger not initialized"})
-		} else {
-			repo, openErr := ledger.OpenRepository(ledgerPath)
-			if openErr != nil {
-				checks = append(checks, check{"ledger_integrity", "fail", fmt.Sprintf("ledger is corrupt or unreadable: %v", openErr)})
-			} else {
-				health, healthErr := repo.HealthCheck()
-				if healthErr != nil {
-					checks = append(checks, check{"ledger_integrity", "fail", fmt.Sprintf("ledger failed integrity check: %v", healthErr)})
-				} else {
-					checks = append(checks, check{"ledger_integrity", "pass", fmt.Sprintf("ok (txn=%d unresolved=%d)", health.TransactionCount, health.UnresolvedCount)})
-				}
-				// Event-chain hash validation (committed-effects proof).
-				if chain, chainErr := repo.VerifyEventChains(); chainErr != nil {
-					checks = append(checks, check{"ledger_event_chains", "fail", chainErr.Error()})
-				} else if !chain.Valid {
-					checks = append(checks, check{"ledger_event_chains", "fail", "event-chain digests are inconsistent"})
-				} else {
-					checks = append(checks, check{"ledger_event_chains", "pass", fmt.Sprintf("transactions=%d events=%d", chain.Transactions, chain.Events)})
-				}
-				_ = repo.Close()
-			}
-		}
+		// Ledger integrity: quiescence-gated offline diagnosis. The ledger
+		// is never opened through the repository API from fdif doctor —
+		// that path runs migrations and can create or alter the
+		// authoritative ledger. Diagnosis runs only against a private
+		// snapshot, and only after quiescence is proved and revalidated.
+		var ledgerCheck doctorCheck
+		ledgerResult, ledgerCheck = a.diagnoseLedgerPath(ctx, home, daemonReachable)
+		checks = append(checks, ledgerCheck)
 
 		// Lock inspection: Inspect reports both a status and a diagnostics
 		// error (corrupt JSON, trailing data, oversized, symlink, unsafe
@@ -1315,25 +1298,25 @@ func (a *App) doctor(ctx context.Context) error {
 			if status.ReasonCode != "" {
 				detail += " (" + status.ReasonCode + ")"
 			}
-			checks = append(checks, check{"daemon_lock", "fail", detail})
+			checks = append(checks, doctorCheck{"daemon_lock", "fail", detail})
 		} else {
 			detail := fmt.Sprintf("held=%v owner_status=%s lock_status=%s", status.Held, status.OwnerStatus, status.LockStatus)
 			if status.ReasonCode != "" {
 				detail += " (" + status.ReasonCode + ")"
 			}
-			checks = append(checks, check{"daemon_lock", "pass", detail})
+			checks = append(checks, doctorCheck{"daemon_lock", "pass", detail})
 		}
 
 		// Storage guard
 		if guard, err := storageguard.Evaluate(home, storageguard.Policy{}, storageguard.OSProbe{}, time.Now()); err == nil {
 			detail := fmt.Sprintf("free=%.1f%% healthy=%v", guard.Filesystem.FreePercent, guard.Healthy)
 			if !guard.Healthy {
-				checks = append(checks, check{"storage", "warn", detail})
+				checks = append(checks, doctorCheck{"storage", "warn", detail})
 			} else {
-				checks = append(checks, check{"storage", "pass", detail})
+				checks = append(checks, doctorCheck{"storage", "pass", detail})
 			}
 		} else {
-			checks = append(checks, check{"storage", "warn", err.Error()})
+			checks = append(checks, doctorCheck{"storage", "warn", err.Error()})
 		}
 
 		// Audit chain
@@ -1341,41 +1324,43 @@ func (a *App) doctor(ctx context.Context) error {
 		if report, err := auditStore.Verify(); err == nil {
 			detail := fmt.Sprintf("valid=%v count=%d", report.Valid, report.Count)
 			if !report.Valid {
-				checks = append(checks, check{"audit_chain", "fail", detail + " " + strings.Join(report.Findings, "; ")})
+				checks = append(checks, doctorCheck{"audit_chain", "fail", detail + " " + strings.Join(report.Findings, "; ")})
 			} else {
-				checks = append(checks, check{"audit_chain", "pass", detail})
+				checks = append(checks, doctorCheck{"audit_chain", "pass", detail})
 			}
 		} else {
-			checks = append(checks, check{"audit_chain", "warn", err.Error()})
+			checks = append(checks, doctorCheck{"audit_chain", "warn", err.Error()})
 		}
 
-		// Backup catalog
-		if repo, err := ledger.OpenRepository(filepath.Join(home, "ledger.db")); err == nil {
-			if backups, err := repo.Backups(); err == nil {
-				checks = append(checks, check{"backup_catalog", "pass", fmt.Sprintf("count=%d", len(backups))})
-			} else {
-				checks = append(checks, check{"backup_catalog", "warn", err.Error()})
-			}
-			_ = repo.Close()
+		// Backup catalog: enumerating backups requires the read-write
+		// repository API (which runs migrations), which fdif doctor must
+		// never run against the authoritative ledger. The catalog is
+		// deferred to the daemon or the standalone doctor.
+		if _, statErr := os.Lstat(filepath.Join(home, "ledger.db")); os.IsNotExist(statErr) {
+			checks = append(checks, doctorCheck{"backup_catalog", "warn", "ledger not available"})
 		} else {
-			checks = append(checks, check{"backup_catalog", "warn", "ledger not available"})
+			checks = append(checks, doctorCheck{"backup_catalog", "warn", "backup catalog inspection requires the repository API and is deferred while the ledger is offline"})
 		}
 	}
 
 	if a.CredentialConfig == "" {
-		checks = append(checks, check{"github_credentials", "warn", "not configured; local publication remains available"})
+		checks = append(checks, doctorCheck{"github_credentials", "warn", "not configured; local publication remains available"})
 	} else if info, err := os.Lstat(a.CredentialConfig); err != nil {
-		checks = append(checks, check{"github_credentials", "fail", err.Error()})
+		checks = append(checks, doctorCheck{"github_credentials", "fail", err.Error()})
 	} else if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
-		checks = append(checks, check{"github_credentials", "fail", "credential config must be a regular file"})
+		checks = append(checks, doctorCheck{"github_credentials", "fail", "credential config must be a regular file"})
 	} else if info.Mode().Perm()&0o077 != 0 {
-		checks = append(checks, check{"github_credentials", "fail", "credential config permissions must be 0600"})
+		checks = append(checks, doctorCheck{"github_credentials", "fail", "credential config permissions must be 0600"})
 	} else if a.GitHubCredentialID == "" {
-		checks = append(checks, check{"github_credentials", "warn", "config file is present but no GitHub credential ID is selected"})
+		checks = append(checks, doctorCheck{"github_credentials", "warn", "config file is present but no GitHub credential ID is selected"})
 	} else {
 	}
 	if a.JSON {
-		return writeJSON(a.Out, map[string]any{"kind": "fdif-doctor", "checks": checks})
+		payload := map[string]any{"kind": "fdif-doctor", "checks": checks}
+		if a.Paths.Home.Path != "" {
+			payload["ledger"] = ledgerResult
+		}
+		return writeJSON(a.Out, payload)
 	}
 	a.Renderer.title("FutureDiff guided CLI doctor")
 	for _, item := range checks {
@@ -1387,6 +1372,9 @@ func (a *App) doctor(ctx context.Context) error {
 		default:
 			fmt.Fprintln(a.Out, "x", item.ID+":", item.Detail)
 		}
+	}
+	if a.Paths.Home.Path != "" && ledgerResult.RecommendedAction != "" && ledgerResult.RecommendedAction != "none" {
+		a.Renderer.next(ledgerResult.RecommendedAction)
 	}
 	return nil
 }
