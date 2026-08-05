@@ -107,6 +107,7 @@ type Diagnosis struct {
 	WALPresent      bool           `json:"wal_present,omitempty"`
 	SHMPresent      bool           `json:"shm_present,omitempty"`
 	QuickCheckOK    bool           `json:"quick_check_ok,omitempty"`
+	FullIntegrityOK bool           `json:"full_integrity_ok,omitempty"`
 	IntegrityErrors []string       `json:"integrity_errors,omitempty"`
 }
 
@@ -120,6 +121,14 @@ type DiagnoseOptions struct {
 	// Quiescent=false, Diagnose fails closed as diagnosis_inconclusive
 	// before reading or copying any authoritative file.
 	Quiescent bool
+	// FullIntegrity requests the full PRAGMA integrity_check on the private
+	// coherent snapshot in addition to the routine quick_check. It is used
+	// by opt-in fail-closed startup gates (futurediffd --require-integrity);
+	// routine diagnosis (doctor) keeps the bounded quick check. Non-ok
+	// results classify as LedgerIntegrityFailed, never corruption, and the
+	// check always runs against the snapshot copy, never the authoritative
+	// files.
+	FullIntegrity bool
 }
 
 // Diagnose performs a bounded, non-mutating integrity diagnosis of a ledger
@@ -192,7 +201,7 @@ func Diagnose(path string, opts DiagnoseOptions) (Diagnosis, error) {
 		return inconclusive(snapshotFailureMessage(err), sqliteVersion), nil
 	}
 
-	d := diagnoseSnapshot(snap, sqliteVersion)
+	d := diagnoseSnapshot(snap, sqliteVersion, opts.FullIntegrity)
 
 	if err := snap.cleanup(); err != nil {
 		return d, fmt.Errorf("remove diagnostic snapshot: %w", err)
@@ -681,17 +690,20 @@ func primaryRC(rc C.int) int {
 }
 
 type connectionResult struct {
-	state        DiagnosisState
-	journalMode  string
-	quickCheckOK bool
-	errs         []string
-	message      string
+	state           DiagnosisState
+	journalMode     string
+	quickCheckOK    bool
+	fullIntegrityOK bool
+	errs            []string
+	message         string
 }
 
 // diagnoseConnection opens one diagnostic connection against dbPath and runs
 // the bounded routine checks: journal-mode probe, (optionally) truncation
-// check, and PRAGMA quick_check. It never runs a WAL checkpoint.
-func diagnoseConnection(dbPath string, checkTruncation bool) connectionResult {
+// check, and PRAGMA quick_check; when fullIntegrity is set it additionally
+// runs the full PRAGMA integrity_check. Both checks run only against the
+// private snapshot copy. It never runs a WAL checkpoint.
+func diagnoseConnection(dbPath string, checkTruncation, fullIntegrity bool) connectionResult {
 	db, rc, err := openDiagnostic(dbPath)
 	if err != nil {
 		return connectionResult{state: stateForRC(rc), message: "cannot open diagnostic snapshot"}
@@ -724,6 +736,7 @@ func diagnoseConnection(dbPath string, checkTruncation bool) connectionResult {
 		}
 	}
 
+	check := "quick_check"
 	qc, rc, err := db.QueryRC("PRAGMA quick_check")
 	if err != nil {
 		return connectionResult{state: stateForCheckRC(rc), journalMode: mode, message: "SQLite quick_check failed"}
@@ -739,18 +752,39 @@ func diagnoseConnection(dbPath string, checkTruncation bool) connectionResult {
 			}
 		}
 	}
-	if ok {
-		return connectionResult{state: Healthy, journalMode: mode, quickCheckOK: true}
+	quickPassed := ok
+	// Full mode: quick_check passed, so run the exhaustive integrity_check on
+	// the same private snapshot. Non-ok results classify as
+	// LedgerIntegrityFailed (never corruption).
+	if ok && fullIntegrity {
+		check = "integrity_check"
+		ic, rc, err := db.QueryRC("PRAGMA integrity_check")
+		if err != nil {
+			return connectionResult{state: stateForCheckRC(rc), journalMode: mode, message: "SQLite integrity_check failed"}
+		}
+		for _, row := range ic {
+			for _, v := range row {
+				s := fmt.Sprint(v)
+				if s != "ok" {
+					ok = false
+					errs = append(errs, s)
+				}
+			}
+		}
 	}
-	return connectionResult{state: LedgerIntegrityFailed, journalMode: mode, errs: errs, message: "SQLite quick_check reported integrity errors"}
+	if ok {
+		return connectionResult{state: Healthy, journalMode: mode, quickCheckOK: true, fullIntegrityOK: fullIntegrity}
+	}
+	return connectionResult{state: LedgerIntegrityFailed, journalMode: mode, quickCheckOK: quickPassed, errs: errs, message: "SQLite " + check + " reported integrity errors"}
 }
 
 // diagnoseSnapshot runs the full two-phase diagnosis against the private
 // snapshot: first with all files present, then — only when transient sidecars
 // could explain a failure — against the main database alone. If the database
-// alone is healthy, the failure is attributed to the sidecars.
-func diagnoseSnapshot(snap *diagnosticSnapshot, sqliteVersion string) Diagnosis {
-	full := diagnoseConnection(snap.dbPath, !snap.walExists)
+// alone is healthy, the failure is attributed to the sidecars. fullIntegrity
+// selects the exhaustive integrity_check in both phases.
+func diagnoseSnapshot(snap *diagnosticSnapshot, sqliteVersion string, fullIntegrity bool) Diagnosis {
+	full := diagnoseConnection(snap.dbPath, !snap.walExists, fullIntegrity)
 	if full.state == Healthy {
 		return buildDiagnosis(Healthy, full, snap, sqliteVersion)
 	}
@@ -758,7 +792,7 @@ func diagnoseSnapshot(snap *diagnosticSnapshot, sqliteVersion string) Diagnosis 
 		if err := snap.moveSidecarsAside(); err != nil {
 			return inconclusive("cannot isolate transient sidecars for diagnosis", sqliteVersion)
 		}
-		main := diagnoseConnection(snap.dbPath, false)
+		main := diagnoseConnection(snap.dbPath, false, fullIntegrity)
 		if main.state == Healthy {
 			d := buildDiagnosis(WALInconsistent, full, snap, sqliteVersion)
 			d.Message = "WAL/SHM is inconsistent: SQLite fails against the full snapshot but the database alone is healthy"
@@ -771,14 +805,15 @@ func diagnoseSnapshot(snap *diagnosticSnapshot, sqliteVersion string) Diagnosis 
 
 func buildDiagnosis(state DiagnosisState, r connectionResult, snap *diagnosticSnapshot, sqliteVersion string) Diagnosis {
 	d := Diagnosis{
-		State:         state,
-		ReasonCode:    reasonCode(state),
-		Message:       r.message,
-		SQLiteVersion: sqliteVersion,
-		JournalMode:   r.journalMode,
-		WALPresent:    snap.walExists,
-		SHMPresent:    snap.shmExists,
-		QuickCheckOK:  r.quickCheckOK,
+		State:           state,
+		ReasonCode:      reasonCode(state),
+		Message:         r.message,
+		SQLiteVersion:   sqliteVersion,
+		JournalMode:     r.journalMode,
+		WALPresent:      snap.walExists,
+		SHMPresent:      snap.shmExists,
+		QuickCheckOK:    r.quickCheckOK,
+		FullIntegrityOK: r.fullIntegrityOK,
 	}
 	if len(r.errs) > 0 {
 		d.IntegrityErrors = boundedIntegrityErrors(r.errs)

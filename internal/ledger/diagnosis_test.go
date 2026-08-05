@@ -1,10 +1,12 @@
 package ledger
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1066,4 +1068,212 @@ func TestDiagnose_TemporarySnapshotCleanupAfterFailures(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertNoSnapshotLeak(t, before)
+}
+
+// buildIndexInconsistentDB creates a database whose unique-index content no
+// longer matches its table: a single byte flip inside an indexed column makes
+// PRAGMA quick_check pass while the exhaustive PRAGMA integrity_check fails.
+// The craft is self-verifying: candidates are tried until the observed
+// quick_check == ok and integrity_check != ok pair holds, so it stays valid
+// across SQLite versions.
+func buildIndexInconsistentDB(t *testing.T, path string) {
+	t.Helper()
+	db, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.ExecScript("CREATE TABLE t(a INTEGER PRIMARY KEY, b TEXT); CREATE UNIQUE INDEX ux ON t(b);"); err != nil {
+		_ = db.Close()
+		t.Fatal(err)
+	}
+	var sb strings.Builder
+	sb.WriteString("INSERT INTO t(b) VALUES ")
+	for i := 0; i < 5000; i++ {
+		fmt.Fprintf(&sb, "('%s'),", fmt.Sprintf("value-%06d", i))
+	}
+	stmt := strings.TrimSuffix(sb.String(), ",")
+	if _, err := db.Exec(stmt); err != nil {
+		_ = db.Close()
+		t.Fatal(err)
+	}
+	if err := db.Checkpoint(); err != nil {
+		_ = db.Close()
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for _, sidecar := range []string{path + "-wal", path + "-shm"} {
+		if _, err := os.Lstat(sidecar); err == nil {
+			if err := os.Remove(sidecar); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	base, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pageSize := int(base[16])<<8 | int(base[17])
+	if pageSize == 0 {
+		pageSize = 4096
+	}
+	// Collect every candidate position: the digit following each "value-"
+	// string inside any page of the file.
+	var candidates []int
+	for i := 0; i+6 < len(base); {
+		idx := bytes.Index(base[i:], []byte("value-"))
+		if idx < 0 {
+			break
+		}
+		pos := i + idx
+		candidates = append(candidates, pos+6)
+		i = pos + 6
+	}
+	if len(candidates) == 0 {
+		t.Fatal("no index/table value bytes found to corrupt")
+	}
+	for _, pos := range candidates {
+		orig := base[pos]
+		corrupted := make([]byte, len(base))
+		copy(corrupted, base)
+		corrupted[pos] = orig ^ 0xFF
+		probe := filepath.Join(t.TempDir(), "probe.db")
+		if err := os.WriteFile(probe, corrupted, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		quickOK, integrityOK := checkPragmas(t, probe)
+		_ = os.Remove(probe)
+		if quickOK && !integrityOK {
+			if err := os.WriteFile(path, corrupted, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			return
+		}
+	}
+	t.Fatal("could not craft an index inconsistency (quick_check ok, integrity_check failing)")
+}
+
+// checkPragmas reports whether quick_check and integrity_check both report ok
+// against a standalone database file.
+func checkPragmas(t *testing.T, path string) (quickOK, integrityOK bool) {
+	t.Helper()
+	db, _, err := openDiagnostic(path)
+	if err != nil {
+		return false, false
+	}
+	defer db.Close()
+	qc, _, err := db.QueryRC("PRAGMA quick_check")
+	if err != nil {
+		return false, false
+	}
+	quickOK = true
+	for _, row := range qc {
+		for _, v := range row {
+			if fmt.Sprint(v) != "ok" {
+				quickOK = false
+			}
+		}
+	}
+	ic, _, err := db.QueryRC("PRAGMA integrity_check")
+	if err != nil {
+		return quickOK, false
+	}
+	integrityOK = true
+	for _, row := range ic {
+		for _, v := range row {
+			if fmt.Sprint(v) != "ok" {
+				integrityOK = false
+			}
+		}
+	}
+	return quickOK, integrityOK
+}
+
+func TestDiagnose_FullIntegrityDetectsIndexInconsistency(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ledger.db")
+	buildIndexInconsistentDB(t, path)
+	before := sha256File(t, path)
+
+	// The routine quick check alone sees this fixture as healthy: the
+	// inconsistency only surfaces under the exhaustive integrity_check.
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.State != Healthy {
+		t.Fatalf("quick check must see the fixture as healthy, got %s (%s)", d.State, d.Message)
+	}
+	if !d.QuickCheckOK {
+		t.Fatal("QuickCheckOK must be true for the quick check")
+	}
+	if d.FullIntegrityOK {
+		t.Fatal("FullIntegrityOK must be false when full integrity was not requested")
+	}
+
+	full, err := Diagnose(path, DiagnoseOptions{Quiescent: true, FullIntegrity: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if full.State != LedgerIntegrityFailed {
+		t.Fatalf("full integrity must classify the index inconsistency as ledger_integrity_failed, got %s (%s)", full.State, full.Message)
+	}
+	if full.ReasonCode != "ledger_integrity_failed" {
+		t.Fatalf("reason code = %s, want ledger_integrity_failed", full.ReasonCode)
+	}
+	if !full.QuickCheckOK {
+		t.Fatal("QuickCheckOK must remain true: quick_check passed, integrity_check failed")
+	}
+	if full.FullIntegrityOK {
+		t.Fatal("FullIntegrityOK must be false: integrity_check reported errors")
+	}
+	if len(full.IntegrityErrors) == 0 || len(full.IntegrityErrors) > maxIntegrityErrors {
+		t.Fatalf("integrity errors must be bounded to (0, %d], got %d", maxIntegrityErrors, len(full.IntegrityErrors))
+	}
+	if !strings.Contains(full.Message, "integrity_check") {
+		t.Fatalf("message must name the failing check, got %q", full.Message)
+	}
+
+	// The authoritative files were never touched and no sidecars appeared.
+	if got := sha256File(t, path); got != before {
+		t.Fatal("diagnosis modified the authoritative database")
+	}
+	for _, sidecar := range []string{path + "-wal", path + "-shm"} {
+		if _, err := os.Lstat(sidecar); err == nil {
+			t.Fatalf("diagnosis created %s", sidecar)
+		}
+	}
+}
+
+func TestDiagnose_FullIntegrityHealthyLedgerSucceeds(t *testing.T) {
+	r, path := fixtureRepo(t, true)
+	closeCheckpointed(t, r, path)
+
+	d, err := Diagnose(path, DiagnoseOptions{Quiescent: true, FullIntegrity: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.State != Healthy {
+		t.Fatalf("healthy ledger under full integrity must be healthy, got %s (%s)", d.State, d.Message)
+	}
+	if !d.QuickCheckOK {
+		t.Fatal("QuickCheckOK must be true")
+	}
+	if !d.FullIntegrityOK {
+		t.Fatal("FullIntegrityOK must be true when the full check passes")
+	}
+}
+
+func TestDiagnose_FullIntegrityStillRequiresQuiescence(t *testing.T) {
+	r, path := fixtureRepo(t, true)
+	closeCheckpointed(t, r, path)
+
+	d, err := Diagnose(path, DiagnoseOptions{FullIntegrity: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.State != DiagnosisInconclusive {
+		t.Fatalf("FullIntegrity without Quiescent must fail closed, got %s", d.State)
+	}
 }
