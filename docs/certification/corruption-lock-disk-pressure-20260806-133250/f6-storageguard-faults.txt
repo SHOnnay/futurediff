@@ -1,0 +1,40 @@
+=== RUN   TestProbeWriteFailure
+--- PASS: TestProbeWriteFailure (0.00s)
+=== RUN   TestProbeShortWritePartialTempNeverAuthoritative
+--- PASS: TestProbeShortWritePartialTempNeverAuthoritative (0.00s)
+=== RUN   TestProbeFileSyncFailure
+--- PASS: TestProbeFileSyncFailure (0.00s)
+=== RUN   TestProbeRenameFailurePreservesPrevious
+--- PASS: TestProbeRenameFailurePreservesPrevious (0.01s)
+=== RUN   TestProbeDirectorySyncFailureNoFalseSuccess
+--- PASS: TestProbeDirectorySyncFailureNoFalseSuccess (0.01s)
+=== RUN   TestProbeClassification
+=== RUN   TestProbeClassification/enospc
+=== RUN   TestProbeClassification/edquot
+=== RUN   TestProbeClassification/erofs
+=== RUN   TestProbeClassification/eio
+--- PASS: TestProbeClassification (0.00s)
+    --- PASS: TestProbeClassification/enospc (0.00s)
+    --- PASS: TestProbeClassification/edquot (0.00s)
+    --- PASS: TestProbeClassification/erofs (0.00s)
+    --- PASS: TestProbeClassification/eio (0.00s)
+=== RUN   TestProbeNoFalseSuccess
+=== RUN   TestProbeNoFalseSuccess/create
+=== RUN   TestProbeNoFalseSuccess/write
+=== RUN   TestProbeNoFalseSuccess/short_write
+=== RUN   TestProbeNoFalseSuccess/file_sync
+=== RUN   TestProbeNoFalseSuccess/rename
+=== RUN   TestProbeNoFalseSuccess/directory_sync
+--- PASS: TestProbeNoFalseSuccess (0.02s)
+    --- PASS: TestProbeNoFalseSuccess/create (0.00s)
+    --- PASS: TestProbeNoFalseSuccess/write (0.00s)
+    --- PASS: TestProbeNoFalseSuccess/short_write (0.00s)
+    --- PASS: TestProbeNoFalseSuccess/file_sync (0.00s)
+    --- PASS: TestProbeNoFalseSuccess/rename (0.01s)
+    --- PASS: TestProbeNoFalseSuccess/directory_sync (0.01s)
+=== RUN   TestProbeRetrySucceedsAfterFaultRemoved
+--- PASS: TestProbeRetrySucceedsAfterFaultRemoved (0.02s)
+=== RUN   TestEvaluateFailsClosed
+--- PASS: TestEvaluateFailsClosed (0.00s)
+PASS
+ok  	github.com/SHOnnay/futurediff/internal/storageguard	(cached)

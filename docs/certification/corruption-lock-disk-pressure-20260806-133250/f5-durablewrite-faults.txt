@@ -1,0 +1,18 @@
+=== RUN   TestReplaceFileCreateFailure
+--- PASS: TestReplaceFileCreateFailure (0.00s)
+=== RUN   TestReplaceFileWriteFailure
+--- PASS: TestReplaceFileWriteFailure (0.00s)
+=== RUN   TestReplaceFileShortWriteLeavesNoAuthoritativeTemp
+--- PASS: TestReplaceFileShortWriteLeavesNoAuthoritativeTemp (0.00s)
+=== RUN   TestReplaceFileFileSyncFailure
+--- PASS: TestReplaceFileFileSyncFailure (0.00s)
+=== RUN   TestReplaceFileRenameFailure
+--- PASS: TestReplaceFileRenameFailure (0.01s)
+=== RUN   TestReplaceFileDirectorySyncFailureIsReported
+--- PASS: TestReplaceFileDirectorySyncFailureIsReported (0.01s)
+=== RUN   TestClassifyMappings
+--- PASS: TestClassifyMappings (0.00s)
+=== RUN   TestOneShotRetrySucceeds
+--- PASS: TestOneShotRetrySucceeds (0.01s)
+PASS
+ok  	github.com/SHOnnay/futurediff/internal/durablewrite	(cached)

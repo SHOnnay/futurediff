@@ -1,0 +1,1 @@
+2026/08/06 19:32:59 ledger integrity gate refused startup: reason_code=ledger_corrupt; journal-mode probe failed; recommended action: restore the ledger from a verified backup; preserve the corrupted files as evidence
