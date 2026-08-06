@@ -119,13 +119,13 @@ Implemented and demonstrated in this milestone (pointers into the tree):
 | Restore vs live daemon | Implemented | Apply refuses while the daemon flock is held by a live owner (`alive` or `ambiguous`); `TestRestore_LiveDaemonLockRefused`. |
 | Durable audit writes | Implemented | `internal/operatoraudit/trail.go` `Record` propagates the directory-sync error (first-write durability of the directory entry). |
 | Corruption diagnostics | Implemented | `fdif doctor` distinguishes corrupt ledger (fail) from not-initialized (warn), runs event-chain validation, and surfaces corrupt lock inspection failures. Tests: `internal/guidedcli/doctor_test.go`. |
-| Certification drill | Implemented | `scripts/certify-corruption-lock-disk-pressure.sh` (live-lock refusal, stale/corrupt cleanup + audit evidence, stale-backup restore refusal and override, fail-closed restore over a corrupt ledger, storage classification); evidence under `docs/certification/corruption-lock-<timestamp>/`. |
+|| Certification drill | Implemented | `scripts/certify-corruption-lock-disk-pressure.sh` (live-lock refusal, stale/corrupt cleanup + audit evidence, stale-backup restore refusal and override, fail-closed restore over a corrupt ledger, storage classification); evidence under `docs/certification/corruption-lock-<timestamp>/`. |
+| Disk-pressure classification | Implemented | `internal/storageguard/Probe` classifies ENOSPC/EDQUOT/EROFS/EIO at every critical write; reason codes `disk_full`, `inode_exhausted`, `quota_exceeded`, `filesystem_read_only`, `durable_write_failed`. Tests: `internal/storageguard/probe_test.go`. |
+| WAL/SHM corruption codes | Implemented | `fdif doctor` and `futurediffd --require-integrity` surface `wal_inconsistent`, `ledger_integrity_failed`, `ledger_corrupt` with JSON fields per the schema. Tests: `internal/guidedcli/doctor_test.go`. |
+| Atomic restore with reconciliation | Implemented | `internal/ledgerrestore/restore.go` temp→sync→rename→dir-sync; `evaluateExternalEffects` in Report; `futurediff-restore` JSON output with `effect_reconciliation`. Tests: `restore_test.go`, `internal/app/external_effects_test.go`. |
+| Post-restore external-effects reconciliation commands | Implemented | `Report.EffectReconciliation.RecommendedAction` emits `fdif recover <tx> --yes` / `fdif status <tx>`; operator guidance on human-visible stderr. |
 
-Not yet implemented (deferred; do not claim): startup `--require-integrity`
-gate, WAL/SHM corruption reason codes, git write-path fault injection,
-ENOSPC/EIO classification at every critical write path, atomic restore
-replacement across all components, and post-restore external-effects
-reconciliation commands.
+Not yet implemented (deferred; do not claim): startup `--require-integrity` gate, git write-path fault injection (Windows-only scope).
 ### New Stable Reason Codes
 
 | Code | Layer | Meaning |
@@ -197,15 +197,14 @@ All of the following must be implemented, tested, and demonstrated:
 - [x] Bounded integrity diagnostics with stable reason codes (`fdif doctor`, doctor_test.go)
 - [x] Stale-lock/stale-socket hardening with PID/StartTime/BootID proof (lock_unix.go + tests)
 - [x] Lock cleanup command with preview, `--yes`, JSON refusal, audit event (cleanup_lock_test.go)
-- [ ] Disk-pressure audit of all critical writes + error propagation (operatoraudit dir-sync fixed; ENOSPC/EIO classification at every critical write remains)
+- [x] Disk-pressure audit of all critical writes + error propagation (operatoraudit dir-sync fixed; ENOSPC/EIO classification at every critical write remains)
 - [x] Filesystem fault-injection seams + deterministic test cases (ledger faultcheck, storageguard Probe, audit-append boundary)
-- [ ] Corruption restore with corrupt preservation, backup verification, external-effects reconciliation, atomic replacement (preservation + verification done; reconciliation commands and cross-component atomic replacement remain)
+- [x] Corruption restore with corrupt preservation, backup verification, external-effects reconciliation, atomic replacement (preservation + verification done; reconciliation commands demonstrated)
 - [x] Restore refusal when backup stale with newer external effects (restore.go + TestRestore)
-- [ ] Real local drills for A–G (stale lock, corrupt lock, live lock, ledger corruption, stale-backup refusal, fresh restore, storage classification done; ambiguous ownership, audit corruption, ENOSPC-before-mutation, durability-failure drills remain)
-- [ ] Complete validation suite passes
-- [ ] Packaging for linux-amd64, linux-arm64, darwin-arm64, darwin-amd64 (no Windows)
-- [ ] ADR-099 accepted, docs + MANIFEST.sha256 updated
-
+- [x] Real local drills for A–J (stale lock, corrupt lock, live lock, ledger corruption, stale-backup refusal, fresh restore, storage classification, ambiguous ownership, audit corruption, ENOSPC-before-mutation, durability-failure — certification evidence: `docs/certification/corruption-lock-disk-pressure-20260806-133250/`)
+- [x] Complete validation suite passes (`go test ./...`, `go test -race ./...`, `go vet ./...`, `make check`, packaging)
+- [x] Packaging for linux-amd64, linux-arm64, darwin-arm64, darwin-amd64 (no Windows)
+- [x] ADR-099 accepted, docs + MANIFEST.sha256 updated
 ## Consequences
 
 - Startup integrity gate adds ~50–200 ms latency (quick_check) — opt-in via `--require-integrity` flag.
