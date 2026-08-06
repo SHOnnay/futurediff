@@ -27,20 +27,21 @@ const Confirmation = "RESTORE_FUTUREDIFF_LEDGER"
 // ADR-099 fault-injection convention: nothing outside tests constructs an
 // injector.
 const (
-	OpQuarantineCreate       = "quarantine_create"
-	OpPreserveLedger         = "preserve_ledger"
-	OpPreserveWAL            = "preserve_wal"
-	OpPreserveSHM            = "preserve_shm"
-	OpPreserveLedgerSync     = "preserve_ledger_sync"
-	OpPreserveWALSync        = "preserve_wal_sync"
-	OpPreserveSHMSync        = "preserve_shm_sync"
-	OpQuarantineEvidenceSync = "quarantine_evidence_sync"
-	OpQuarantineDirSync      = "quarantine_dir_sync"
-	OpQuarantineParentSync   = "quarantine_parent_sync"
-	OpRemoveLiveSidecars     = "remove_live_sidecars"
-	OpPublishRename          = "publish_rename"
-	OpPublishDirectorySync   = "publish_directory_sync"
-	OpPostVerify             = "post_verify"
+	OpAuthoritativeCatalogRead = "authoritative_catalog_read"
+	OpQuarantineCreate         = "quarantine_create"
+	OpPreserveLedger           = "preserve_ledger"
+	OpPreserveWAL              = "preserve_wal"
+	OpPreserveSHM              = "preserve_shm"
+	OpPreserveLedgerSync       = "preserve_ledger_sync"
+	OpPreserveWALSync          = "preserve_wal_sync"
+	OpPreserveSHMSync          = "preserve_shm_sync"
+	OpQuarantineEvidenceSync   = "quarantine_evidence_sync"
+	OpQuarantineDirSync        = "quarantine_dir_sync"
+	OpQuarantineParentSync     = "quarantine_parent_sync"
+	OpRemoveLiveSidecars       = "remove_live_sidecars"
+	OpPublishRename            = "publish_rename"
+	OpPublishDirectorySync     = "publish_directory_sync"
+	OpPostVerify               = "post_verify"
 )
 
 type Options struct {
@@ -122,15 +123,19 @@ func Run(opts Options) (Report, error) {
 // file_sync/rename/directory_sync boundaries and at the restore-specific
 // quarantine, preserve, publish, and post-verification boundaries.
 //
-// Provenance binds the backup to this FutureDiff home two ways: the backup
-// must resolve inside the live ledger's data root, and every backup recorded
-// inside the backup file's own ledger_backups catalog must also resolve
-// inside that root (with a digest that still matches the on-disk file when
-// the referenced backup still exists). A backup that was produced by another
-// home carries that home's catalog entries and is refused. A first backup of
-// a home records nothing and passes vacuously; that residual cannot be bound
-// further when the damaged live ledger is unreadable, so it remains gated by
-// the operator's explicit confirmation and digest.
+// Provenance binds the backup to this FutureDiff home: the backup must
+// resolve inside the live ledger's data root, and it must be recorded in the
+// live home's own authoritative backup catalog (its ledger_backups table)
+// with a matching recorded path, size, and digest. The catalog is read from
+// a private snapshot copy of the live ledger so the authoritative path is
+// never opened or mutated during validation, and an unreadable or missing
+// authoritative catalog fails the restore closed. Records embedded only
+// inside the candidate backup file itself are never treated as proof of
+// same-home provenance: a valid ledger copied in from another home (or a
+// first backup of this home, whose snapshot predates its own catalog insert)
+// is trusted only because this home's catalog records it. A live ledger that
+// is already byte-identical to the verified backup is trivially proven (the
+// repeat path reports AlreadyRestored and replaces nothing).
 //
 // The apply flow is a same-filesystem staged replacement:
 //
@@ -250,6 +255,14 @@ func RunWithInjector(opts Options, inject durablewrite.Injector) (Report, error)
 	}); err != nil {
 		return Report{}, fmt.Errorf("stage backup: %w", err)
 	}
+	// The staged copy must still be byte-identical to the verified backup:
+	// this re-binds the published bytes to the operator-supplied digest and
+	// refuses a backup swapped between the digest computation and the copy.
+	if stagedSHA, err := shaFile(staging); err != nil {
+		return Report{}, err
+	} else if !strings.EqualFold(stagedSHA, digest) {
+		return Report{}, errors.New("backup file changed during staging")
+	}
 	candidateRepo, err := ledger.OpenRepository(staging)
 	if err != nil {
 		return Report{}, fmt.Errorf("backup validation: %w", err)
@@ -257,7 +270,6 @@ func RunWithInjector(opts Options, inject durablewrite.Injector) (Report, error)
 	health, healthErr := candidateRepo.HealthCheck()
 	audit, auditErr := candidateRepo.Audit()
 	chain, chainErr := candidateRepo.VerifyEventChains()
-	backupRecords, recordsErr := candidateRepo.Backups()
 	closeErr := candidateRepo.Close()
 	if healthErr != nil {
 		return Report{}, healthErr
@@ -268,19 +280,20 @@ func RunWithInjector(opts Options, inject durablewrite.Injector) (Report, error)
 	if chainErr != nil {
 		return Report{}, chainErr
 	}
-	if recordsErr != nil {
-		return Report{}, fmt.Errorf("read backup catalog: %w", recordsErr)
-	}
+
 	if closeErr != nil {
 		return Report{}, closeErr
 	}
 	if !audit.Healthy || !chain.Valid {
 		return Report{}, errors.New("backup failed semantic validation")
 	}
-	// Provenance binding: every backup recorded inside the backup file's own
-	// catalog must belong to this data root and still match the on-disk file.
-	// This refuses a valid ledger copied in from another FutureDiff home.
-	if err := verifyBackupLineage(dir, backupRecords); err != nil {
+	// Authoritative provenance: the backup must be recorded in the live
+	// home's own catalog with a matching path, size, and digest. Records
+	// embedded only inside the candidate file are never sufficient. This
+	// refuses an arbitrary SQLite ledger copied into the data root even when
+	// its digest is supplied, and it fails closed when the home's catalog is
+	// missing or unreadable.
+	if err := verifyAuthoritativeProvenance(live, dir, backup, digest, inject); err != nil {
 		return Report{}, err
 	}
 	report := Report{LivePath: live, BackupPath: backup, BackupSHA256: digest, Health: health, AuditHealthy: audit.Healthy, EventChainValid: chain.Valid, CompletedAt: time.Now().UTC()}
@@ -805,45 +818,112 @@ func syncDir(path string) error {
 	return d.Sync()
 }
 
-// verifyBackupLineage binds the verified backup to this FutureDiff home using
-// the repository-controlled backup metadata recorded inside the backup file
-// itself (its ledger_backups table). Every referenced backup must resolve
-// inside the data root; a referenced file that still exists must still match
-// the recorded size and digest. This refuses a valid ledger copied in from
-// another home (its internal catalog points at that home's root) and a
-// doctored catalog. A backup that records nothing (a home's first backup)
-// passes vacuously: that residual cannot be bound further when the damaged
-// live ledger is unreadable, so it remains gated by the operator's explicit
-// confirmation and digest.
-func verifyBackupLineage(dir string, records []ledger.BackupRecord) error {
-	for _, rec := range records {
-		if !withinRoot(dir, rec.Path) {
-			return fmt.Errorf("backup ledger references backup %s outside the FutureDiff data root %s", rec.Path, dir)
-		}
-		st, err := os.Lstat(rec.Path)
-		if err != nil {
-			if os.IsNotExist(err) {
-				// The referenced backup was already deleted (e.g. by
-				// retention); lineage is still consistent.
-				continue
-			}
-			return err
-		}
-		if st.Mode()&os.ModeSymlink != 0 || !st.Mode().IsRegular() {
-			continue
-		}
-		if st.Size() != rec.SizeBytes {
-			return fmt.Errorf("backup ledger references backup %s with size %d, on-disk size %d", rec.Path, rec.SizeBytes, st.Size())
-		}
-		sum, err := shaFile(rec.Path)
-		if err != nil {
-			return err
-		}
-		if !strings.EqualFold(sum, rec.SHA256) {
-			return fmt.Errorf("backup ledger references backup %s with digest %s that does not match the on-disk file", rec.Path, rec.SHA256)
+// verifyAuthoritativeProvenance binds the verified backup to the live
+// FutureDiff home using the home's own backup catalog (the ledger_backups
+// table of the live ledger). The candidate must be recorded under the exact
+// path being restored with a recorded size and digest that still match the
+// on-disk file; anything else is refused. Records embedded only inside the
+// candidate backup file are never sufficient proof of same-home provenance,
+// so an arbitrary SQLite ledger copied into the data root is refused even
+// when the operator supplies its digest. A live ledger that is already
+// byte-identical to the verified backup is trivially proven (nothing will be
+// replaced; the repeat path reports AlreadyRestored), because after a
+// successful restore the restored home's catalog legitimately no longer
+// records the restored backup (its snapshot predates its own catalog
+// insert).
+//
+// The catalog is read from a private snapshot copy of the live ledger (db
+// plus any WAL/SHM sidecars), so the authoritative path is never opened or
+// mutated during validation — including during a dry run. A missing or
+// unreadable authoritative catalog fails the restore closed. Recorded paths
+// are only compared for equality and echoed in error messages; they are
+// never opened, so a doctored record cannot redirect file operations.
+func verifyAuthoritativeProvenance(live, dir, backup, digest string, inject durablewrite.Injector) error {
+	if liveSHA, err := shaFile(live); err == nil && strings.EqualFold(liveSHA, digest) {
+		return nil
+	}
+	records, err := readAuthoritativeCatalog(live, inject)
+	if err != nil {
+		return fmt.Errorf("authoritative backup catalog unavailable: %w", err)
+	}
+	var rec *ledger.BackupRecord
+	for i := range records {
+		if records[i].Path == backup {
+			rec = &records[i]
+			break
 		}
 	}
+	if rec == nil {
+		return fmt.Errorf("backup %s is not recorded in the authoritative backup catalog of %s", backup, dir)
+	}
+	st, err := os.Lstat(backup)
+	if err != nil {
+		return err
+	}
+	if st.Mode()&os.ModeSymlink != 0 || !st.Mode().IsRegular() {
+		return fmt.Errorf("backup %s must be a regular file", backup)
+	}
+	if st.Size() != rec.SizeBytes {
+		return fmt.Errorf("backup %s catalog record has size %d, on-disk size %d", backup, rec.SizeBytes, st.Size())
+	}
+	if !strings.EqualFold(rec.SHA256, digest) {
+		return fmt.Errorf("backup %s catalog record has digest %s that does not match the on-disk file", backup, rec.SHA256)
+	}
 	return nil
+}
+
+// readAuthoritativeCatalog reads the live home's backup catalog from a
+// private snapshot copy of the at-rest live ledger (ledger.db plus any
+// WAL/SHM sidecars). Opening a copy keeps the authoritative path untouched
+// and lets a damaged original be read without ever writing to it. The
+// snapshot is disposable and removed on every path.
+func readAuthoritativeCatalog(live string, inject durablewrite.Injector) ([]ledger.BackupRecord, error) {
+	if inject != nil {
+		if err := inject.Before(OpAuthoritativeCatalogRead); err != nil {
+			return nil, err
+		}
+	}
+	scratch, err := os.MkdirTemp("", "futurediff-provenance-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(scratch)
+	base := filepath.Base(live)
+	// A live ledger that does not exist cannot supply an authoritative
+	// catalog: fail closed instead of letting an open of an empty copy
+	// masquerade as an empty catalog.
+	if _, err := os.Lstat(live); err != nil {
+		return nil, err
+	}
+	for _, suffix := range []string{"", "-wal", "-shm"} {
+		src := live + suffix
+		st, statErr := os.Lstat(src)
+		if statErr != nil {
+			if os.IsNotExist(statErr) {
+				continue
+			}
+			return nil, statErr
+		}
+		if st.Mode()&os.ModeSymlink != 0 || !st.Mode().IsRegular() {
+			return nil, fmt.Errorf("live file %s must be a regular non-symlink file", src)
+		}
+		if err := copyFileContents(src, filepath.Join(scratch, base+suffix), 0o600); err != nil {
+			return nil, err
+		}
+	}
+	repo, err := ledger.OpenRepository(filepath.Join(scratch, base))
+	if err != nil {
+		return nil, err
+	}
+	records, readErr := repo.Backups()
+	closeErr := repo.Close()
+	if readErr != nil {
+		return nil, readErr
+	}
+	if closeErr != nil {
+		return nil, closeErr
+	}
+	return records, nil
 }
 
 // removeLiveSidecars removes the pre-restore WAL/SHM sidecars from the

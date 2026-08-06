@@ -26,26 +26,7 @@ func addTx(t *testing.T, r *ledger.Repository, id, root string) {
 }
 
 func TestRestore(t *testing.T) {
-	root := t.TempDir()
-	sourcePath := filepath.Join(root, "source.db")
-	source, err := ledger.OpenRepository(sourcePath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	addTx(t, source, "one", root)
-	backupPath := filepath.Join(root, "backup.db")
-	if _, err = source.Backup(backupPath); err != nil {
-		t.Fatal(err)
-	}
-	source.Close()
-	livePath := filepath.Join(root, "live.db")
-	live, err := ledger.OpenRepository(livePath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	addTx(t, live, "one", root)
-	addTx(t, live, "two", root)
-	live.Close()
+	root, livePath, backupPath := restoreFixture(t)
 	dry, err := Run(Options{LivePath: livePath, BackupPath: backupPath})
 	if err != nil {
 		t.Fatal(err)
@@ -110,24 +91,19 @@ func TestRestore_CurrentBackupAllowed(t *testing.T) {
 
 func TestRestore_LiveDaemonLockRefused(t *testing.T) {
 	root := t.TempDir()
-	sourcePath := filepath.Join(root, "source.db")
-	source, err := ledger.OpenRepository(sourcePath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	addTx(t, source, "one", root)
-	backupPath := filepath.Join(root, "backup.db")
-	if _, err = source.Backup(backupPath); err != nil {
-		t.Fatal(err)
-	}
-	source.Close()
 	livePath := filepath.Join(root, "live.db")
 	live, err := ledger.OpenRepository(livePath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	addTx(t, live, "one", root)
-	live.Close()
+	backupPath := filepath.Join(root, "backup.db")
+	if _, err := live.Backup(backupPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := live.Close(); err != nil {
+		t.Fatal(err)
+	}
 	lockPath := filepath.Join(root, "daemon.lock")
 	lock, err := daemonlock.Acquire(lockPath, root, time.Now())
 	if err != nil {
@@ -174,30 +150,24 @@ func corruptMiddleBytes(t *testing.T, path string) {
 }
 
 // restoreFixture returns an isolated data root containing a live ledger with
-// two transactions and a verified backup of a sibling ledger with one
-// transaction (an older backup that requires AllowStaleBackup to apply).
+// two transactions and a verified backup of that same home recorded in its
+// authoritative catalog with one transaction (an older backup that requires
+// AllowStaleBackup to apply). The backup is the home's first backup: its
+// snapshot predates its own catalog insert, so the candidate file itself
+// records nothing — provenance comes from the home's catalog.
 func restoreFixture(t *testing.T) (root, live, backup string) {
 	t.Helper()
 	root = t.TempDir()
-	src := filepath.Join(root, "source.db")
-	s, err := ledger.OpenRepository(src)
-	if err != nil {
-		t.Fatal(err)
-	}
-	addTx(t, s, "one", root)
-	backup = filepath.Join(root, "backup.db")
-	if _, err := s.Backup(backup); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.Close(); err != nil {
-		t.Fatal(err)
-	}
 	live = filepath.Join(root, "live.db")
 	l, err := ledger.OpenRepository(live)
 	if err != nil {
 		t.Fatal(err)
 	}
 	addTx(t, l, "one", root)
+	backup = filepath.Join(root, "backup.db")
+	if _, err := l.Backup(backup); err != nil {
+		t.Fatal(err)
+	}
 	addTx(t, l, "two", root)
 	if err := l.Close(); err != nil {
 		t.Fatal(err)
@@ -205,14 +175,23 @@ func restoreFixture(t *testing.T) (root, live, backup string) {
 	return root, live, backup
 }
 
-// walAtRestLedger builds a ledger whose WAL and SHM files exist at rest with
-// uncheckpointed frames, copied out while the writer connection is open.
-func walAtRestLedger(t *testing.T, root string) string {
+// walAtRestLedger builds a live ledger whose WAL and SHM files exist at rest
+// with uncheckpointed frames, copied out while the writer connection is open,
+// together with a backup recorded in that same home's authoritative catalog.
+// The backup is created before the uncheckpointed frame is added, so it holds
+// two transactions and cannot be polluted by the later wal-tx frame.
+func walAtRestLedger(t *testing.T, root string) (live, backup string) {
 	t.Helper()
 	scratch := t.TempDir()
 	path := filepath.Join(scratch, "ledger.db")
 	r, err := ledger.OpenRepository(path)
 	if err != nil {
+		t.Fatal(err)
+	}
+	addTx(t, r, "one", scratch)
+	addTx(t, r, "two", scratch)
+	backup = filepath.Join(root, "backup.db")
+	if _, err := r.Backup(backup); err != nil {
 		t.Fatal(err)
 	}
 	addTx(t, r, "wal-tx", scratch)
@@ -226,7 +205,7 @@ func walAtRestLedger(t *testing.T, root string) string {
 		}
 	}
 	_ = r.Close()
-	return filepath.Join(root, "ledger.db")
+	return filepath.Join(root, "ledger.db"), backup
 }
 
 func stagingArtifacts(t *testing.T, dir string) []string {
@@ -415,23 +394,9 @@ func TestRestore_CorruptOriginalPreservedByteForByte(t *testing.T) {
 
 func TestRestore_WALAndSHMPreservedWhenPresent(t *testing.T) {
 	root := t.TempDir()
-	live := walAtRestLedger(t, root)
+	live, backup := walAtRestLedger(t, root)
 	walSHA := mustSHA(t, live+"-wal")
 	shmSHA := mustSHA(t, live+"-shm")
-	src := filepath.Join(root, "source.db")
-	s, err := ledger.OpenRepository(src)
-	if err != nil {
-		t.Fatal(err)
-	}
-	addTx(t, s, "one", root)
-	addTx(t, s, "two", root)
-	backup := filepath.Join(root, "backup.db")
-	if _, err := s.Backup(backup); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.Close(); err != nil {
-		t.Fatal(err)
-	}
 	dry, err := Run(Options{LivePath: live, BackupPath: backup})
 	if err != nil {
 		t.Fatal(err)
@@ -619,15 +584,20 @@ func TestRestore_SidecarSymlinkRefused(t *testing.T) {
 	}
 	before := mustSHA(t, live)
 	backupSHA := mustSHA(t, backup)
-	dry, err := Run(Options{LivePath: live, BackupPath: backup})
-	if err != nil {
-		t.Fatal(err)
+	// The authoritative catalog snapshot refuses to follow a symlinked
+	// sidecar, so validation fails closed for the dry run too.
+	_, err := Run(Options{LivePath: live, BackupPath: backup})
+	if err == nil {
+		t.Fatal("dry run with a symlinked sidecar must fail closed")
 	}
-	_, err = RunWithInjector(applyOptions(root, live, backup, dry.BackupSHA256), nil)
+	if !strings.Contains(err.Error(), "regular non-symlink") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = RunWithInjector(applyOptions(root, live, backup, backupSHA), nil)
 	if err == nil {
 		t.Fatal("symlinked sidecar must refuse the restore")
 	}
-	if !strings.Contains(err.Error(), "sidecar") {
+	if !strings.Contains(err.Error(), "regular non-symlink") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if mustSHA(t, live) != before {
@@ -636,7 +606,7 @@ func TestRestore_SidecarSymlinkRefused(t *testing.T) {
 	if mustSHA(t, backup) != backupSHA {
 		t.Fatal("backup changed")
 	}
-	// The partial quarantine is removed; nothing is left behind.
+	// Nothing is left behind.
 	assertNoRestoreArtifacts(t, root)
 }
 
@@ -821,20 +791,7 @@ func TestRestore_PreserveFaultsFailClosed(t *testing.T) {
 			var root, live, backup string
 			if tc.withSidecars {
 				root = t.TempDir()
-				live = walAtRestLedger(t, root)
-				src := filepath.Join(root, "source.db")
-				s, err := ledger.OpenRepository(src)
-				if err != nil {
-					t.Fatal(err)
-				}
-				addTx(t, s, "one", root)
-				backup = filepath.Join(root, "backup.db")
-				if _, err := s.Backup(backup); err != nil {
-					t.Fatal(err)
-				}
-				if err := s.Close(); err != nil {
-					t.Fatal(err)
-				}
+				live, backup = walAtRestLedger(t, root)
 			} else {
 				root, live, backup = restoreFixture(t)
 			}
@@ -1122,55 +1079,51 @@ func TestRestore_RepeatFaultPersistsNoFalseSuccess(t *testing.T) {
 func TestRestore_RepeatedDistinctRestorePreservesEvidence(t *testing.T) {
 	// A genuine re-restore with a different verified backup is not
 	// already-restored: it creates a second, distinct quarantine and the
-	// first preserved original is never overwritten.
+	// first preserved original is never overwritten. Both backups are
+	// recorded in the home's authoritative catalog at restore time, so the
+	// restores run newest-first: once an older backup is restored, later
+	// backups are no longer catalogued by the restored home and are refused
+	// (fail-closed provenance sequencing).
 	root := t.TempDir()
-	live := buildLedgerAt(t, root, "live.db", 2)
-	src1 := filepath.Join(root, "src1.db")
-	s1, err := ledger.OpenRepository(src1)
+	live := filepath.Join(root, "live.db")
+	l, err := ledger.OpenRepository(live)
 	if err != nil {
 		t.Fatal(err)
 	}
-	addTx(t, s1, "a", root)
+	addTx(t, l, "a", root)
 	backup1 := filepath.Join(root, "backup1.db")
-	if _, err := s1.Backup(backup1); err != nil {
+	if _, err := l.Backup(backup1); err != nil {
 		t.Fatal(err)
 	}
-	if err := s1.Close(); err != nil {
-		t.Fatal(err)
-	}
-	src2 := filepath.Join(root, "src2.db")
-	s2, err := ledger.OpenRepository(src2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	addTx(t, s2, "b", root)
+	addTx(t, l, "b", root)
 	backup2 := filepath.Join(root, "backup2.db")
-	if _, err := s2.Backup(backup2); err != nil {
+	if _, err := l.Backup(backup2); err != nil {
 		t.Fatal(err)
 	}
-	if err := s2.Close(); err != nil {
+	addTx(t, l, "c", root)
+	if err := l.Close(); err != nil {
 		t.Fatal(err)
 	}
 	original := mustSHA(t, live)
-	dry1, err := Run(Options{LivePath: live, BackupPath: backup1})
-	if err != nil {
-		t.Fatal(err)
-	}
-	r1, err := RunWithInjector(applyOptions(root, live, backup1, dry1.BackupSHA256), nil)
-	if err != nil || !r1.Applied {
-		t.Fatalf("first restore failed: err=%v", err)
-	}
-	after1 := mustSHA(t, live)
-	if after1 == original {
-		t.Fatal("first restore did not change the ledger")
-	}
 	dry2, err := Run(Options{LivePath: live, BackupPath: backup2})
 	if err != nil {
 		t.Fatal(err)
 	}
 	r2, err := RunWithInjector(applyOptions(root, live, backup2, dry2.BackupSHA256), nil)
 	if err != nil || !r2.Applied {
-		t.Fatalf("second restore failed: err=%v", err)
+		t.Fatalf("newer restore failed: err=%v", err)
+	}
+	after2 := mustSHA(t, live)
+	if after2 == original {
+		t.Fatal("restore did not change the ledger")
+	}
+	dry1, err := Run(Options{LivePath: live, BackupPath: backup1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r1, err := RunWithInjector(applyOptions(root, live, backup1, dry1.BackupSHA256), nil)
+	if err != nil || !r1.Applied {
+		t.Fatalf("older restore failed: err=%v", err)
 	}
 	all := evidenceDirs(t, root)
 	if len(all) != 2 {
@@ -1180,11 +1133,21 @@ func TestRestore_RepeatedDistinctRestorePreservesEvidence(t *testing.T) {
 	for _, d := range all {
 		shas[mustSHA(t, filepath.Join(d, "ledger.db"))] = true
 	}
-	if !shas[original] || !shas[after1] {
-		t.Fatalf("preserved evidence shas %v, want %s and %s", shas, original, after1)
+	if !shas[original] || !shas[after2] {
+		t.Fatalf("preserved evidence shas %v, want %s and %s", shas, original, after2)
 	}
-	if r1.Preserved.LedgerSHA256 == r2.Preserved.LedgerSHA256 {
+	if r2.Preserved.LedgerSHA256 == r1.Preserved.LedgerSHA256 {
 		t.Fatal("second restore reused the first quarantine")
+	}
+	// After the older backup is restored, the newer backup is no longer
+	// recorded in the restored home's catalog: it must be refused rather than
+	// trusted from its own embedded records.
+	_, err = Run(Options{LivePath: live, BackupPath: backup2})
+	if err == nil {
+		t.Fatal("backup no longer catalogued after an older restore must be refused")
+	}
+	if !strings.Contains(err.Error(), "not recorded in the authoritative backup catalog") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -1210,20 +1173,7 @@ func TestRestore_QuarantineDurabilityFaultsFailClosed(t *testing.T) {
 			var root, live, backup string
 			if tc.withSidecars {
 				root = t.TempDir()
-				live = walAtRestLedger(t, root)
-				src := filepath.Join(root, "source.db")
-				s, err := ledger.OpenRepository(src)
-				if err != nil {
-					t.Fatal(err)
-				}
-				addTx(t, s, "one", root)
-				backup = filepath.Join(root, "backup.db")
-				if _, err := s.Backup(backup); err != nil {
-					t.Fatal(err)
-				}
-				if err := s.Close(); err != nil {
-					t.Fatal(err)
-				}
+				live, backup = walAtRestLedger(t, root)
 			} else {
 				root, live, backup = restoreFixture(t)
 			}
@@ -1305,9 +1255,9 @@ func TestRestore_RemoveLiveSidecarsFaultRetainsQuarantine(t *testing.T) {
 }
 
 func TestRestore_Provenance_ValidCataloguedSameHomeBackup(t *testing.T) {
-	// A same-home backup whose internal catalog records an earlier same-home
-	// backup (path inside the root, matching on-disk size and digest) passes
-	// lineage and restores.
+	// A later backup of the same home is recorded in the home's authoritative
+	// catalog (under its exact path, with matching size and digest), so it
+	// passes provenance and restores.
 	root := t.TempDir()
 	live := filepath.Join(root, "live.db")
 	r, err := ledger.OpenRepository(live)
@@ -1327,7 +1277,6 @@ func TestRestore_Provenance_ValidCataloguedSameHomeBackup(t *testing.T) {
 	if err := r.Close(); err != nil {
 		t.Fatal(err)
 	}
-	// backup2 internally records backup1 at a path inside this data root.
 	before := mustSHA(t, live)
 	dry, err := Run(Options{LivePath: live, BackupPath: backup2})
 	if err != nil {
@@ -1342,11 +1291,75 @@ func TestRestore_Provenance_ValidCataloguedSameHomeBackup(t *testing.T) {
 	}
 }
 
+func TestRestore_Provenance_EmptyCandidateCatalogAccepted(t *testing.T) {
+	// A home's first backup records nothing inside the backup file itself
+	// (the snapshot predates its own catalog insert), yet it is recorded in
+	// the live home's authoritative catalog. An empty candidate catalog is
+	// accepted precisely because provenance comes from the home, not from
+	// records embedded in the candidate.
+	root, live, backup := restoreFixture(t)
+	dry, err := Run(Options{LivePath: live, BackupPath: backup})
+	if err != nil {
+		t.Fatal(err)
+	}
+	report, err := RunWithInjector(applyOptions(root, live, backup, dry.BackupSHA256), nil)
+	if err != nil || !report.Applied {
+		t.Fatalf("first home backup with an empty candidate catalog must restore: err=%v", err)
+	}
+}
+
+func TestRestore_Provenance_UncataloguedBackupRefused(t *testing.T) {
+	// A valid ledger produced by a sibling repository and placed inside the
+	// data root is not recorded in the live home's authoritative catalog and
+	// must be refused even though its path is inside the root and its digest
+	// is supplied: records embedded only inside a candidate file are never
+	// treated as proof of same-home provenance.
+	root, live, _ := restoreFixture(t)
+	src := filepath.Join(root, "sibling-source.db")
+	s, err := ledger.OpenRepository(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addTx(t, s, "sibling", root)
+	uncatalogued := filepath.Join(root, "uncatalogued.db")
+	if _, err := s.Backup(uncatalogued); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	before := mustSHA(t, live)
+	backupSHA := mustSHA(t, uncatalogued)
+	// Provenance is part of validation, so the dry run refuses too.
+	if _, err := Run(Options{LivePath: live, BackupPath: uncatalogued}); err == nil {
+		t.Fatal("dry run with an uncatalogued backup must be refused")
+	}
+	_, err = RunWithInjector(applyOptions(root, live, uncatalogued, backupSHA), nil)
+	if err == nil {
+		t.Fatal("uncatalogued backup must be refused")
+	}
+	if !strings.Contains(err.Error(), "not recorded in the authoritative backup catalog") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Refusal errors never leak environment secrets.
+	for _, secret := range []string{os.Getenv("HOME"), os.Getenv("USER")} {
+		if secret != "" && strings.Contains(err.Error(), secret) {
+			t.Fatalf("refusal error leaks %q: %v", secret, err)
+		}
+	}
+	if mustSHA(t, live) != before {
+		t.Fatal("live ledger changed")
+	}
+	if mustSHA(t, uncatalogued) != backupSHA {
+		t.Fatal("backup changed")
+	}
+	assertNoRestoreArtifacts(t, root)
+}
+
 func TestRestore_Provenance_OtherHomeBackupRefused(t *testing.T) {
-	// A valid ledger produced by another FutureDiff home records that home's
-	// backups at that home's root. Placed in this data root, it must be
-	// refused — location alone must not make an uncatalogued foreign file a
-	// trusted same-home backup.
+	// A valid ledger produced by another FutureDiff home is refused even when
+	// copied inside this data root: its records live only in the other home's
+	// catalog, and this home's authoritative catalog does not record it.
 	otherRoot := t.TempDir()
 	br, err := ledger.OpenRepository(filepath.Join(otherRoot, "live.db"))
 	if err != nil {
@@ -1364,9 +1377,8 @@ func TestRestore_Provenance_OtherHomeBackupRefused(t *testing.T) {
 	if err := br.Close(); err != nil {
 		t.Fatal(err)
 	}
-	root := t.TempDir()
-	live := buildLedgerAt(t, root, "live.db", 1)
-	foreign := filepath.Join(root, "backup.db")
+	root, live, _ := restoreFixture(t)
+	foreign := filepath.Join(root, "foreign.db")
 	if err := copyFile(b2, foreign, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -1379,7 +1391,7 @@ func TestRestore_Provenance_OtherHomeBackupRefused(t *testing.T) {
 	if err == nil {
 		t.Fatal("foreign home's backup must be refused")
 	}
-	if !strings.Contains(err.Error(), "outside the FutureDiff data root") {
+	if !strings.Contains(err.Error(), "not recorded in the authoritative backup catalog") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if mustSHA(t, live) != before {
@@ -1388,10 +1400,10 @@ func TestRestore_Provenance_OtherHomeBackupRefused(t *testing.T) {
 	assertNoRestoreArtifacts(t, root)
 }
 
-func TestRestore_Provenance_MismatchedInternalDigestRefused(t *testing.T) {
-	// A backup whose internal catalog references an earlier backup whose
-	// on-disk bytes no longer match the recorded digest is refused: the
-	// repository-controlled metadata is no longer truthful.
+func TestRestore_Provenance_MismatchedAuthoritativeDigestRefused(t *testing.T) {
+	// The authoritative catalog records the digest of the backup at creation
+	// time; a file whose on-disk bytes no longer match that recorded digest
+	// is refused even when the operator supplies the current digest.
 	root := t.TempDir()
 	live := filepath.Join(root, "live.db")
 	r, err := ledger.OpenRepository(live)
@@ -1399,31 +1411,168 @@ func TestRestore_Provenance_MismatchedInternalDigestRefused(t *testing.T) {
 		t.Fatal(err)
 	}
 	addTx(t, r, "one", root)
-	addTx(t, r, "two", root)
-	backup1 := filepath.Join(root, "backup1.db")
-	if _, err := r.Backup(backup1); err != nil {
-		t.Fatal(err)
-	}
-	// Tamper with the referenced backup after its record was recorded, then
-	// produce a later backup whose internal catalog still holds the original
-	// digest for the now-different file.
-	corruptMiddleBytes(t, backup1)
-	backup2 := filepath.Join(root, "backup2.db")
-	if _, err := r.Backup(backup2); err != nil {
+	backup := filepath.Join(root, "backup.db")
+	if _, err := r.Backup(backup); err != nil {
 		t.Fatal(err)
 	}
 	if err := r.Close(); err != nil {
 		t.Fatal(err)
 	}
+	corruptMiddleBytes(t, backup)
 	before := mustSHA(t, live)
-	if _, err := Run(Options{LivePath: live, BackupPath: backup2}); err == nil {
-		t.Fatal("backup with a mismatched internal digest must be refused")
+	current := mustSHA(t, backup)
+	if _, err := Run(Options{LivePath: live, BackupPath: backup}); err == nil {
+		t.Fatal("dry run with a tampered backup must be refused")
 	}
-	_, err = RunWithInjector(applyOptions(root, live, backup2, mustSHA(t, backup2)), nil)
+	_, err = RunWithInjector(applyOptions(root, live, backup, current), nil)
 	if err == nil {
-		t.Fatal("apply with a mismatched internal digest must be refused")
+		t.Fatal("apply with a tampered backup must be refused")
 	}
 	if !strings.Contains(err.Error(), "does not match the on-disk file") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if mustSHA(t, live) != before {
+		t.Fatal("live ledger changed")
+	}
+	assertNoRestoreArtifacts(t, root)
+}
+
+func TestRestore_Provenance_MismatchedAuthoritativeSizeRefused(t *testing.T) {
+	// Appending trailing bytes changes the on-disk size, which no longer
+	// matches the recorded size in the authoritative catalog: refused.
+	root := t.TempDir()
+	live := filepath.Join(root, "live.db")
+	r, err := ledger.OpenRepository(live)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addTx(t, r, "one", root)
+	backup := filepath.Join(root, "backup.db")
+	if _, err := r.Backup(backup); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Close(); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.OpenFile(backup, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Write([]byte("stale-trailing-bytes")); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	before := mustSHA(t, live)
+	current := mustSHA(t, backup)
+	if _, err := Run(Options{LivePath: live, BackupPath: backup}); err == nil {
+		t.Fatal("dry run with a size-mismatched backup must be refused")
+	}
+	_, err = RunWithInjector(applyOptions(root, live, backup, current), nil)
+	if err == nil {
+		t.Fatal("apply with a size-mismatched backup must be refused")
+	}
+	if !strings.Contains(err.Error(), "catalog record has size") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if mustSHA(t, live) != before {
+		t.Fatal("live ledger changed")
+	}
+	assertNoRestoreArtifacts(t, root)
+}
+
+func TestRestore_Provenance_MismatchedAuthoritativePathRefused(t *testing.T) {
+	// The authoritative catalog binds the record to the exact recorded path;
+	// restoring the same bytes from a different path inside the root is not a
+	// catalogued backup and is refused.
+	root := t.TempDir()
+	live := filepath.Join(root, "live.db")
+	r, err := ledger.OpenRepository(live)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addTx(t, r, "one", root)
+	backup1 := filepath.Join(root, "backup1.db")
+	if _, err := r.Backup(backup1); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Close(); err != nil {
+		t.Fatal(err)
+	}
+	renamed := filepath.Join(root, "renamed.db")
+	if err := copyFile(backup1, renamed, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	before := mustSHA(t, live)
+	sha := mustSHA(t, renamed)
+	if _, err := Run(Options{LivePath: live, BackupPath: renamed}); err == nil {
+		t.Fatal("dry run with a path-mismatched backup must be refused")
+	}
+	_, err = RunWithInjector(applyOptions(root, live, renamed, sha), nil)
+	if err == nil {
+		t.Fatal("apply with a path-mismatched backup must be refused")
+	}
+	if !strings.Contains(err.Error(), "not recorded in the authoritative backup catalog") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if mustSHA(t, live) != before {
+		t.Fatal("live ledger changed")
+	}
+	assertNoRestoreArtifacts(t, root)
+}
+
+func TestRestore_Provenance_MissingLiveCatalogFailsClosed(t *testing.T) {
+	// With no live ledger there is no authoritative catalog to prove
+	// same-home provenance: restore fails closed rather than trusting a file
+	// merely because it sits inside the data root with a supplied digest.
+	root := t.TempDir()
+	live := filepath.Join(root, "live.db")
+	src := filepath.Join(root, "source.db")
+	s, err := ledger.OpenRepository(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addTx(t, s, "one", root)
+	backup := filepath.Join(root, "backup.db")
+	if _, err := s.Backup(backup); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	_, err = Run(Options{LivePath: live, BackupPath: backup})
+	if err == nil {
+		t.Fatal("dry run with a missing live ledger must fail closed")
+	}
+	if !strings.Contains(err.Error(), "authoritative backup catalog unavailable") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = RunWithInjector(applyOptions(root, live, backup, mustSHA(t, backup)), nil)
+	if err == nil {
+		t.Fatal("apply with a missing live ledger must fail closed")
+	}
+	if !strings.Contains(err.Error(), "authoritative backup catalog unavailable") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertNoRestoreArtifacts(t, root)
+}
+
+func TestRestore_Provenance_CorruptCatalogFailsClosed(t *testing.T) {
+	// A catalog read that cannot complete fails the restore closed: an
+	// unreadable authoritative catalog must never be silently bypassed.
+	root, live, backup := restoreFixture(t)
+	before := mustSHA(t, live)
+	dry, err := Run(Options{LivePath: live, BackupPath: backup})
+	if err != nil {
+		t.Fatal(err)
+	}
+	inject := durablewrite.NewFaultMap(map[string]error{OpAuthoritativeCatalogRead: durablewrite.ErrIO})
+	_, err = RunWithInjector(applyOptions(root, live, backup, dry.BackupSHA256), inject)
+	if err == nil {
+		t.Fatal("unreadable authoritative catalog must fail closed")
+	}
+	if !strings.Contains(err.Error(), "authoritative backup catalog unavailable") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if mustSHA(t, live) != before {
@@ -1436,7 +1585,7 @@ func TestRestore_Provenance_ReplacedBackupRefused(t *testing.T) {
 	// After a successful dry-run validation, replacing the backup file with a
 	// different ledger (or making the path a symlink) must be refused at
 	// apply time: the operator's digest no longer matches, and the staged
-	// copy is re-validated from the current bytes.
+	// copy is re-bound to the verified digest.
 	root, live, backup := restoreFixture(t)
 	dry, err := Run(Options{LivePath: live, BackupPath: backup})
 	if err != nil {
@@ -1479,7 +1628,7 @@ func TestRestore_Provenance_ReplacedBackupRefused(t *testing.T) {
 		t.Fatal(err)
 	}
 	target := filepath.Join(root, "target.db")
-	if err := copyFile(filepath.Join(root, "source.db"), target, 0o600); err != nil {
+	if err := copyFile(b2, target, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(target, backup); err != nil {
@@ -1494,6 +1643,51 @@ func TestRestore_Provenance_ReplacedBackupRefused(t *testing.T) {
 	}
 	if mustSHA(t, live) != before {
 		t.Fatal("live ledger changed")
+	}
+	assertNoRestoreArtifacts(t, root)
+}
+
+// swapBackupInjector replaces the backup file's contents with another file's
+// bytes at the staging-create boundary, simulating a swap that lands between
+// the digest computation and the staging copy.
+type swapBackupInjector struct {
+	swapTo string
+	backup string
+}
+
+func (s *swapBackupInjector) Before(op string) error {
+	if op != durablewrite.OpCreate {
+		return nil
+	}
+	return copyFile(s.swapTo, s.backup, 0o600)
+}
+
+func TestRestore_Provenance_BackupReplacedDuringStagingRefused(t *testing.T) {
+	// Even within a single apply call the staged bytes are re-bound to the
+	// verified digest: a backup swapped between the digest computation and
+	// the staging copy is refused and never published.
+	root, live, backup := restoreFixture(t)
+	dry, err := Run(Options{LivePath: live, BackupPath: backup})
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := buildLedgerAt(t, t.TempDir(), "other.db", 1)
+	before := mustSHA(t, live)
+	swapped := mustSHA(t, other)
+	_, err = RunWithInjector(applyOptions(root, live, backup, dry.BackupSHA256), &swapBackupInjector{swapTo: other, backup: backup})
+	if err == nil {
+		t.Fatal("backup swapped during staging must be refused")
+	}
+	if !strings.Contains(err.Error(), "changed during staging") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if mustSHA(t, live) != before {
+		t.Fatal("live ledger changed")
+	}
+	// The restore never wrote to the backup path; the only difference is the
+	// attacker's own swap.
+	if mustSHA(t, backup) != swapped {
+		t.Fatal("backup bytes were further modified by the restore")
 	}
 	assertNoRestoreArtifacts(t, root)
 }
