@@ -382,7 +382,7 @@ func RunWithInjector(opts Options, inject durablewrite.Injector) (Report, error)
 	// file, the quarantine directory, and the parent directory are fsynced
 	// before publication; a durability failure aborts and removes only the
 	// partial quarantine.
-	preserved, err := quarantineOriginal(live, digest, inject)
+	preserved, err := quarantineOriginal(live, backup, digest, inject)
 	if err != nil {
 		return Report{}, err
 	}
@@ -567,7 +567,7 @@ func cleanAbandonedStaging(dir, live, backup string) error {
 // publication and removes only the partial quarantine; the original ledger
 // remains authoritative. A completed quarantine is never deleted
 // automatically and is never overwritten by later restores (unique names).
-func quarantineOriginal(live, backupDigest string, inject durablewrite.Injector) (*PreservedOriginal, error) {
+func quarantineOriginal(live, backupPath, backupDigest string, inject durablewrite.Injector) (*PreservedOriginal, error) {
 	st, err := os.Lstat(live)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -659,6 +659,7 @@ func quarantineOriginal(live, backupDigest string, inject durablewrite.Injector)
 		PreservedAt:  time.Now().UTC().Format(time.RFC3339Nano),
 		LedgerSHA256: preserved.LedgerSHA256,
 		BackupSHA256: backupDigest,
+		BackupPath:   filepath.Clean(backupPath),
 		WALPreserved: preserved.WALPreserved,
 		SHMPreserved: preserved.SHMPreserved,
 	}
@@ -845,12 +846,24 @@ func syncDir(path string) error {
 // on-disk file; anything else is refused. Records embedded only inside the
 // candidate backup file are never sufficient proof of same-home provenance,
 // so an arbitrary SQLite ledger copied into the data root is refused even
-// when the operator supplies its digest. A live ledger that is already
-// byte-identical to the verified backup is trivially proven (nothing will be
-// replaced; the repeat path reports AlreadyRestored), because after a
-// successful restore the restored home's catalog legitimately no longer
-// records the restored backup (its snapshot predates its own catalog
-// insert).
+// when the operator supplies its digest.
+//
+// When the live ledger is already byte-identical to the verified backup (a
+// prior restore succeeded), byte identity alone never establishes trusted
+// provenance: an uncatalogued arbitrary file must not be reported as an
+// authenticated completed restore merely because its bytes equal the live
+// ledger. The repeat path is accepted only when a FutureDiff-authored source
+// proves the prior restore: either the live home's authoritative backup
+// catalog still records this exact path with a matching size and digest (the
+// backup was taken from the current state and nothing changed since), or a
+// completed restore-evidence manifest already retained by FutureDiff in this
+// home records this backup's verified digest (and, when the manifest was
+// written by a version that records it, the exact backup path). This keeps
+// the repeated-invocation contract stable — after a successful restore the
+// restored home's catalog legitimately no longer records the restored backup,
+// because its snapshot predates its own catalog insert — without trusting a
+// caller-supplied digest or a bare byte comparison. When neither source can
+// prove the prior restore the restore fails closed.
 //
 // The catalog is read from a private snapshot copy of the live ledger (db
 // plus any WAL/SHM sidecars), so the authoritative path is never opened or
@@ -860,11 +873,41 @@ func syncDir(path string) error {
 // never opened, so a doctored record cannot redirect file operations.
 func verifyAuthoritativeProvenance(live, dir, backup, digest string, inject durablewrite.Injector) error {
 	if liveSHA, err := shaFile(live); err == nil && strings.EqualFold(liveSHA, digest) {
-		return nil
+		rec, err := catalogRecordFor(live, backup, digest, inject)
+		if err != nil {
+			return err
+		}
+		if rec != nil {
+			return nil
+		}
+		proven, err := restoreEvidenceProves(dir, backup, digest)
+		if err != nil {
+			return err
+		}
+		if proven {
+			return nil
+		}
+		return fmt.Errorf("backup %s is byte-identical to the live ledger but is not recorded in the authoritative backup catalog of %s and no completed restore evidence records it; refusing to report already-restored without authenticated provenance", backup, dir)
 	}
+	rec, err := catalogRecordFor(live, backup, digest, inject)
+	if err != nil {
+		return err
+	}
+	if rec == nil {
+		return fmt.Errorf("backup %s is not recorded in the authoritative backup catalog of %s", backup, dir)
+	}
+	return nil
+}
+
+// catalogRecordFor returns the live home's authoritative backup-catalog
+// record for backup when one exists with a recorded path, size, and digest
+// that all still match the on-disk file, or nil when the catalog is readable
+// but records no such backup. A missing or unreadable authoritative catalog
+// fails the restore closed.
+func catalogRecordFor(live, backup, digest string, inject durablewrite.Injector) (*ledger.BackupRecord, error) {
 	records, err := readAuthoritativeCatalog(live, inject)
 	if err != nil {
-		return fmt.Errorf("authoritative backup catalog unavailable: %w", err)
+		return nil, fmt.Errorf("authoritative backup catalog unavailable: %w", err)
 	}
 	var rec *ledger.BackupRecord
 	for i := range records {
@@ -874,22 +917,74 @@ func verifyAuthoritativeProvenance(live, dir, backup, digest string, inject dura
 		}
 	}
 	if rec == nil {
-		return fmt.Errorf("backup %s is not recorded in the authoritative backup catalog of %s", backup, dir)
+		return nil, nil
 	}
 	st, err := os.Lstat(backup)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if st.Mode()&os.ModeSymlink != 0 || !st.Mode().IsRegular() {
-		return fmt.Errorf("backup %s must be a regular file", backup)
+		return nil, fmt.Errorf("backup %s must be a regular file", backup)
 	}
 	if st.Size() != rec.SizeBytes {
-		return fmt.Errorf("backup %s catalog record has size %d, on-disk size %d", backup, rec.SizeBytes, st.Size())
+		return nil, fmt.Errorf("backup %s catalog record has size %d, on-disk size %d", backup, rec.SizeBytes, st.Size())
 	}
 	if !strings.EqualFold(rec.SHA256, digest) {
-		return fmt.Errorf("backup %s catalog record has digest %s that does not match the on-disk file", backup, rec.SHA256)
+		return nil, fmt.Errorf("backup %s catalog record has digest %s that does not match the on-disk file", backup, rec.SHA256)
 	}
-	return nil
+	return rec, nil
+}
+
+// restoreEvidenceProves reports whether a completed restore-evidence manifest
+// already retained by FutureDiff in the live home's directory proves that
+// backup was verified and applied here. Each private quarantine directory
+// (ledger-restore-evidence-*) carries an evidence.json written and fsynced by
+// the restore that created it. A manifest proves the prior restore when its
+// recorded backup digest matches the verified digest and, when it records a
+// backup path (manifests written by versions that predate the field do not),
+// that path equals the backup being restored. Anything that looks like
+// restore evidence but cannot be read or parsed — a missing or malformed
+// evidence.json, an unsupported version, a missing digest, or an evidence
+// directory without its preserved ledger — fails closed: it cannot be ruled
+// out as the needed proof, so the caller must refuse rather than assume.
+func restoreEvidenceProves(dir, backup, digest string) (bool, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false, err
+	}
+	for _, e := range entries {
+		if !e.IsDir() || !strings.HasPrefix(e.Name(), "ledger-restore-evidence-") {
+			continue
+		}
+		evidenceDir := filepath.Join(dir, e.Name())
+		manifestPath := filepath.Join(evidenceDir, "evidence.json")
+		data, err := os.ReadFile(manifestPath)
+		if err != nil {
+			return false, fmt.Errorf("restore evidence %s is unreadable: %w", manifestPath, err)
+		}
+		var m evidenceManifest
+		if err := json.Unmarshal(data, &m); err != nil {
+			return false, fmt.Errorf("restore evidence %s is malformed: %w", manifestPath, err)
+		}
+		if m.Version != 1 {
+			return false, fmt.Errorf("restore evidence %s has unsupported version %d", manifestPath, m.Version)
+		}
+		if m.BackupSHA256 == "" {
+			return false, fmt.Errorf("restore evidence %s lacks a verified backup digest", manifestPath)
+		}
+		if _, err := os.Lstat(filepath.Join(evidenceDir, "ledger.db")); err != nil {
+			return false, fmt.Errorf("restore evidence %s is incomplete: preserved ledger missing: %w", evidenceDir, err)
+		}
+		if m.BackupPath != "" && filepath.Clean(m.BackupPath) != filepath.Clean(backup) {
+			// Evidence of a completed restore of a different backup path is
+			// not proof for this backup; keep scanning for a matching one.
+			continue
+		}
+		if strings.EqualFold(m.BackupSHA256, digest) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // readAuthoritativeCatalog reads the live home's backup catalog from a
@@ -991,6 +1086,13 @@ type evidenceManifest struct {
 	PreservedAt  string `json:"preserved_at"`
 	LedgerSHA256 string `json:"ledger_sha256"`
 	BackupSHA256 string `json:"backup_sha256"`
+	// BackupPath records the exact backup path this completed restore
+	// verified and applied. It lets a later repeat restore be authenticated
+	// to this backup specifically: an arbitrary byte-identical file at a
+	// different path is not this restore's evidence. Omitted by manifests
+	// written before this field existed; those are still accepted on digest
+	// alone when no path can be bound.
+	BackupPath   string `json:"backup_path,omitempty"`
 	WALPreserved bool   `json:"wal_preserved"`
 	SHMPreserved bool   `json:"shm_preserved"`
 }

@@ -1897,3 +1897,397 @@ func TestRestore_StagingIsSameFilesystemAsLive(t *testing.T) {
 	}
 	assertNoRestoreArtifacts(t, root)
 }
+
+// The authenticated already-restored contract: byte identity alone never
+// establishes trusted backup provenance. A byte-identical live ledger is
+// reported AlreadyRestored only when a FutureDiff-authored source proves the
+// prior restore — a matching authoritative current-home backup-catalog record
+// for the exact backup path, or a completed restore-evidence manifest
+// retained by FutureDiff that records this backup's verified digest (and, for
+// manifests that record it, the exact backup path). Everything else fails
+// closed, with no mutation and no new quarantine.
+
+func TestRestore_AlreadyRestored_CataloguedIdenticalBackup(t *testing.T) {
+	// A byte-identical backup is already-restored when the live home's
+	// authoritative backup catalog records the exact backup path with a
+	// matching recorded size and digest (provenance source 1). The record is
+	// planted in the live ledger's uncheckpointed WAL so the authoritative
+	// main file stays byte-identical to the backup while the snapshot-based
+	// catalog read still sees the record — the state a home is in right after
+	// Backup() records a backup with no intervening checkpoint.
+	root := t.TempDir()
+	live := filepath.Join(root, "live.db")
+	backup := filepath.Join(root, "backup.db")
+	scratch := filepath.Join(root, "scratch.db")
+	l, err := ledger.OpenRepository(scratch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addTx(t, l, "one", root)
+	if err := l.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := copyFile(scratch, live, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := copyFile(scratch, backup, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	digest := mustSHA(t, backup)
+	st, err := os.Stat(backup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Record the backup in the live home's catalog without changing the main
+	// file: the insert lands in the WAL and is left uncheckpointed.
+	raw, err := ledger.Open(live)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := raw.Exec(`INSERT INTO ledger_backups(backup_id,path,sha256,size_bytes,created_at) VALUES(?,?,?,?,?)`, "backup-catalogued", backup, digest, st.Size(), time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
+		_ = raw.Close()
+		t.Fatal(err)
+	}
+	if got := mustSHA(t, live); got != digest {
+		_ = raw.Close()
+		t.Fatalf("live main file diverged from backup: %s != %s", got, digest)
+	}
+	before := mustSHA(t, live)
+	dry, err := Run(Options{LivePath: live, BackupPath: backup})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dry.Applied {
+		t.Fatal("dry run must not apply")
+	}
+	r, err := RunWithInjector(applyOptions(root, live, backup, digest), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.AlreadyRestored || r.Applied {
+		t.Fatalf("report=%+v, want AlreadyRestored with Applied=false", r)
+	}
+	if !r.RestoredHealthy || r.RestoreVerification != "healthy" {
+		t.Fatalf("report=%+v, want healthy verification", r)
+	}
+	// The restore itself never mutates the authoritative main file: it is
+	// still byte-identical to the backup while the test's raw catalog
+	// connection remains open. (Closing that last WAL connection afterwards
+	// checkpoints the planted record into the main file — a normal SQLite
+	// behavior outside the restore, so the remaining assertions run first.)
+	if mustSHA(t, live) != before || mustSHA(t, live) != digest {
+		t.Fatal("live ledger changed")
+	}
+	if mustSHA(t, backup) != digest {
+		t.Fatal("backup changed")
+	}
+	if got := evidenceDirs(t, root); len(got) != 0 {
+		t.Fatalf("evidence dirs=%v, want none (already-restored creates no quarantine)", got)
+	}
+	_ = raw.Close()
+}
+
+func TestRestore_AlreadyRestored_EvidenceManifestProves(t *testing.T) {
+	// An identical backup is already-restored when a completed
+	// restore-evidence manifest already retained by FutureDiff records this
+	// backup's verified digest and exact path (provenance source 2). The
+	// first restore creates the evidence; the repeat consumes it, creates no
+	// new quarantine, and mutates neither the ledger nor the backup.
+	root, live, backup := restoreFixture(t)
+	dry, err := Run(Options{LivePath: live, BackupPath: backup})
+	if err != nil {
+		t.Fatal(err)
+	}
+	backupSHA := dry.BackupSHA256
+	r1, err := RunWithInjector(applyOptions(root, live, backup, backupSHA), nil)
+	if err != nil || !r1.Applied {
+		t.Fatalf("first restore failed: err=%v", err)
+	}
+	if r1.Preserved == nil || r1.Preserved.QuarantineDir == "" {
+		t.Fatalf("first restore preserved=%+v, want a quarantine", r1.Preserved)
+	}
+	// The evidence manifest records the verified digest and the exact backup
+	// path, so a repeat restore can be authenticated to this backup.
+	manifestPath := filepath.Join(r1.Preserved.QuarantineDir, "evidence.json")
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m evidenceManifest
+	if err := json.Unmarshal(data, &m); err != nil {
+		t.Fatalf("evidence manifest %s is unreadable: %v", manifestPath, err)
+	}
+	if m.Version != 1 || !strings.EqualFold(m.BackupSHA256, backupSHA) {
+		t.Fatalf("evidence manifest=%+v, want version 1 and backup sha %s", m, backupSHA)
+	}
+	if filepath.Clean(m.BackupPath) != filepath.Clean(backup) {
+		t.Fatalf("evidence manifest backup path %q, want %q", m.BackupPath, backup)
+	}
+	liveAfter := mustSHA(t, live)
+	r2, err := RunWithInjector(applyOptions(root, live, backup, backupSHA), nil)
+	if err != nil {
+		t.Fatalf("second restore failed: %v", err)
+	}
+	if !r2.AlreadyRestored || r2.Applied {
+		t.Fatalf("repeat report=%+v, want AlreadyRestored with Applied=false", r2)
+	}
+	if got := evidenceDirs(t, root); len(got) != 1 {
+		t.Fatalf("evidence dirs=%v, want 1 (no duplicate quarantine)", got)
+	}
+	if mustSHA(t, live) != liveAfter || mustSHA(t, live) != backupSHA {
+		t.Fatal("live ledger changed")
+	}
+	if mustSHA(t, backup) != backupSHA {
+		t.Fatal("backup changed")
+	}
+}
+
+func TestRestore_AlreadyRestored_LegacyManifestWithoutPathStillProves(t *testing.T) {
+	// Manifests written before the backup_path field existed carry no path;
+	// they still prove the prior restore by verified digest alone, so a
+	// repeat restore of the same backup remains accepted after upgrading.
+	root, live, backup := restoreFixture(t)
+	dry, err := Run(Options{LivePath: live, BackupPath: backup})
+	if err != nil {
+		t.Fatal(err)
+	}
+	backupSHA := dry.BackupSHA256
+	r1, err := RunWithInjector(applyOptions(root, live, backup, backupSHA), nil)
+	if err != nil || !r1.Applied {
+		t.Fatalf("first restore failed: err=%v", err)
+	}
+	manifestPath := filepath.Join(r1.Preserved.QuarantineDir, "evidence.json")
+	legacy := evidenceManifest{
+		Version:      1,
+		PreservedAt:  time.Now().UTC().Format(time.RFC3339Nano),
+		LedgerSHA256: r1.Preserved.LedgerSHA256,
+		BackupSHA256: backupSHA,
+		WALPreserved: r1.Preserved.WALPreserved,
+		SHMPreserved: r1.Preserved.SHMPreserved,
+	}
+	body, err := json.MarshalIndent(legacy, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(manifestPath, append(body, '\n'), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	r2, err := RunWithInjector(applyOptions(root, live, backup, backupSHA), nil)
+	if err != nil {
+		t.Fatalf("repeat after legacy evidence failed: %v", err)
+	}
+	if !r2.AlreadyRestored || r2.Applied {
+		t.Fatalf("repeat report=%+v, want AlreadyRestored", r2)
+	}
+	if got := evidenceDirs(t, root); len(got) != 1 {
+		t.Fatalf("evidence dirs=%v, want 1", got)
+	}
+}
+
+func TestRestore_AlreadyRestored_UncataloguedIdenticalFileRefused(t *testing.T) {
+	// An uncatalogued arbitrary path whose bytes equal the live ledger is
+	// never reported as an authenticated completed restore: there is no
+	// catalog record for that path and no completed restore evidence in this
+	// home. Byte identity alone must fail closed.
+	root, live, _ := restoreFixture(t)
+	foreign := filepath.Join(root, "foreign.db")
+	if err := copyFile(live, foreign, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	before := mustSHA(t, live)
+	// The dry run refuses too: provenance is part of validation.
+	if _, err := Run(Options{LivePath: live, BackupPath: foreign}); err == nil {
+		t.Fatal("dry run with an uncatalogued byte-identical file must be refused")
+	}
+	_, err := RunWithInjector(applyOptions(root, live, foreign, mustSHA(t, foreign)), nil)
+	if err == nil {
+		t.Fatal("uncatalogued byte-identical file must be refused")
+	}
+	if !strings.Contains(err.Error(), "byte-identical") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, secret := range []string{os.Getenv("HOME"), os.Getenv("USER")} {
+		if secret != "" && strings.Contains(err.Error(), secret) {
+			t.Fatalf("refusal error leaks %q: %v", secret, err)
+		}
+	}
+	if mustSHA(t, live) != before {
+		t.Fatal("live ledger changed")
+	}
+	if mustSHA(t, foreign) != before {
+		t.Fatal("foreign file changed")
+	}
+	assertNoRestoreArtifacts(t, root)
+}
+
+func TestRestore_AlreadyRestored_PathBoundEvidenceRefusesForeignCopy(t *testing.T) {
+	// After a completed restore, a byte-identical copy of the restored ledger
+	// at a different path is refused even though the evidence manifest's
+	// digest matches: the manifest records the exact backup path that was
+	// restored, and the copy is not that path. Only the recorded path (or a
+	// legacy manifest without a path) is accepted.
+	root, live, backup := restoreFixture(t)
+	dry, err := Run(Options{LivePath: live, BackupPath: backup})
+	if err != nil {
+		t.Fatal(err)
+	}
+	backupSHA := dry.BackupSHA256
+	if _, err := RunWithInjector(applyOptions(root, live, backup, backupSHA), nil); err != nil {
+		t.Fatal(err)
+	}
+	foreign := filepath.Join(root, "foreign.db")
+	if err := copyFile(live, foreign, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	before := mustSHA(t, live)
+	_, err = RunWithInjector(applyOptions(root, live, foreign, mustSHA(t, foreign)), nil)
+	if err == nil {
+		t.Fatal("byte-identical copy at another path must be refused")
+	}
+	if !strings.Contains(err.Error(), "byte-identical") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if mustSHA(t, live) != before {
+		t.Fatal("live ledger changed")
+	}
+	if got := evidenceDirs(t, root); len(got) != 1 {
+		t.Fatalf("evidence dirs=%v, want 1 retained", got)
+	}
+}
+
+func TestRestore_AlreadyRestored_MalformedEvidenceRefused(t *testing.T) {
+	// Restore evidence that cannot be parsed is never proof; it cannot be
+	// ruled out as the needed evidence, so the repeat fails closed.
+	root, live, backup := restoreFixture(t)
+	dry, err := Run(Options{LivePath: live, BackupPath: backup})
+	if err != nil {
+		t.Fatal(err)
+	}
+	backupSHA := dry.BackupSHA256
+	r1, err := RunWithInjector(applyOptions(root, live, backup, backupSHA), nil)
+	if err != nil || !r1.Applied {
+		t.Fatalf("first restore failed: err=%v", err)
+	}
+	manifestPath := filepath.Join(r1.Preserved.QuarantineDir, "evidence.json")
+	if err := os.WriteFile(manifestPath, []byte("{not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err = RunWithInjector(applyOptions(root, live, backup, backupSHA), nil)
+	if err == nil {
+		t.Fatal("malformed evidence manifest must be refused")
+	}
+	if !strings.Contains(err.Error(), "malformed") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := evidenceDirs(t, root); len(got) != 1 {
+		t.Fatalf("evidence dirs=%v, want 1", got)
+	}
+}
+
+func TestRestore_AlreadyRestored_ForgedEvidenceRefused(t *testing.T) {
+	// A structurally valid but forged manifest — unsupported version or a
+	// missing verified backup digest — proves nothing and fails closed.
+	root, live, backup := restoreFixture(t)
+	dry, err := Run(Options{LivePath: live, BackupPath: backup})
+	if err != nil {
+		t.Fatal(err)
+	}
+	backupSHA := dry.BackupSHA256
+	r1, err := RunWithInjector(applyOptions(root, live, backup, backupSHA), nil)
+	if err != nil || !r1.Applied {
+		t.Fatalf("first restore failed: err=%v", err)
+	}
+	manifestPath := filepath.Join(r1.Preserved.QuarantineDir, "evidence.json")
+	for name, forged := range map[string]evidenceManifest{
+		"unsupported version": {Version: 2, PreservedAt: time.Now().UTC().Format(time.RFC3339Nano), BackupSHA256: backupSHA, BackupPath: backup},
+		"missing digest":      {Version: 1, PreservedAt: time.Now().UTC().Format(time.RFC3339Nano), BackupPath: backup},
+	} {
+		body, err := json.MarshalIndent(forged, "", "  ")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(manifestPath, append(body, '\n'), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		_, err = RunWithInjector(applyOptions(root, live, backup, backupSHA), nil)
+		if err == nil {
+			t.Fatalf("forged evidence (%s) must be refused", name)
+		}
+		if !strings.Contains(err.Error(), "version") && !strings.Contains(err.Error(), "digest") {
+			t.Fatalf("forged evidence (%s) unexpected error: %v", name, err)
+		}
+	}
+}
+
+func TestRestore_AlreadyRestored_EvidenceDigestMismatchRefused(t *testing.T) {
+	// A manifest that records this backup path but a different verified
+	// digest is not proof of this backup's prior restore; with no other
+	// provenance source the repeat fails closed.
+	root, live, backup := restoreFixture(t)
+	dry, err := Run(Options{LivePath: live, BackupPath: backup})
+	if err != nil {
+		t.Fatal(err)
+	}
+	backupSHA := dry.BackupSHA256
+	r1, err := RunWithInjector(applyOptions(root, live, backup, backupSHA), nil)
+	if err != nil || !r1.Applied {
+		t.Fatalf("first restore failed: err=%v", err)
+	}
+	manifestPath := filepath.Join(r1.Preserved.QuarantineDir, "evidence.json")
+	mismatched := evidenceManifest{
+		Version:      1,
+		PreservedAt:  time.Now().UTC().Format(time.RFC3339Nano),
+		LedgerSHA256: r1.Preserved.LedgerSHA256,
+		BackupSHA256: strings.Repeat("0", 64),
+		BackupPath:   backup,
+		WALPreserved: r1.Preserved.WALPreserved,
+		SHMPreserved: r1.Preserved.SHMPreserved,
+	}
+	body, err := json.MarshalIndent(mismatched, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(manifestPath, append(body, '\n'), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err = RunWithInjector(applyOptions(root, live, backup, backupSHA), nil)
+	if err == nil {
+		t.Fatal("digest-mismatched evidence must be refused")
+	}
+	if !strings.Contains(err.Error(), "byte-identical") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRestore_AlreadyRestored_IncompleteEvidenceDirRefused(t *testing.T) {
+	// An evidence directory that looks like a quarantine but lacks its
+	// evidence manifest or its preserved ledger is incomplete and fails the
+	// repeat closed: it cannot be ruled out as the needed proof.
+	for name, remove := range map[string]string{
+		"missing manifest":         "evidence.json",
+		"missing preserved ledger": "ledger.db",
+	} {
+		t.Run(name, func(t *testing.T) {
+			root, live, backup := restoreFixture(t)
+			dry, err := Run(Options{LivePath: live, BackupPath: backup})
+			if err != nil {
+				t.Fatal(err)
+			}
+			backupSHA := dry.BackupSHA256
+			r1, err := RunWithInjector(applyOptions(root, live, backup, backupSHA), nil)
+			if err != nil || !r1.Applied {
+				t.Fatalf("first restore failed: err=%v", err)
+			}
+			if err := os.Remove(filepath.Join(r1.Preserved.QuarantineDir, remove)); err != nil {
+				t.Fatal(err)
+			}
+			_, err = RunWithInjector(applyOptions(root, live, backup, backupSHA), nil)
+			if err == nil {
+				t.Fatal("incomplete evidence directory must be refused")
+			}
+			if !strings.Contains(err.Error(), "unreadable") && !strings.Contains(err.Error(), "incomplete") {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
