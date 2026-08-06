@@ -600,8 +600,9 @@ make check
 make build
 ```
 
-Keep changes focused, include tests, and avoid expanding public claims without matching evidence.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the complete contribution guidelines including platform support, testing requirements, safety model, and the full PR checklist.
 
+Keep changes focused, include tests, and avoid expanding public claims without matching evidence.
 ---
 
 ## Roadmap
