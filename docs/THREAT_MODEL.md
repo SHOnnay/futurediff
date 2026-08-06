@@ -68,3 +68,23 @@ native platform behavior, or hosted attestation unless corresponding real
 external evidence is present and certified. Local simulation is not external
 certification. Cooperative workspace isolation is not a complete filesystem or
 process sandbox.
+
+## Resilience controls (certified 2026-08-06)
+
+The corruption/lock/disk-pressure drill validates the following threat mitigations:
+
+| Threat | Control | Evidence |
+|--------|---------|----------|
+| SQLite header/page corruption | `fdif doctor` quick_check + `futurediffd --require-integrity` | `ledger_corrupt` reason code |
+| WAL/SHM corruption | Startup integrity gate; quarantine preserves corrupt sidecars | `wal_inconsistent` reason code |
+| Corrupt transaction/receipt/audit/backup metadata | Granular `IntegrityCheck` + bounded reads | `receipt_corrupt`, `audit_chain_invalid`, `backup_invalid` |
+| Stale-lock without PID/StartTime/BootID proof | `lock_owner_ambiguous` fail-closed; cleanup requires `--yes` | `stale_lock_candidate` + `lock_owner_alive` |
+| PID reuse / previous-boot lock | `isProcessAlive` validates StartTime and BootID on Linux/macOS | `lock_unix_test.go` `TestPIDReuse*`, `TestBootID*` |
+| Disk pressure (ENOSPC/EDQUOT/EROFS/EIO) | `storageguard.Probe` classifies at every critical write | `disk_full`, `inode_exhausted`, `quota_exceeded`, `filesystem_read_only`, `durable_write_failed` |
+| Audit-chain corruption | `Store.Verify()` detects hash/sequence gaps; `fdif doctor` surfaces scope | `audit_chain_invalid` |
+| Duplicate external effects | Idempotency keys, durable attempts, receipts, reconciliation | `effect_reconciliation` in restore JSON |
+| Unknown provider outcome | Persist unknown state; block dependent effects | `needs_reconciliation`, `recommended_action: fdif recover` |
+| Evidence tampering | SHA-256 manifests, deterministic bundles, provenance | `MANIFEST.sha256`, certification drill `secrets-scan.txt` |
+| Corrupt restore evidence destruction | Quarantine never auto-deleted; evidence manifest binds backup digest | `ledger-restore-evidence-*` directories |
+
+The drill produces real local evidence (`real_local`) and deterministic fault-injection evidence (`deterministic_injection`) with zero secrets.

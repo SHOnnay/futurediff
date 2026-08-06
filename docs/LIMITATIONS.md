@@ -68,7 +68,8 @@ flock also blocks restore until stopped. Restore does not by itself reconcile
 provider side effects; it reports the restored event chains for operator
 reconciliation. See
 [`adr/ADR-099-corruption-lock-disk-pressure-resilience.md`](adr/ADR-099-corruption-lock-disk-pressure-resilience.md).
-## GitHub
+
+**Already-restored provenance**: a byte-identical backup is reported `already_restored: true` only when an authoritative backup-catalog record or a completed restore-evidence manifest proves the prior restore. An uncatalogued byte-identical file at another path is refused (fail closed). The certification drill (`scripts/certify-corruption-lock-disk-pressure.sh`, evidence under `docs/certification/corruption-lock-disk-pressure-20260806-133250/`) validates this behavior with 77/77 checks passing.
 
 GitHub credentials are optional. `fdif finish` publishes locally without them.
 `fdif finish --github` requires an explicitly configured credential and

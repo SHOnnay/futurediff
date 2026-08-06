@@ -268,11 +268,18 @@ See [`FDIF_COMMAND_REFERENCE.md`](FDIF_COMMAND_REFERENCE.md) and
 - JSON mode never prompts and contains no ANSI decoration;
 - low-level FutureDiff exit codes are preserved;
 - `fdif` does not duplicate transaction business logic;
-- publication creates `futurediff/<transaction-id>` and never switches or
-  mutates the current branch.
+- publication creates `futurediff/<transaction-id>` and never switches or mutates the current branch.
 
 Security-sensitive daemon/API actions triggered by the guided flow are also recorded in the local operator audit trail. Verify it separately with:
 
 ```bash
 futurediff-audit --root ~/.futurediff --operator-events
 ```
+
+## Resilience and recovery
+
+- **Stale-lock cleanup**: `fdif cleanup-lock` previews removal of a proved-stale lock/socket; requires `--yes` to confirm; emits operator-audit event with `lock_cleanup` type; idempotent.
+- **Corrupt-ledger restore**: `fdif doctor` diagnoses corruption (reason codes: `ledger_corrupt`, `wal_inconsistent`, `ledger_integrity_failed`); restore refuses to run over a corrupt ledger until the operator explicitly preserves evidence (`futurediff-restore` preserves the corrupt original to a quarantine directory before replacement).
+- **Already-restored provenance**: a byte-identical backup is reported `already_restored: true` only when an authoritative backup-catalog record or a completed restore-evidence manifest proves the prior restore; uncatalogued byte-identical files are refused (fail closed).
+- **Disk-pressure classification**: `fdif doctor --json` surfaces `disk_full`, `inode_exhausted`, `quota_exceeded`, `filesystem_read_only`, `durable_write_failed` with `safe_to_retry`, `automatic_cleanup_allowed`, `recovery_required` fields.
+- **Certified drill**: `scripts/certify-corruption-lock-disk-pressure.sh` reproduces all beta-blocker scenarios with real_local evidence (77/77 checks, 9/9 scenarios, 0 failures).

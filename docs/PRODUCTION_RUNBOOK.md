@@ -29,6 +29,8 @@ For a public production claim, replace the local policy with `config/production-
 
 Create backups from a quiesced or transactionally consistent data directory. Store the archive checksum separately. Test restoration regularly with `scripts/recovery-drill.sh`. Never extract untrusted archives using generic archive commands; use the safe restore command supplied by this overlay.
 
+- **Already-restored provenance**: a byte-identical backup is reported `already_restored: true` only when an authoritative backup-catalog record or a completed restore-evidence manifest proves the prior restore; uncatalogued byte-identical files are refused (fail closed).
+
 ## Upgrade and rollback
 
 Deploy side by side, run migrations with a verified backup available, and retain the prior binary and configuration. Roll back application binaries only when ledger/schema compatibility is confirmed. Never discard unknown-outcome records during rollback.
