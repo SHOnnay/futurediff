@@ -104,8 +104,16 @@ type Report struct {
 	// AlreadyRestored reports that the authoritative ledger was already
 	// byte-identical to the verified backup, so no replacement was performed
 	// and no new evidence was created; Applied stays false in that case.
-	AlreadyRestored bool      `json:"already_restored,omitempty"`
-	CompletedAt     time.Time `json:"completed_at"`
+	AlreadyRestored bool `json:"already_restored,omitempty"`
+	// EffectReconciliation classifies the restored ledger's external effects
+	// against durable receipts and attempts and detects effects newer than
+	// the backup whose awareness a replacement would otherwise erase. It is
+	// populated only after a successful apply (or a stable already-restored
+	// repeat); dry runs leave it empty. The comparison is read-only and never
+	// dispatches providers; a state that cannot be proved from durable
+	// evidence is reported as evidence_unavailable instead of assumed absent.
+	EffectReconciliation *EffectReconciliation `json:"effect_reconciliation,omitempty"`
+	CompletedAt          time.Time             `json:"completed_at"`
 }
 
 // Run validates and optionally applies a ledger restore. Apply restores only
@@ -336,6 +344,10 @@ func RunWithInjector(opts Options, inject durablewrite.Injector) (Report, error)
 			report.RestoreVerification = string(diag.State)
 		}
 		report.CompletedAt = time.Now().UTC()
+		// Post-restore comparison of the restored ledger's external effects
+		// (already-restored: the live ledger is byte-identical to the backup, and
+		// no new quarantine was created to compare against).
+		report.EffectReconciliation = evaluateExternalEffects(live, "")
 		return report, nil
 	}
 	if !opts.AllowStaleBackup {
@@ -424,6 +436,14 @@ func RunWithInjector(opts Options, inject durablewrite.Injector) (Report, error)
 	}
 	report.Applied = true
 	report.CompletedAt = time.Now().UTC()
+	// Post-restore comparison: classify the restored ledger's external
+	// effects and detect effects newer than the backup from the preserved
+	// pre-restore ledger.
+	quarantine := ""
+	if report.Preserved != nil {
+		quarantine = report.Preserved.QuarantineDir
+	}
+	report.EffectReconciliation = evaluateExternalEffects(live, quarantine)
 	return report, nil
 }
 
@@ -883,38 +903,11 @@ func readAuthoritativeCatalog(live string, inject durablewrite.Injector) ([]ledg
 			return nil, err
 		}
 	}
-	scratch, err := os.MkdirTemp("", "futurediff-provenance-")
+	repo, cleanup, err := openSnapshotCopy(live)
 	if err != nil {
 		return nil, err
 	}
-	defer os.RemoveAll(scratch)
-	base := filepath.Base(live)
-	// A live ledger that does not exist cannot supply an authoritative
-	// catalog: fail closed instead of letting an open of an empty copy
-	// masquerade as an empty catalog.
-	if _, err := os.Lstat(live); err != nil {
-		return nil, err
-	}
-	for _, suffix := range []string{"", "-wal", "-shm"} {
-		src := live + suffix
-		st, statErr := os.Lstat(src)
-		if statErr != nil {
-			if os.IsNotExist(statErr) {
-				continue
-			}
-			return nil, statErr
-		}
-		if st.Mode()&os.ModeSymlink != 0 || !st.Mode().IsRegular() {
-			return nil, fmt.Errorf("live file %s must be a regular non-symlink file", src)
-		}
-		if err := copyFileContents(src, filepath.Join(scratch, base+suffix), 0o600); err != nil {
-			return nil, err
-		}
-	}
-	repo, err := ledger.OpenRepository(filepath.Join(scratch, base))
-	if err != nil {
-		return nil, err
-	}
+	defer cleanup()
 	records, readErr := repo.Backups()
 	closeErr := repo.Close()
 	if readErr != nil {
@@ -924,6 +917,51 @@ func readAuthoritativeCatalog(live string, inject durablewrite.Injector) ([]ledg
 		return nil, closeErr
 	}
 	return records, nil
+}
+
+// openSnapshotCopy copies an at-rest ledger (ledger.db plus any WAL/SHM
+// sidecars) into a private temp directory and opens the copy. The original
+// path is never opened or mutated, so validation and comparison never disturb
+// the authoritative ledger, a preserved quarantine, or their sidecars. The
+// returned cleanup function removes the snapshot and must always be called.
+func openSnapshotCopy(path string) (*ledger.Repository, func(), error) {
+	scratch, err := os.MkdirTemp("", "futurediff-snapshot-")
+	if err != nil {
+		return nil, nil, err
+	}
+	cleanup := func() { os.RemoveAll(scratch) }
+	// A ledger that does not exist cannot be snapshotted; fail closed rather
+	// than letting an open of an empty copy masquerade as an empty ledger.
+	if _, err := os.Lstat(path); err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	base := filepath.Base(path)
+	for _, suffix := range []string{"", "-wal", "-shm"} {
+		src := path + suffix
+		st, statErr := os.Lstat(src)
+		if statErr != nil {
+			if os.IsNotExist(statErr) {
+				continue
+			}
+			cleanup()
+			return nil, nil, statErr
+		}
+		if st.Mode()&os.ModeSymlink != 0 || !st.Mode().IsRegular() {
+			cleanup()
+			return nil, nil, fmt.Errorf("live file %s must be a regular non-symlink file", src)
+		}
+		if err := copyFileContents(src, filepath.Join(scratch, base+suffix), 0o600); err != nil {
+			cleanup()
+			return nil, nil, err
+		}
+	}
+	repo, err := ledger.OpenRepository(filepath.Join(scratch, base))
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	return repo, cleanup, nil
 }
 
 // removeLiveSidecars removes the pre-restore WAL/SHM sidecars from the

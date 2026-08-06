@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/SHOnnay/futurediff/internal/buildinfo"
-	"github.com/SHOnnay/futurediff/internal/ledgerrestore"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"github.com/SHOnnay/futurediff/internal/buildinfo"
+	"github.com/SHOnnay/futurediff/internal/ledgerrestore"
 )
 
 func main() {
@@ -30,6 +32,31 @@ func main() {
 	}
 	b, _ := json.MarshalIndent(r, "", "  ")
 	fmt.Println(string(b))
+	// Human reconciliation guidance goes to stderr so stdout stays a pure
+	// JSON stream for scripts. The guidance never prompts and never runs the
+	// recovery command; it only tells the operator what to run.
+	if g := humanGuidance(r); g != "" {
+		fmt.Fprintln(os.Stderr, g)
+	}
 }
+
+// humanGuidance renders the post-restore external-effect comparison for a
+// human reader: one of the four stable summary states plus the exact
+// canonical recovery/reconciliation commands to run (never executed here).
+func humanGuidance(r ledgerrestore.Report) string {
+	rec := r.EffectReconciliation
+	if rec == nil {
+		return ""
+	}
+	lines := []string{rec.HumanSummary}
+	for _, cmd := range rec.RecoveryCommands {
+		lines = append(lines, "run: "+cmd)
+	}
+	if rec.RecommendedAction != "" && rec.RecommendedAction != rec.HumanSummary {
+		lines = append(lines, rec.RecommendedAction)
+	}
+	return strings.Join(lines, "\n")
+}
+
 func defaultRoot() string { h, _ := os.UserHomeDir(); return filepath.Join(h, ".futurediff") }
 func fail(e error)        { fmt.Fprintln(os.Stderr, "error:", e); os.Exit(1) }
