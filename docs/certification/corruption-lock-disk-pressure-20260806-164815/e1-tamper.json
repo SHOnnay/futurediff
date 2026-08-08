@@ -1,0 +1,10 @@
+{
+  "before": {
+    "sha256": "ec2a7af090b071b926c336b05f70c07a651d7c4b65305d69961bfaf151441e75",
+    "lines": 3
+  },
+  "after_tamper": {
+    "sha256": "4a69f2828c476f90b77ebfd2d6e2906554ad82e51a8995cf61c3b9b92697e790",
+    "lines": 4
+  }
+}

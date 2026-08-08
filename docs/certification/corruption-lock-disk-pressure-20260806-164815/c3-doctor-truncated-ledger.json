@@ -1,0 +1,75 @@
+{
+  "checks": [
+    {
+      "ID": "futurediff_binary",
+      "Status": "pass",
+      "Detail": "/tmp/futurediff-corruption-lock.dyB78I/futurediff"
+    },
+    {
+      "ID": "futurediffd_binary",
+      "Status": "pass",
+      "Detail": "/tmp/futurediff-corruption-lock.dyB78I/futurediffd"
+    },
+    {
+      "ID": "git",
+      "Status": "pass",
+      "Detail": "/usr/bin/git"
+    },
+    {
+      "ID": "futurediff_home",
+      "Status": "pass",
+      "Detail": "/private/tmp/futurediff-corruption-lock.dyB78I/home"
+    },
+    {
+      "ID": "safe_workspaces",
+      "Status": "pass",
+      "Detail": "/private/tmp/futurediff-corruption-lock.dyB78I/home/runtime"
+    },
+    {
+      "ID": "daemon",
+      "Status": "warn",
+      "Detail": "not running"
+    },
+    {
+      "ID": "ledger_integrity",
+      "Status": "fail",
+      "Detail": "journal-mode probe failed"
+    },
+    {
+      "ID": "daemon_lock",
+      "Status": "pass",
+      "Detail": "held=false owner_status=dead lock_status=released (stale_lock_candidate)"
+    },
+    {
+      "ID": "storage",
+      "Status": "warn",
+      "Detail": "unsupported storage policy version \"\""
+    },
+    {
+      "ID": "audit_chain",
+      "Status": "fail",
+      "Detail": "valid=false count=3 event hash mismatch at sequence 3"
+    },
+    {
+      "ID": "backup_catalog",
+      "Status": "warn",
+      "Detail": "backup catalog inspection requires the repository API and is deferred while the ledger is offline"
+    },
+    {
+      "ID": "github_credentials",
+      "Status": "warn",
+      "Detail": "not configured; local publication remains available"
+    }
+  ],
+  "kind": "fdif-doctor",
+  "ledger": {
+    "reason_code": "ledger_corrupt",
+    "state": "ledger_corrupt",
+    "integrity_status": "fail",
+    "diagnosis_performed": true,
+    "quiescence_proved": true,
+    "daemon_status": "stopped",
+    "recommended_action": "restore the ledger from a verified backup; preserve the corrupted files as evidence",
+    "message": "journal-mode probe failed"
+  }
+}

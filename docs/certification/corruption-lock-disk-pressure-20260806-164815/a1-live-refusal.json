@@ -1,0 +1,9 @@
+{
+  "action": "refused",
+  "automatic_cleanup": false,
+  "kind": "cleanup_lock",
+  "lock_path": "/private/tmp/futurediff-corruption-lock.dyB78I/home/daemon.lock",
+  "message": "lock is held by a live, reachable daemon; cannot clean",
+  "reason_code": "lock_owner_alive",
+  "socket_path": "/private/tmp/futurediff-corruption-lock.dyB78I/home/futurediff.sock"
+}

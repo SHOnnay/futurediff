@@ -120,12 +120,12 @@ Completed 2026-08-03 with a fully local drill (`scripts/certify-corruption-lock-
 
 Evidence lives in `docs/certification/corruption-lock-20260803-132704/` (`SUMMARY.json` plus per-scenario artifacts). Restore gating is also covered by deterministic Go tests in `internal/ledgerrestore/restore_test.go`; lock identity and cleanup semantics by `internal/daemonlock/lock_unix_test.go` and `internal/guidedcli/cleanup_lock_test.go`.
 
-**New certification evidence**: `docs/certification/corruption-lock-disk-pressure-20260806-133250/` (77/77 checks, 9/9 scenarios, 0 failures; 33 evidence rows: 29 `real_local`, 4 `deterministic_injection`).
+**New certification evidence**: `docs/certification/corruption-lock-disk-pressure-20260806-164815/` (77/77 checks, 9/9 scenarios, 0 failures; 33 evidence rows: 29 `real_local`, 4 `deterministic_injection`).
 
 ## Required before beta
 
 - guided recovery for stale selections, deleted workspaces, and interrupted top-level flows — **completed 2026-08-02** (see the guided-recovery certification above);
-- **corruption, stale-lock, and disk-pressure drills with operator guidance — completed 2026-08-06** (full 9-scenario certification: live-lock refusal, stale/corrupt cleanup with audit evidence, corrupt-ledger diagnosis, stale-backup restore refusal and override, fail-closed restore over corrupt ledger, storage classification, ambiguous ownership, audit corruption, ENOSPC-before-mutation, durability failure — see `docs/certification/corruption-lock-disk-pressure-20260806-133250/`);
+- **corruption, stale-lock, and disk-pressure drills with operator guidance — completed 2026-08-06** (full 9-scenario certification: live-lock refusal, stale/corrupt cleanup with audit evidence, corrupt-ledger diagnosis, stale-backup restore refusal and override, fail-closed restore over corrupt ledger, storage classification, ambiguous ownership, audit corruption, ENOSPC-before-mutation, durability failure — see `docs/certification/corruption-lock-disk-pressure-20260806-164815/`);
 - concrete provider-integration evidence for every supported provider surface.
 ## Required before stable
 
@@ -153,7 +153,7 @@ These should remain product safeguards even in stable releases:
 
 ### High
 
-1. **corruption, stale-lock, and disk-pressure drills — completed 2026-08-06** (full 9-scenario certification; see `docs/certification/corruption-lock-disk-pressure-20260806-133250/` and `docs/adr/ADR-099-corruption-lock-disk-pressure-resilience.md`).
+1. **corruption, stale-lock, and disk-pressure drills — completed 2026-08-06** (full 9-scenario certification; see `docs/certification/corruption-lock-disk-pressure-20260806-164815/` and `docs/adr/ADR-099-corruption-lock-disk-pressure-resilience.md`).
 2. stable release evidence set: signatures, SBOMs, reproducibility, install/upgrade/uninstall evidence;
 3. real hosted GitHub write/recovery certification — **completed 2026-08-02** (see `docs/certification/GITHUB_WRITE_RECOVERY_2026-08-02.md`).
 ### Medium
