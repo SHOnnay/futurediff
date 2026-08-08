@@ -4,10 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -83,40 +81,14 @@ func Run(ctx context.Context, opts Options) Report {
 		}
 	}
 	add(Check{Name: "sqlite", Status: Pass, Message: "system SQLite library available", Details: ledger.SQLiteVersion()})
-	ledgerPath := filepath.Join(opts.DataRoot, "ledger.db")
-	repo, err := ledger.OpenRepository(ledgerPath)
-	if err != nil {
-		add(Check{Name: "ledger", Status: Fail, Message: err.Error()})
-	} else {
-		audit, e := repo.Audit()
-		_ = repo.Close()
-		if e != nil {
-			add(Check{Name: "ledger", Status: Fail, Message: e.Error()})
-		} else if !audit.Healthy {
-			add(Check{Name: "ledger", Status: Fail, Message: "ledger invariant audit failed", Details: audit})
-		} else if audit.WarningCount > 0 {
-			add(Check{Name: "ledger", Status: Warn, Message: "ledger audit passed with warnings", Details: audit})
-		} else {
-			add(Check{Name: "ledger", Status: Pass, Message: "ledger integrity and invariants passed", Details: audit})
-		}
-	}
-	if opts.Socket == "" {
-		add(Check{Name: "daemon", Status: Skip, Message: "socket path not configured"})
-	} else if st, e := os.Stat(opts.Socket); e != nil {
-		add(Check{Name: "daemon", Status: Warn, Message: "daemon socket is not available"})
-	} else if st.Mode().Perm() != 0o600 {
-		add(Check{Name: "daemon", Status: Fail, Message: fmt.Sprintf("socket permissions are %04o; expected 0600", st.Mode().Perm())})
-	} else {
-		client := api.NewClient(opts.Socket)
-		raw, e := client.Do("GET", "/v1/health", nil)
-		if e != nil {
-			add(Check{Name: "daemon", Status: Fail, Message: e.Error()})
-		} else {
-			var health map[string]any
-			_ = json.Unmarshal(raw, &health)
-			add(Check{Name: "daemon", Status: Pass, Message: "private daemon is reachable", Details: health})
-		}
-	}
+	// The ledger check is quiescence-gated and non-mutating: the authoritative
+	// ledger is never opened through the repository API (that path creates a
+	// missing ledger and runs migrations), and the offline diagnosis needs to
+	// know whether an authenticated daemon answered the health probe first.
+	daemonCheck, daemonReachable := probeDaemon(ctx, opts)
+	add(diagnoseLedger(opts.DataRoot, opts.Socket, daemonReachable))
+	add(daemonCheck)
+
 	if opts.CredentialConfig == "" {
 		add(Check{Name: "credential_config", Status: Skip, Message: "credential configuration not supplied"})
 	} else if st, e := os.Stat(opts.CredentialConfig); e != nil {
@@ -139,10 +111,30 @@ func Run(ctx context.Context, opts Options) Report {
 			add(Check{Name: "rootless_runtime", Status: Pass, Message: "rootless runtime is ready", Details: backend})
 		}
 	}
-	if opts.Socket != "" {
-		if conn, e := net.DialTimeout("unix", opts.Socket, 500*time.Millisecond); e == nil {
-			_ = conn.Close()
-		}
-	}
+
 	return report
+}
+
+// probeDaemon runs the daemon reachability check. The returned bool reports
+// whether an authenticated daemon answered the health probe; the ledger
+// diagnosis uses it to refuse raw offline diagnosis while a daemon is live.
+func probeDaemon(ctx context.Context, opts Options) (Check, bool) {
+	if opts.Socket == "" {
+		return Check{Name: "daemon", Status: Skip, Message: "socket path not configured"}, false
+	}
+	st, e := os.Stat(opts.Socket)
+	if e != nil {
+		return Check{Name: "daemon", Status: Warn, Message: "daemon socket is not available"}, false
+	}
+	if st.Mode().Perm() != 0o600 {
+		return Check{Name: "daemon", Status: Fail, Message: fmt.Sprintf("socket permissions are %04o; expected 0600", st.Mode().Perm())}, false
+	}
+	client := api.NewClient(opts.Socket)
+	raw, e := client.Do("GET", "/v1/health", nil)
+	if e != nil {
+		return Check{Name: "daemon", Status: Fail, Message: e.Error()}, false
+	}
+	var health map[string]any
+	_ = json.Unmarshal(raw, &health)
+	return Check{Name: "daemon", Status: Pass, Message: "private daemon is reachable", Details: health}, true
 }

@@ -12,12 +12,20 @@ import (
 	"time"
 
 	"github.com/SHOnnay/futurediff/internal/domain"
+	"github.com/SHOnnay/futurediff/internal/durablewrite"
 )
 
 //go:embed migrations/*.sql
 var migrationFS embed.FS
 
-type Repository struct{ db *DB }
+type Repository struct {
+	db *DB
+	// Injector is a test-only deterministic durable-write fault-injection seam
+	// for the external-effect receipt lifecycle (ADR-099). Production callers
+	// leave it nil and every method behaves exactly as before; nothing outside
+	// tests constructs an injector.
+	Injector durablewrite.Injector
+}
 
 func OpenRepository(path string) (*Repository, error) {
 	db, err := Open(path)

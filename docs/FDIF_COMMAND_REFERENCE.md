@@ -146,9 +146,20 @@ futurediff-audit --root ~/.futurediff --operator-events
 
 `fdif events` shows the per-transaction ledger event stream.
 
-`futurediff-audit` verifies durable local evidence. `--operator-events` verifies the separate tamper-evident operator audit trail for security-sensitive daemon/API actions.
+`fdif cleanup-lock` removes a proved-stale daemon lock (dead PID, PID reuse, or
+previous boot) and its stale socket, records `event_type: lock_cleanup` in the
+operator audit trail, and reports `action: cleaned` (`none` when already
+cleaned). It refuses — with JSON `action: refused` and exit code 2 — when the
+lock is held by a live reachable daemon (`lock_owner_alive`), the owner is
+ambiguous (`lock_owner_ambiguous`), permissions are unsafe, the file is
+oversized, or `--yes` is missing in non-interactive/`--json` mode
+(`confirmation_required`). A corrupt (unparseable) lock with safe `0600`
+permissions is eligible for cleanup; the audit write is made durable before any
+removal, and each path removal is individually race-safe (flock + inode
+verification) — never an atomic pair.
 
-`discard` is an alias of `abort`.
+`futurediff-audit` verifies durable local evidence. `--operator-events` verifies the separate tamper-evident operator audit trail for security-sensitive daemon/API actions. `discard` is an alias of `abort`.
+
 ## Daemon
 
 ```bash
@@ -228,12 +239,33 @@ fdif version
 fdif completion bash|zsh|fish|powershell
 ```
 
-The demo proves that the current branch stays unchanged and the published safe
-branch contains the staged change. It performs no GitHub mutation.
+`fdif doctor` checks requirements and the effective home, then runs bounded integrity diagnostics: `ledger_integrity` (a present-but-corrupt ledger reports `fail`, a missing ledger reports `warn`), `ledger_event_chains` (hash-chain validation), `daemon_lock` (a corrupt or unsafe lock reports `fail` with the inspection reason), `storage`, `audit_chain`, and `backup_catalog`. Use `--json` for structured output with stable `reason_code`, `component`, `path_class`, `integrity_status`, `lock_status`, `owner_status`, `safe_to_retry`, `automatic_cleanup_allowed`, `backup_available`, `backup_verified`, `recovery_required`, `recommended_action`.
+
+The demo proves that the current branch stays unchanged and the published safe branch contains the staged change. It performs no GitHub mutation.
+
+## Low-level resilience commands
+
+```bash
+futurediff-restore -root PATH -backup PATH -expected-sha256 HEX -apply -confirm RESTORE_FUTUREDIFF_LEDGER [--allow-stale-backup] [--pre-restore-backup PATH]
+futurediff-storage-check
+futurediff-integrity-checkpoint
+```
+
+`futurediff-restore` restores a verified backup into a FutureDiff home. Key behaviors:
+- Provenance: the backup must be recorded in the live home's authoritative backup catalog with matching path, size, and digest, or proven by a completed restore-evidence manifest.
+- **Already-restored provenance**: a byte-identical backup is reported `already_restored: true` only when the catalog or evidence manifest proves the prior restore; uncatalogued byte-identical files are refused (fail closed).
+- Corrupt preservation: the live ledger (and WAL/SHM) is copied to a private quarantine directory before any replacement.
+- Atomic replacement: temp copy → validate → fsync → rename → parent-dir sync.
+- Post-restore: offline diagnosis + external-effects reconciliation; JSON report includes `effect_reconciliation` with `recommended_action` (e.g., `fdif recover <tx> --yes`).
+- `--allow-stale-backup` overrides the "older than the live ledger" refusal; records a pre-restore backup first.
+- Refuses if daemon lock is held by a live/ambiguous owner.
+- JSON output with stable fields per ADR-099 reason codes.
+
+`futurediff-storage-check` classifies disk pressure at critical write paths (ENOSPC/EDQUOT/EROFS/EIO, short-write, sync/rename failure, inode exhaustion) and reports JSON with `reason_code` and `safe_to_retry`.
+
+`futurediff-integrity-checkpoint` creates or verifies an integrity checkpoint (digest + event-chain + settings snapshot) for the authoritative ledger.
 
 ## Global flags
-
-Global flags may appear before or after a subcommand:
 
 ```text
 --home PATH

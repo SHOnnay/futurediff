@@ -1,0 +1,15 @@
+{
+  "backup": {
+    "backup_id": "backup_07c3bca248fe55954cbef8bf",
+    "path": "/tmp/futurediff-corruption-lock.l8jHOS/home/backup-one.db",
+    "sha256": "040945395b46569d03b723c1ef752d25a44a66c674160f39a35f0bbed29a4bc1",
+    "size_bytes": 462848,
+    "created_at": "2026-08-06T13:32:57.762323Z"
+  },
+  "health": {
+    "integrity_ok": true,
+    "migration_count": 16,
+    "transaction_count": 7,
+    "unresolved_transaction_count": 2
+  }
+}

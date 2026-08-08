@@ -146,6 +146,18 @@ func (d *DB) Query(query string, args ...Value) ([]Row, error) {
 	}
 	return queryPrepared(d.db, query, args...)
 }
+
+// QueryRC is Query with the SQLite result code from the final step, so
+// diagnostic callers can classify failures without parsing message text.
+func (d *DB) QueryRC(query string, args ...Value) ([]Row, C.int, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if err := d.before("query"); err != nil {
+		return nil, 0, err
+	}
+	return queryPreparedRC(d.db, query, args...)
+}
+
 func (t *Tx) Query(query string, args ...Value) ([]Row, error) {
 	return queryPrepared(t.db.db, query, args...)
 }
@@ -236,22 +248,32 @@ func execPrepared(db *C.sqlite3, query string, args ...Value) (int64, error) {
 }
 
 func queryPrepared(db *C.sqlite3, query string, args ...Value) ([]Row, error) {
+	rows, _, err := queryPreparedRC(db, query, args...)
+	return rows, err
+}
+
+// queryPreparedRC is queryPrepared with the SQLite result code from the final
+// sqlite3_step call, so callers can classify failures (corrupt, not-a-database,
+// I/O, busy) without parsing message text.
+func queryPreparedRC(db *C.sqlite3, query string, args ...Value) ([]Row, C.int, error) {
 	stmt, err := prepare(db, query)
 	if err != nil {
-		return nil, err
+		// prepare_v2 can fail eagerly (NOTADB, CORRUPT) for statements that
+		// touch the database header; surface the result code for callers.
+		return nil, C.sqlite3_extended_errcode(db), err
 	}
 	defer C.sqlite3_finalize(stmt)
 	if err := bind(stmt, args); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	var rows []Row
 	for {
 		rc := C.sqlite3_step(stmt)
 		if rc == C.SQLITE_DONE {
-			return rows, nil
+			return rows, rc, nil
 		}
 		if rc != C.SQLITE_ROW {
-			return nil, fmt.Errorf("sqlite query step: %s", C.GoString(C.fd_sqlite_errmsg(db)))
+			return nil, rc, fmt.Errorf("sqlite query step: %s", C.GoString(C.fd_sqlite_errmsg(db)))
 		}
 		n := int(C.sqlite3_column_count(stmt))
 		row := make(Row, n)

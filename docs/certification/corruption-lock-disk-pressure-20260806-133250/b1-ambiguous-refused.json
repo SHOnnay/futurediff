@@ -1,0 +1,9 @@
+{
+  "action": "refused",
+  "automatic_cleanup": false,
+  "kind": "cleanup_lock",
+  "lock_path": "/private/tmp/futurediff-corruption-lock.l8jHOS/home/daemon.lock",
+  "message": "automatic cleanup not allowed for this lock state",
+  "reason_code": "lock_owner_ambiguous",
+  "socket_path": "/private/tmp/futurediff-corruption-lock.l8jHOS/home/futurediff.sock"
+}

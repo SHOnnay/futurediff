@@ -1,0 +1,19 @@
+{
+  "version": "0.1",
+  "checked_at": "2026-08-06T16:48:27.052868Z",
+  "healthy": false,
+  "filesystem": {
+    "total_bytes": 994662584320,
+    "free_bytes": 259504599040,
+    "free_percent": 26.089711539457376
+  },
+  "ledger_bytes": 462848,
+  "runtime_bytes": 0,
+  "findings": [
+    "free bytes 259504599040 below minimum 1099511627776"
+  ],
+  "policy": {
+    "version": "0.1",
+    "minimum_free_bytes": 1099511627776
+  }
+}

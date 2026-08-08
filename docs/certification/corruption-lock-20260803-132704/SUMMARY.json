@@ -1,0 +1,31 @@
+{
+  "kind": "corruption-lock-disk-pressure-certification",
+  "generated_at": "2026-08-03T13:27:11Z",
+  "host": "Darwin-arm64",
+  "scenarios": [
+    "live_daemon_lock_refusal",
+    "stale_lock_cleanup_with_audit",
+    "corrupt_lock_cleanup",
+    "corrupt_ledger_diagnosis",
+    "stale_backup_restore_refusal",
+    "allow_stale_backup_override",
+    "fail_closed_restore_over_corrupt_ledger",
+    "fresh_root_restore",
+    "disk_pressure_classification"
+  ],
+  "failures": 0,
+  "evidence": [
+  "/Users/sakibulhudaonnay/Downloads/futurediff-production/futurediff/docs/certification/corruption-lock-20260803-132704/a1-doctor-corrupt-ledger.json",
+  "/Users/sakibulhudaonnay/Downloads/futurediff-production/futurediff/docs/certification/corruption-lock-20260803-132704/a2-corrupt-live-refused.json",
+  "/Users/sakibulhudaonnay/Downloads/futurediff-production/futurediff/docs/certification/corruption-lock-20260803-132704/b1-live-refusal.json",
+  "/Users/sakibulhudaonnay/Downloads/futurediff-production/futurediff/docs/certification/corruption-lock-20260803-132704/c1-stale-cleaned.json",
+  "/Users/sakibulhudaonnay/Downloads/futurediff-production/futurediff/docs/certification/corruption-lock-20260803-132704/c2-repeat.json",
+  "/Users/sakibulhudaonnay/Downloads/futurediff-production/futurediff/docs/certification/corruption-lock-20260803-132704/d1-doctor-corrupt-lock.json",
+  "/Users/sakibulhudaonnay/Downloads/futurediff-production/futurediff/docs/certification/corruption-lock-20260803-132704/d2-corrupt-cleaned.json",
+  "/Users/sakibulhudaonnay/Downloads/futurediff-production/futurediff/docs/certification/corruption-lock-20260803-132704/e0-backup-one.json",
+  "/Users/sakibulhudaonnay/Downloads/futurediff-production/futurediff/docs/certification/corruption-lock-20260803-132704/e1-stale-refused.json",
+  "/Users/sakibulhudaonnay/Downloads/futurediff-production/futurediff/docs/certification/corruption-lock-20260803-132704/e2-stale-allowed.json",
+  "/Users/sakibulhudaonnay/Downloads/futurediff-production/futurediff/docs/certification/corruption-lock-20260803-132704/f1-fresh-apply.json",
+  "/Users/sakibulhudaonnay/Downloads/futurediff-production/futurediff/docs/certification/corruption-lock-20260803-132704/SUMMARY.json"
+]
+}

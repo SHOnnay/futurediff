@@ -1,0 +1,15 @@
+{
+  "matches": {
+    "ledger.db": true
+  },
+  "missing": [],
+  "manifest_present": true,
+  "manifest": {
+    "version": 1,
+    "preserved_at": "2026-08-06T13:32:58.193641Z",
+    "ledger_sha256": "1e1f82ffd4d7ec905b5221df851a147ece4e38d9d44f65876f15539db99d5f4d",
+    "backup_sha256": "040945395b46569d03b723c1ef752d25a44a66c674160f39a35f0bbed29a4bc1",
+    "wal_preserved": false,
+    "shm_preserved": false
+  }
+}

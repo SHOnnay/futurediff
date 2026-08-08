@@ -1,0 +1,38 @@
+# github.com/SHOnnay/futurediff/internal/app.test
+ld: warning: ignoring duplicate libraries: '-lsqlite3'
+=== RUN   TestChangedMaterialRequiresNewApproval
+--- PASS: TestChangedMaterialRequiresNewApproval (0.48s)
+=== RUN   TestMaterializationFaultClassificationThroughCommit
+=== RUN   TestMaterializationFaultClassificationThroughCommit/enospc
+=== RUN   TestMaterializationFaultClassificationThroughCommit/edquot
+=== RUN   TestMaterializationFaultClassificationThroughCommit/erofs
+=== RUN   TestMaterializationFaultClassificationThroughCommit/eio
+--- PASS: TestMaterializationFaultClassificationThroughCommit (1.30s)
+    --- PASS: TestMaterializationFaultClassificationThroughCommit/enospc (0.34s)
+    --- PASS: TestMaterializationFaultClassificationThroughCommit/edquot (0.31s)
+    --- PASS: TestMaterializationFaultClassificationThroughCommit/erofs (0.33s)
+    --- PASS: TestMaterializationFaultClassificationThroughCommit/eio (0.33s)
+=== RUN   TestReceiptFaultBeforeEffectPreventsProviderCall
+=== RUN   TestReceiptFaultBeforeEffectPreventsProviderCall/create
+=== RUN   TestReceiptFaultBeforeEffectPreventsProviderCall/write
+--- PASS: TestReceiptFaultBeforeEffectPreventsProviderCall (1.05s)
+    --- PASS: TestReceiptFaultBeforeEffectPreventsProviderCall/create (0.55s)
+    --- PASS: TestReceiptFaultBeforeEffectPreventsProviderCall/write (0.50s)
+=== RUN   TestPostEffectReceiptFaultRequiresReconciliation
+=== RUN   TestPostEffectReceiptFaultRequiresReconciliation/short_write
+=== RUN   TestPostEffectReceiptFaultRequiresReconciliation/file_sync
+=== RUN   TestPostEffectReceiptFaultRequiresReconciliation/rename
+=== RUN   TestPostEffectReceiptFaultRequiresReconciliation/directory_sync
+--- PASS: TestPostEffectReceiptFaultRequiresReconciliation (1.85s)
+    --- PASS: TestPostEffectReceiptFaultRequiresReconciliation/short_write (0.47s)
+    --- PASS: TestPostEffectReceiptFaultRequiresReconciliation/file_sync (0.46s)
+    --- PASS: TestPostEffectReceiptFaultRequiresReconciliation/rename (0.45s)
+    --- PASS: TestPostEffectReceiptFaultRequiresReconciliation/directory_sync (0.47s)
+=== RUN   TestAlreadyPresentOutcomeRecognizedWithoutDuplication
+--- PASS: TestAlreadyPresentOutcomeRecognizedWithoutDuplication (0.44s)
+=== RUN   TestAmbiguousOutcomeRefusesBlindRetry
+--- PASS: TestAmbiguousOutcomeRefusesBlindRetry (0.45s)
+=== RUN   TestRepeatedRecoveryDoesNotDuplicateEffects
+--- PASS: TestRepeatedRecoveryDoesNotDuplicateEffects (0.47s)
+PASS
+ok  	github.com/SHOnnay/futurediff/internal/app	6.377s

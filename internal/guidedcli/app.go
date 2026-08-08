@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +16,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/SHOnnay/futurediff/internal/daemonlock"
+	"github.com/SHOnnay/futurediff/internal/operatoraudit"
+	"github.com/SHOnnay/futurediff/internal/storageguard"
 )
 
 const defaultVerificationPolicy = `{
@@ -172,6 +177,8 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		err = a.daemon(ctx, args)
 	case "doctor":
 		err = a.doctor(ctx)
+	case "cleanup-lock":
+		err = a.cleanupLock(ctx, args)
 	case "config":
 		err = a.config(args)
 	case "demo":
@@ -187,7 +194,22 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	return 0
 }
 
+// reportedError is returned by commands that have already emitted their
+// structured response to Out (for example a JSON refusal). fail() returns its
+// exit code without writing a second response, so scripters get one JSON
+// document and a reliable non-zero exit code.
+type reportedError struct {
+	code int
+	msg  string
+}
+
+func (e *reportedError) Error() string { return e.msg }
+
 func (a *App) fail(err error) int {
+	var reported *reportedError
+	if errors.As(err, &reported) {
+		return reported.code
+	}
 	code := 1
 	var commandErr *CommandError
 	if errors.As(err, &commandErr) && commandErr.ExitCode > 0 {
@@ -1215,55 +1237,130 @@ func (a *App) daemon(ctx context.Context, args []string) error {
 }
 
 func (a *App) doctor(ctx context.Context) error {
-	type check struct{ ID, Status, Detail string }
-	checks := []check{}
+	checks := []doctorCheck{}
 	if path, err := resolveExecutable(a.Binary); err == nil {
-		checks = append(checks, check{"futurediff_binary", "pass", path})
+		checks = append(checks, doctorCheck{"futurediff_binary", "pass", path})
 	} else {
-		checks = append(checks, check{"futurediff_binary", "fail", err.Error()})
+		checks = append(checks, doctorCheck{"futurediff_binary", "fail", err.Error()})
 	}
 	if path, err := resolveExecutable(a.DaemonBinary); err == nil {
-		checks = append(checks, check{"futurediffd_binary", "pass", path})
+		checks = append(checks, doctorCheck{"futurediffd_binary", "pass", path})
 	} else {
-		checks = append(checks, check{"futurediffd_binary", "fail", err.Error()})
+		checks = append(checks, doctorCheck{"futurediffd_binary", "fail", err.Error()})
 	}
 	if path, err := exec.LookPath(a.GitBinary); err == nil {
-		checks = append(checks, check{"git", "pass", path})
+		checks = append(checks, doctorCheck{"git", "pass", path})
 	} else {
-		checks = append(checks, check{"git", "fail", err.Error()})
+		checks = append(checks, doctorCheck{"git", "fail", err.Error()})
 	}
 	if a.Paths.Home.Path != "" {
 		if _, err := os.Lstat(a.Paths.Home.Path); os.IsNotExist(err) {
-			checks = append(checks, check{"futurediff_home", "pass", a.Paths.Home.Path + " (will be created with private permissions)"})
+			checks = append(checks, doctorCheck{"futurediff_home", "pass", a.Paths.Home.Path + " (will be created with private permissions)"})
 		} else if err != nil {
-			checks = append(checks, check{"futurediff_home", "fail", err.Error()})
+			checks = append(checks, doctorCheck{"futurediff_home", "fail", err.Error()})
 		} else if err := validatePrivateDirectory(a.Paths.Home.Path); err != nil {
-			checks = append(checks, check{"futurediff_home", "fail", err.Error()})
+			checks = append(checks, doctorCheck{"futurediff_home", "fail", err.Error()})
 		} else {
-			checks = append(checks, check{"futurediff_home", "pass", a.Paths.Home.Path})
+			checks = append(checks, doctorCheck{"futurediff_home", "pass", a.Paths.Home.Path})
 		}
-		checks = append(checks, check{"safe_workspaces", "pass", a.Paths.WorkspaceRoot.Path})
+		checks = append(checks, doctorCheck{"safe_workspaces", "pass", a.Paths.WorkspaceRoot.Path})
 	}
-	if err := a.Daemon.Status(ctx); err == nil {
-		checks = append(checks, check{"daemon", "pass", "running"})
+	daemonReachable := false
+	if a.Daemon.Engine != nil {
+		daemonReachable = a.Daemon.Status(ctx) == nil
+	}
+	if daemonReachable {
+		checks = append(checks, doctorCheck{"daemon", "pass", "running"})
 	} else {
-		checks = append(checks, check{"daemon", "warn", "not running"})
+		checks = append(checks, doctorCheck{"daemon", "warn", "not running"})
 	}
+
+	// Comprehensive integrity diagnostics
+	var ledgerResult ledgerDiagnosisResult
+	if a.Paths.Home.Path != "" {
+		home := a.Paths.Home.Path
+		// Ledger integrity: quiescence-gated offline diagnosis. The ledger
+		// is never opened through the repository API from fdif doctor —
+		// that path runs migrations and can create or alter the
+		// authoritative ledger. Diagnosis runs only against a private
+		// snapshot, and only after quiescence is proved and revalidated.
+		var ledgerCheck doctorCheck
+		ledgerResult, ledgerCheck = a.diagnoseLedgerPath(ctx, home, daemonReachable)
+		checks = append(checks, ledgerCheck)
+
+		// Lock inspection: Inspect reports both a status and a diagnostics
+		// error (corrupt JSON, trailing data, oversized, symlink, unsafe
+		// permissions). Surface corruption explicitly as a failure.
+		lockPath := filepath.Join(home, "daemon.lock")
+		status, inspectErr := daemonlock.Inspect(lockPath, time.Now())
+		if inspectErr != nil {
+			detail := fmt.Sprintf("lock inspection failed: %v", inspectErr)
+			if status.ReasonCode != "" {
+				detail += " (" + status.ReasonCode + ")"
+			}
+			checks = append(checks, doctorCheck{"daemon_lock", "fail", detail})
+		} else {
+			detail := fmt.Sprintf("held=%v owner_status=%s lock_status=%s", status.Held, status.OwnerStatus, status.LockStatus)
+			if status.ReasonCode != "" {
+				detail += " (" + status.ReasonCode + ")"
+			}
+			checks = append(checks, doctorCheck{"daemon_lock", "pass", detail})
+		}
+
+		// Storage guard
+		if guard, err := storageguard.Evaluate(home, storageguard.Policy{}, storageguard.OSProbe{}, time.Now()); err == nil {
+			detail := fmt.Sprintf("free=%.1f%% healthy=%v", guard.Filesystem.FreePercent, guard.Healthy)
+			if !guard.Healthy {
+				checks = append(checks, doctorCheck{"storage", "warn", detail})
+			} else {
+				checks = append(checks, doctorCheck{"storage", "pass", detail})
+			}
+		} else {
+			checks = append(checks, doctorCheck{"storage", "warn", err.Error()})
+		}
+
+		// Audit chain
+		auditStore := operatoraudit.Store{Root: home}
+		if report, err := auditStore.Verify(); err == nil {
+			detail := fmt.Sprintf("valid=%v count=%d", report.Valid, report.Count)
+			if !report.Valid {
+				checks = append(checks, doctorCheck{"audit_chain", "fail", detail + " " + strings.Join(report.Findings, "; ")})
+			} else {
+				checks = append(checks, doctorCheck{"audit_chain", "pass", detail})
+			}
+		} else {
+			checks = append(checks, doctorCheck{"audit_chain", "warn", err.Error()})
+		}
+
+		// Backup catalog: enumerating backups requires the read-write
+		// repository API (which runs migrations), which fdif doctor must
+		// never run against the authoritative ledger. The catalog is
+		// deferred to the daemon or the standalone doctor.
+		if _, statErr := os.Lstat(filepath.Join(home, "ledger.db")); os.IsNotExist(statErr) {
+			checks = append(checks, doctorCheck{"backup_catalog", "warn", "ledger not available"})
+		} else {
+			checks = append(checks, doctorCheck{"backup_catalog", "warn", "backup catalog inspection requires the repository API and is deferred while the ledger is offline"})
+		}
+	}
+
 	if a.CredentialConfig == "" {
-		checks = append(checks, check{"github_credentials", "warn", "not configured; local publication remains available"})
+		checks = append(checks, doctorCheck{"github_credentials", "warn", "not configured; local publication remains available"})
 	} else if info, err := os.Lstat(a.CredentialConfig); err != nil {
-		checks = append(checks, check{"github_credentials", "fail", err.Error()})
+		checks = append(checks, doctorCheck{"github_credentials", "fail", err.Error()})
 	} else if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
-		checks = append(checks, check{"github_credentials", "fail", "credential config must be a regular file"})
+		checks = append(checks, doctorCheck{"github_credentials", "fail", "credential config must be a regular file"})
 	} else if info.Mode().Perm()&0o077 != 0 {
-		checks = append(checks, check{"github_credentials", "fail", "credential config permissions must be 0600"})
+		checks = append(checks, doctorCheck{"github_credentials", "fail", "credential config permissions must be 0600"})
 	} else if a.GitHubCredentialID == "" {
-		checks = append(checks, check{"github_credentials", "warn", "config file is present but no GitHub credential ID is selected"})
+		checks = append(checks, doctorCheck{"github_credentials", "warn", "config file is present but no GitHub credential ID is selected"})
 	} else {
-		checks = append(checks, check{"github_credentials", "pass", "configured as " + a.GitHubCredentialID})
 	}
 	if a.JSON {
-		return writeJSON(a.Out, map[string]any{"kind": "fdif-doctor", "checks": checks})
+		payload := map[string]any{"kind": "fdif-doctor", "checks": checks}
+		if a.Paths.Home.Path != "" {
+			payload["ledger"] = ledgerResult
+		}
+		return writeJSON(a.Out, payload)
 	}
 	a.Renderer.title("FutureDiff guided CLI doctor")
 	for _, item := range checks {
@@ -1275,6 +1372,9 @@ func (a *App) doctor(ctx context.Context) error {
 		default:
 			fmt.Fprintln(a.Out, "x", item.ID+":", item.Detail)
 		}
+	}
+	if a.Paths.Home.Path != "" && ledgerResult.RecommendedAction != "" && ledgerResult.RecommendedAction != "none" {
+		a.Renderer.next(ledgerResult.RecommendedAction)
 	}
 	return nil
 }
@@ -1301,6 +1401,149 @@ func pathOr(explicit, found string) string {
 		return found
 	}
 	return explicit
+}
+
+func (a *App) cleanupLock(ctx context.Context, args []string) error {
+	// The CLI parser folds a leading --yes into a.Yes; direct calls may pass
+	// it through args. Accept both.
+	yes := a.Yes
+	for _, arg := range args {
+		if arg == "--yes" {
+			yes = true
+		} else {
+			return fmt.Errorf("unknown cleanup-lock option %q", arg)
+		}
+	}
+	if a.Paths.Home.Path == "" {
+		return errors.New("futurediff home not configured")
+	}
+	lockPath := filepath.Join(a.Paths.Home.Path, "daemon.lock")
+	socketPath := filepath.Join(a.Paths.Home.Path, "futurediff.sock")
+
+	refuse := func(reasonCode, message string) error {
+		if a.JSON {
+			_ = writeJSON(a.Out, map[string]any{
+				"kind":              "cleanup_lock",
+				"lock_path":         lockPath,
+				"socket_path":       socketPath,
+				"action":            "refused",
+				"reason_code":       reasonCode,
+				"message":           message,
+				"automatic_cleanup": false,
+			})
+			return &reportedError{code: 2, msg: message}
+		}
+		a.Renderer.warning(message)
+		return errors.New(message)
+	}
+
+	status, err := daemonlock.Inspect(lockPath, time.Now())
+	// Inspect returns a diagnostics error for corrupt/oversized/symlink/permission
+	// cases while still populating the status. Only a status that cannot guide a
+	// decision is a hard failure; corrupt and trailing-data locks are still
+	// eligible for cleanup (AutomaticCleanupAllowed=true).
+	if err != nil && status.ReasonCode == "" && !status.AutomaticCleanupAllowed {
+		return fmt.Errorf("inspect lock: %w", err)
+	}
+	if !status.Held && status.LockStatus == "released" && status.ReasonCode == "no_lock" {
+		if a.JSON {
+			return writeJSON(a.Out, map[string]any{
+				"kind":              "cleanup_lock",
+				"lock_path":         lockPath,
+				"socket_path":       socketPath,
+				"action":            "none",
+				"message":           "no lock present; nothing to clean",
+				"automatic_cleanup": false,
+			})
+		}
+		a.Renderer.success("No lock present; nothing to clean")
+		return nil
+	}
+	if status.LockStatus == "held" && status.OwnerStatus == "alive" && status.DaemonReachable {
+		return refuse(status.ReasonCode, "lock is held by a live, reachable daemon; cannot clean")
+	}
+	if !status.AutomaticCleanupAllowed {
+		return refuse(status.ReasonCode, "automatic cleanup not allowed for this lock state")
+	}
+	if !yes && !a.Interactive {
+		return refuse("confirmation_required", "cleanup requires explicit --yes or interactive confirmation")
+	}
+	if a.Interactive && !yes {
+		confirmed, err := a.confirm(fmt.Sprintf("Remove stale lock at %s and socket at %s?", lockPath, socketPath), "CLEANUP LOCK")
+		if err != nil {
+			return err
+		}
+		if !confirmed {
+			return errors.New("cleanup declined")
+		}
+	}
+
+	// Pre-mutation audit: fail closed if the audit event cannot be recorded.
+	// The mutation must not start when pre-mutation audit recording fails.
+	auditStore := operatoraudit.Store{Root: a.Paths.Home.Path}
+	if _, auditErr := auditStore.Record(operatoraudit.Input{
+		OperationID:    "cleanup-lock",
+		Actor:          operatoraudit.Actor{Source: "local"},
+		Context:        operatoraudit.ExecutionContext{Component: "fdif"},
+		EventType:      "lock_cleanup",
+		Target:         operatoraudit.Target{ResourceType: "daemon_lock", ResourceID: lockPath},
+		Result:         operatoraudit.ResultSucceeded,
+		PolicyDecision: operatoraudit.PolicyAllow,
+		Metadata:       map[string]string{"lock_path": lockPath, "socket_path": socketPath},
+	}); auditErr != nil {
+		return refuse("audit_write_failed", fmt.Sprintf("cannot record cleanup audit event; refusing cleanup: %v", auditErr))
+	}
+
+	// Race-safe removal: RemoveIfUnheld acquires the flock and verifies the path
+	// still refers to the same inode before unlinking. If a daemon re-acquired
+	// the lock after our inspection, this fails closed and nothing is removed.
+	var cleanupErrs []error
+	if err := daemonlock.RemoveIfUnheld(lockPath); err != nil {
+		if errors.Is(err, daemonlock.ErrLockHeld) {
+			return refuse("lock_reacquired", "lock was re-acquired during cleanup; refusing to remove")
+		}
+		cleanupErrs = append(cleanupErrs, fmt.Errorf("remove lock: %w", err))
+	}
+	// The socket is removed separately and only when nothing is listening on it.
+	// The two removals are independent filesystem paths and are not atomic with
+	// respect to each other; each is individually verified and safe.
+	if conn, dialErr := net.DialTimeout("unix", socketPath, 300*time.Millisecond); dialErr == nil {
+		_ = conn.Close()
+		// Something is listening; keep the socket and report it.
+		if a.JSON {
+			return writeJSON(a.Out, map[string]any{
+				"kind":              "cleanup_lock",
+				"lock_path":         lockPath,
+				"socket_path":       socketPath,
+				"action":            "partial",
+				"reason_code":       "stale_socket_live_listener",
+				"message":           "stale lock removed; socket left in place because a listener is active",
+				"automatic_cleanup": true,
+			})
+		}
+		a.Renderer.warning("Stale lock removed; socket left in place (listener active)")
+		return nil
+	}
+	if _, err := os.Lstat(socketPath); err == nil {
+		if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
+			cleanupErrs = append(cleanupErrs, fmt.Errorf("remove socket: %w", err))
+		}
+	}
+	if len(cleanupErrs) > 0 {
+		return fmt.Errorf("cleanup failed: %v", cleanupErrs)
+	}
+	if a.JSON {
+		return writeJSON(a.Out, map[string]any{
+			"kind":              "cleanup_lock",
+			"lock_path":         lockPath,
+			"socket_path":       socketPath,
+			"action":            "cleaned",
+			"message":           "stale lock and socket removed",
+			"automatic_cleanup": true,
+		})
+	}
+	a.Renderer.success("Stale lock and socket removed")
+	return nil
 }
 
 func (a *App) config(args []string) error {
@@ -1504,7 +1747,6 @@ func (a *App) completion(args []string) error {
 	_, err = io.WriteString(a.Out, script)
 	return err
 }
-
 func (a *App) version(ctx context.Context) error {
 	raw, err := a.Engine.Run(ctx, "version")
 	if err != nil {

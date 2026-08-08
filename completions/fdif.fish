@@ -22,6 +22,7 @@ complete -c fdif -n '__fish_use_subcommand' -a abort
 complete -c fdif -n '__fish_use_subcommand' -a discard
 complete -c fdif -n '__fish_use_subcommand' -a daemon
 complete -c fdif -n '__fish_use_subcommand' -a doctor
+complete -c fdif -n '__fish_use_subcommand' -a cleanup-lock
 complete -c fdif -n '__fish_use_subcommand' -a config
 complete -c fdif -n '__fish_use_subcommand' -a menu
 complete -c fdif -n '__fish_use_subcommand' -a demo
@@ -31,5 +32,6 @@ complete -c fdif -n '__fish_use_subcommand' -a help
 complete -c fdif -n '__fish_seen_subcommand_from daemon' -a 'status start stop restart logs'
 complete -c fdif -n '__fish_seen_subcommand_from recover' -a '--yes --json'
 complete -c fdif -n '__fish_seen_subcommand_from use' -a '--clear --json'
+complete -c fdif -n '__fish_seen_subcommand_from cleanup-lock' -a '--yes --json'
 complete -c fdif -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish powershell'
 complete -c fdif -n '__fish_seen_subcommand_from finish' -a '--github --remote --base --title --body --body-file --credential-config --github-credential --full --yes'

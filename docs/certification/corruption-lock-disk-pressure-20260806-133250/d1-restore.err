@@ -1,0 +1,5 @@
+restore complete; reconciliation is required before further publication
+run: fdif recover tx-jm --yes
+run: fdif recover tx-jr --yes
+run: fdif status tx-jh
+run the canonical recovery command for each affected change before further publication

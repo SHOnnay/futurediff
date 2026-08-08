@@ -1,0 +1,7 @@
+{
+  "corruption": "flip bytes 100-139 of the SQLite header",
+  "files_before_corruption": {
+    "ledger.db": "040945395b46569d03b723c1ef752d25a44a66c674160f39a35f0bbed29a4bc1"
+  },
+  "corrupted_sha256": "6f93cd175f98eab2d0a916e29a608b577600c89f45fed8cf66757fcbe91abce8"
+}
