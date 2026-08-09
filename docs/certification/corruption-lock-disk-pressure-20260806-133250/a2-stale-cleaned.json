@@ -1,0 +1,8 @@
+{
+  "action": "cleaned",
+  "automatic_cleanup": true,
+  "kind": "cleanup_lock",
+  "lock_path": "/private/tmp/futurediff-corruption-lock.l8jHOS/home/daemon.lock",
+  "message": "stale lock and socket removed",
+  "socket_path": "/private/tmp/futurediff-corruption-lock.l8jHOS/home/futurediff.sock"
+}

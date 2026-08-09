@@ -22,11 +22,9 @@ import (
 	"github.com/SHOnnay/futurediff/internal/buildinfo"
 	"github.com/SHOnnay/futurediff/internal/configattest"
 	"github.com/SHOnnay/futurediff/internal/credentials"
-	"github.com/SHOnnay/futurediff/internal/daemonlock"
 	"github.com/SHOnnay/futurediff/internal/drain"
 	"github.com/SHOnnay/futurediff/internal/egress"
 	"github.com/SHOnnay/futurediff/internal/evidencecrypto"
-	"github.com/SHOnnay/futurediff/internal/ledger"
 	"github.com/SHOnnay/futurediff/internal/maintenance"
 	"github.com/SHOnnay/futurediff/internal/operatorapproval"
 	"github.com/SHOnnay/futurediff/internal/operatoraudit"
@@ -74,6 +72,7 @@ func main() {
 	allowedPeerUIDs := flag.String("allowed-peer-uids", strconv.Itoa(os.Geteuid()), "comma-separated Unix UIDs allowed to access the daemon socket")
 	disablePeerAuth := flag.Bool("disable-peer-auth", false, "disable kernel-authenticated local peer authorization (unsafe; not recommended)")
 	version := flag.Bool("version", false, "print build information")
+	requireIntegrity := flag.Bool("require-integrity", false, "fail closed at startup unless the offline ledger diagnosis proves the ledger is healthy")
 	flag.Parse()
 	if *version {
 		fmt.Printf("%+v\n", buildinfo.Current())
@@ -107,15 +106,11 @@ func main() {
 			log.Fatal("FutureDiff data-root security audit failed")
 		}
 	}
-	instanceLock, err := daemonlock.Acquire(*lockFile, *root, time.Now())
+	instanceLock, repo, err := openLedgerForStartup(*root, *lockFile, *requireIntegrity)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer instanceLock.Release()
-	repo, err := ledger.OpenRepository(filepath.Join(*root, "ledger.db"))
-	if err != nil {
-		log.Fatal(err)
-	}
 	defer repo.Close()
 	var runner *runtimeoci.Runner
 	if *runtimeImage != "" {

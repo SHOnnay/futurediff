@@ -32,3 +32,10 @@ func (l *Lock) Release() error     { return nil }
 func Inspect(path string, now time.Time) (Status, error) {
 	return Status{Path: path, CheckedAt: now.UTC()}, errors.New("daemon file locks are unsupported on this platform")
 }
+
+// ErrLockHeld is returned by RemoveIfUnheld when a process holds the lock.
+var ErrLockHeld = errors.New("daemon lock is currently held")
+
+func RemoveIfUnheld(path string) error {
+	return errors.New("daemon file locks are unsupported on this platform")
+}

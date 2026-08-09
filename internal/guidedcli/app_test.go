@@ -22,6 +22,9 @@ type fakeEngine struct {
 	calls     [][]string
 	effects   []ExternalEffect
 	receipts  []EffectReceipt
+	// healthErr makes the daemon health probe fail (a stopped daemon) when
+	// non-nil; it is the seam doctor tests use to prove quiescence.
+	healthErr error
 }
 
 func (f *fakeEngine) Run(_ context.Context, args ...string) ([]byte, error) {
@@ -46,6 +49,9 @@ func (f *fakeEngine) Run(_ context.Context, args ...string) ([]byte, error) {
 	}
 	switch args[0] {
 	case "health":
+		if f.healthErr != nil {
+			return nil, f.healthErr
+		}
 		return []byte(`{"status":"ok"}`), nil
 	case "create":
 		if len(args) >= 2 {

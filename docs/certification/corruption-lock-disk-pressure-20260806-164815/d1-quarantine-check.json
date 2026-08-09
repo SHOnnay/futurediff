@@ -1,0 +1,16 @@
+{
+  "matches": {
+    "ledger.db": true
+  },
+  "missing": [],
+  "manifest_present": true,
+  "manifest": {
+    "version": 1,
+    "preserved_at": "2026-08-06T16:48:24.120876Z",
+    "ledger_sha256": "9dbc5a4a6b83124ee1d165b692f9e7836dfb4217b2fc274394a863422c74158a",
+    "backup_sha256": "96a9ec2bbe5f46ec26c1132cd4e20845ee35598d8cc011b979b944e0b8574f4c",
+    "backup_path": "/tmp/futurediff-corruption-lock.dyB78I/home/backup-one.db",
+    "wal_preserved": false,
+    "shm_preserved": false
+  }
+}

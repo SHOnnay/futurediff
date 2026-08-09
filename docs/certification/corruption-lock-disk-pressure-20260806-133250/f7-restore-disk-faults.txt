@@ -1,0 +1,22 @@
+# github.com/SHOnnay/futurediff/internal/ledgerrestore.test
+ld: warning: ignoring duplicate libraries: '-lsqlite3'
+=== RUN   TestRestore_QuarantineDurabilityFaultsFailClosed
+=== RUN   TestRestore_QuarantineDurabilityFaultsFailClosed/ledger-file-sync
+=== RUN   TestRestore_QuarantineDurabilityFaultsFailClosed/wal-file-sync
+=== RUN   TestRestore_QuarantineDurabilityFaultsFailClosed/shm-file-sync
+=== RUN   TestRestore_QuarantineDurabilityFaultsFailClosed/evidence-file-sync
+=== RUN   TestRestore_QuarantineDurabilityFaultsFailClosed/quarantine-dir-sync
+=== RUN   TestRestore_QuarantineDurabilityFaultsFailClosed/parent-dir-sync
+--- PASS: TestRestore_QuarantineDurabilityFaultsFailClosed (0.98s)
+    --- PASS: TestRestore_QuarantineDurabilityFaultsFailClosed/ledger-file-sync (0.16s)
+    --- PASS: TestRestore_QuarantineDurabilityFaultsFailClosed/wal-file-sync (0.16s)
+    --- PASS: TestRestore_QuarantineDurabilityFaultsFailClosed/shm-file-sync (0.17s)
+    --- PASS: TestRestore_QuarantineDurabilityFaultsFailClosed/evidence-file-sync (0.15s)
+    --- PASS: TestRestore_QuarantineDurabilityFaultsFailClosed/quarantine-dir-sync (0.17s)
+    --- PASS: TestRestore_QuarantineDurabilityFaultsFailClosed/parent-dir-sync (0.17s)
+=== RUN   TestRestore_RemoveLiveSidecarsFaultRetainsQuarantine
+--- PASS: TestRestore_RemoveLiveSidecarsFaultRetainsQuarantine (0.17s)
+=== RUN   TestRestore_StorageClassification
+--- PASS: TestRestore_StorageClassification (0.08s)
+PASS
+ok  	github.com/SHOnnay/futurediff/internal/ledgerrestore	(cached)

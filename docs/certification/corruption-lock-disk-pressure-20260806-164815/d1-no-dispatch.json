@@ -1,0 +1,29 @@
+{
+  "attempts": [
+    [
+      "att-ja",
+      "status",
+      "not_found"
+    ],
+    [
+      "att-jm",
+      "commit",
+      "unknown"
+    ],
+    [
+      "att-jp",
+      "commit",
+      "success"
+    ],
+    [
+      "att-jr",
+      "commit",
+      "unknown"
+    ]
+  ],
+  "receipts": [
+    "rcpt-jp"
+  ],
+  "attempt_count": 4,
+  "receipt_count": 1
+}

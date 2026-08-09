@@ -1,0 +1,89 @@
+{
+  "live_path": "/tmp/futurediff-corruption-lock.l8jHOS/home/ledger.db",
+  "backup_path": "/tmp/futurediff-corruption-lock.l8jHOS/home/backup-one.db",
+  "backup_sha256": "040945395b46569d03b723c1ef752d25a44a66c674160f39a35f0bbed29a4bc1",
+  "health": {
+    "integrity_ok": true,
+    "migration_count": 16,
+    "transaction_count": 7,
+    "unresolved_transaction_count": 2
+  },
+  "audit_healthy": true,
+  "event_chain_valid": true,
+  "restored_healthy": true,
+  "restore_verification": "healthy",
+  "applied": false,
+  "already_restored": true,
+  "effect_reconciliation": {
+    "evaluated_at": "2026-08-06T13:32:58.637362Z",
+    "affected_transaction_ids": [
+      "tx-ja",
+      "tx-jh",
+      "tx-jm",
+      "tx-jp",
+      "tx-jr"
+    ],
+    "affected_effect_ids": [
+      "eff-ja",
+      "eff-jh",
+      "eff-jm",
+      "eff-jp",
+      "eff-jr"
+    ],
+    "reconciliation_required": true,
+    "reconciliation_required_count": 1,
+    "known_absent_count": 1,
+    "known_present_count": 1,
+    "ambiguous_count": 2,
+    "evidence_unavailable_count": 0,
+    "no_external_effect_count": 1,
+    "newer_than_backup_count": 0,
+    "automatic_resume_allowed": false,
+    "recommended_action": "run the canonical recovery command for each affected change before further publication",
+    "human_summary": "restore complete; reconciliation is required before further publication",
+    "recovery_commands": [
+      "fdif recover tx-jm --yes",
+      "fdif recover tx-jr --yes",
+      "fdif status tx-jh"
+    ],
+    "effects": [
+      {
+        "effect_id": "eff-ja",
+        "transaction_id": "tx-ja",
+        "state": "known_absent",
+        "reason": "provider_absent"
+      },
+      {
+        "effect_id": "eff-jh",
+        "transaction_id": "tx-jh",
+        "state": "external_state_ambiguous",
+        "reason": "manual_intervention"
+      },
+      {
+        "effect_id": "eff-jm",
+        "transaction_id": "tx-jm",
+        "state": "external_state_ambiguous",
+        "reason": "dispatch_outcome_unknown"
+      },
+      {
+        "effect_id": "eff-jn",
+        "transaction_id": "tx-jn",
+        "state": "no_external_effect",
+        "reason": "never_dispatched"
+      },
+      {
+        "effect_id": "eff-jp",
+        "transaction_id": "tx-jp",
+        "state": "known_present",
+        "reason": "receipt"
+      },
+      {
+        "effect_id": "eff-jr",
+        "transaction_id": "tx-jr",
+        "state": "reconciliation_required",
+        "reason": "requires_canonical_recovery"
+      }
+    ]
+  },
+  "completed_at": "2026-08-06T13:32:58.637362Z"
+}

@@ -1,0 +1,1 @@
+error: stage backup: durablewrite: create /tmp/futurediff-corruption-lock.dyB78I/home-g/.ledger-restore-staged_0eb0f191b8b5a8cf1c943bdb.db: open /tmp/futurediff-corruption-lock.dyB78I/home-g/.ledger-restore-staged_0eb0f191b8b5a8cf1c943bdb.db.tmp-599753772: permission denied

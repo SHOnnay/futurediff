@@ -1,0 +1,10 @@
+Recovery
+  Change ID          tx_1b3379594e35a93521f6c371
+  Status             ready
+  Reason             recovered
+  Recovery required  false
+  Safe to retry      false
+  Safe working copy  present
+
+
+Next -> fdif finish

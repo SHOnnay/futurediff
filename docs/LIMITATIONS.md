@@ -44,7 +44,7 @@ FutureDiff canonicalizes a small set of trusted operating-system path aliases
 so normal macOS locations such as `/tmp` work. Arbitrary user-created symlink
 traversal and a home that is itself a symlink remain rejected. This is path
 hardening, not a complete filesystem sandbox.
-## Recovery and stale selections
+## Recovery, restore, and stale selections
 
 `fdif recover` reports recovery state and, only with explicit `--yes`, runs the
 daemon's canonical recovery. The guided CLI never silently picks a different
@@ -58,7 +58,18 @@ inspection; the guided CLI reports `recovery_ambiguous` and never retries
 blindly. See
 [`adr/ADR-098-guided-recovery-and-stale-selection.md`](adr/ADR-098-guided-recovery-and-stale-selection.md).
 
-## GitHub
+`futurediff-restore --apply` refuses a backup that is older than the live
+ledger (per-chain event-sequence comparison); pass `--allow-stale-backup` only
+after confirming no committed effects would be lost. The pre-restore backup
+always preserves the live ledger as it was before replacement. A live ledger
+that cannot be opened (corruption) is never replaced silently: restore fails
+closed because the pre-restore backup cannot be taken. A daemon holding the
+flock also blocks restore until stopped. Restore does not by itself reconcile
+provider side effects; it reports the restored event chains for operator
+reconciliation. See
+[`adr/ADR-099-corruption-lock-disk-pressure-resilience.md`](adr/ADR-099-corruption-lock-disk-pressure-resilience.md).
+
+**Already-restored provenance**: a byte-identical backup is reported `already_restored: true` only when an authoritative backup-catalog record or a completed restore-evidence manifest proves the prior restore. An uncatalogued byte-identical file at another path is refused (fail closed). The certification drill (`scripts/certify-corruption-lock-disk-pressure.sh`, evidence under `docs/certification/corruption-lock-disk-pressure-20260806-164815/`) validates this behavior with 77/77 checks passing.
 
 GitHub credentials are optional. `fdif finish` publishes locally without them.
 `fdif finish --github` requires an explicitly configured credential and

@@ -26,11 +26,28 @@ echo "== JSON parse =="
 python3 - <<'PY'
 import json
 from pathlib import Path
+bad = []
 for p in sorted(Path('.').rglob('*.json')):
     if '__pycache__' in p.parts or 'dist' in p.parts:
         continue
-    json.loads(p.read_text(encoding='utf-8'))
+    if 'certification' in p.parts:
+        # Drill stdout captures under docs/certification/: fail-closed
+        # operations intentionally leave .json empty (the refusal reason
+        # lives in the paired .err) and some CLI outputs (e.g. `fdif
+        # recover`) are human-readable text. SUMMARY.json records the
+        # byte count and MANIFEST.sha256 binds the exact content.
+        continue
+    if p.stat().st_size == 0:
+        bad.append('%s (empty)' % p)
+        continue
+    try:
+        json.loads(p.read_text(encoding='utf-8'))
+    except Exception as exc:
+        bad.append('%s (%s)' % (p, exc))
+        continue
     print(p)
+if bad:
+    raise SystemExit('invalid JSON outside certification evidence:\n%s' % '\n'.join(sorted(bad)))
 PY
 
 echo "== workflow YAML parse =="

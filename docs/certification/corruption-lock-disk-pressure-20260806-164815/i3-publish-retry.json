@@ -1,0 +1,6 @@
+OK Reviewed change published locally
+  Safe branch     futurediff/tx_ec99f2c79cebd09330955022
+  Commit          3607b87221ae...
+  Current branch  unchanged
+
+Next -> review with: git -C "/private/tmp/futurediff-corruption-lock.dyB78I/source-i" diff HEAD..futurediff/tx_ec99f2c79cebd09330955022

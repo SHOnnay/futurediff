@@ -1,0 +1,15 @@
+{
+  "live_path": "/tmp/futurediff-corruption-lock.GpfZy9/fresh-home/ledger.db",
+  "backup_path": "/tmp/futurediff-corruption-lock.GpfZy9/backup-one.db",
+  "backup_sha256": "6f157d70383341dae409cae2a765284c698a3396f9c9ac5c4e033c631d18d172",
+  "health": {
+    "integrity_ok": true,
+    "migration_count": 16,
+    "transaction_count": 1,
+    "unresolved_transaction_count": 0
+  },
+  "audit_healthy": true,
+  "event_chain_valid": true,
+  "applied": true,
+  "completed_at": "2026-08-03T13:27:11.28551Z"
+}

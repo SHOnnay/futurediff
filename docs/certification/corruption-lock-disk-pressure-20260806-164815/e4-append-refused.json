@@ -1,0 +1,9 @@
+{
+  "action": "refused",
+  "automatic_cleanup": false,
+  "kind": "cleanup_lock",
+  "lock_path": "/private/tmp/futurediff-corruption-lock.dyB78I/home/daemon.lock",
+  "message": "cannot record cleanup audit event; refusing cleanup: operator audit trail is not appendable: event hash mismatch at sequence 3",
+  "reason_code": "audit_write_failed",
+  "socket_path": "/private/tmp/futurediff-corruption-lock.dyB78I/home/futurediff.sock"
+}

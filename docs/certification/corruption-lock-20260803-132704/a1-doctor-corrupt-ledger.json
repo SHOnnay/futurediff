@@ -1,0 +1,65 @@
+{
+  "checks": [
+    {
+      "ID": "futurediff_binary",
+      "Status": "pass",
+      "Detail": "/tmp/futurediff-corruption-lock.GpfZy9/futurediff"
+    },
+    {
+      "ID": "futurediffd_binary",
+      "Status": "pass",
+      "Detail": "/tmp/futurediff-corruption-lock.GpfZy9/futurediffd"
+    },
+    {
+      "ID": "git",
+      "Status": "pass",
+      "Detail": "/usr/bin/git"
+    },
+    {
+      "ID": "futurediff_home",
+      "Status": "pass",
+      "Detail": "/private/tmp/futurediff-corruption-lock.GpfZy9/home"
+    },
+    {
+      "ID": "safe_workspaces",
+      "Status": "pass",
+      "Detail": "/private/tmp/futurediff-corruption-lock.GpfZy9/home/runtime"
+    },
+    {
+      "ID": "daemon",
+      "Status": "warn",
+      "Detail": "not running"
+    },
+    {
+      "ID": "ledger_integrity",
+      "Status": "fail",
+      "Detail": "ledger is corrupt or unreadable: sqlite exec: database disk image is malformed"
+    },
+    {
+      "ID": "daemon_lock",
+      "Status": "pass",
+      "Detail": "held=false owner_status=dead lock_status=released (no_lock)"
+    },
+    {
+      "ID": "storage",
+      "Status": "warn",
+      "Detail": "unsupported storage policy version \"\""
+    },
+    {
+      "ID": "audit_chain",
+      "Status": "pass",
+      "Detail": "valid=true count=6"
+    },
+    {
+      "ID": "backup_catalog",
+      "Status": "warn",
+      "Detail": "ledger not available"
+    },
+    {
+      "ID": "github_credentials",
+      "Status": "warn",
+      "Detail": "not configured; local publication remains available"
+    }
+  ],
+  "kind": "fdif-doctor"
+}
