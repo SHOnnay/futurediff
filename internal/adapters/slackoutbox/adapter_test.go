@@ -57,3 +57,62 @@ func TestAmbiguousPostIsClassified(t *testing.T) {
 		t.Fatalf("err=%v", err)
 	}
 }
+
+func TestProviderRejectionIsDefinite(t *testing.T) {
+	a := &Adapter{HTTPClient: &http.Client{Transport: roundTrip(func(*http.Request) (*http.Response, error) {
+		return response(400, `{"ok":false,"error":"invalid_auth"}`), nil
+	})}}
+	p, _, _ := a.Prepare("eff_1", Input{Channel: "C12345678", Text: "Build passed"})
+	_, err := a.Post(context.Background(), p, []byte("secret"))
+	var pe *ProviderError
+	if !errors.As(err, &pe) || pe.Ambiguous || pe.Class != "provider_rejected" || pe.StatusCode != 400 {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestIncompleteReceiptIsAmbiguous(t *testing.T) {
+	a := &Adapter{HTTPClient: &http.Client{Transport: roundTrip(func(*http.Request) (*http.Response, error) {
+		return response(200, `{"ok":true,"channel":"C12345678"}`), nil // missing ts
+	})}}
+	p, _, _ := a.Prepare("eff_1", Input{Channel: "C12345678", Text: "Build passed"})
+	_, err := a.Post(context.Background(), p, []byte("secret"))
+	var pe *ProviderError
+	if !errors.As(err, &pe) || !pe.Ambiguous || pe.Class != "incomplete_receipt_unknown" {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestClientMsgIDIsStableAcrossPrepares(t *testing.T) {
+	a := &Adapter{}
+	p1, _, _ := a.Prepare("eff_stable", Input{Channel: "C12345678", Text: "Build passed"})
+	p2, _, _ := a.Prepare("eff_stable", Input{Channel: "C12345678", Text: "Build passed"})
+	if p1.Payload.ClientMsgID != p2.Payload.ClientMsgID || !strings.Contains(p1.Payload.ClientMsgID, "-") {
+		t.Fatalf("client_msg_id not stable: %q vs %q", p1.Payload.ClientMsgID, p2.Payload.ClientMsgID)
+	}
+}
+
+func TestStatusRecoversByMetadataWhenClientMsgIDDiffers(t *testing.T) {
+	// A previously posted message whose client_msg_id was rewritten by the
+	// workspace must still be recognized through the FutureDiff metadata.
+	a := &Adapter{HTTPClient: &http.Client{Transport: roundTrip(func(*http.Request) (*http.Response, error) {
+		body, _ := json.Marshal(map[string]any{"ok": true, "messages": []any{map[string]any{"ts": "1700.9", "client_msg_id": "rewritten-by-slack", "metadata": map[string]any{"event_type": "futurediff_effect", "event_payload": map[string]string{"effect_id": "eff_meta"}}}}})
+		return response(200, string(body)), nil
+	})}}
+	p, _, _ := a.Prepare("eff_meta", Input{Channel: "C12345678", Text: "Build passed"})
+	status, err := a.Status(context.Background(), p, []byte("secret"))
+	if err != nil || status.Status != StatusCommitted || status.Receipt == nil || status.Receipt.Timestamp != "1700.9" {
+		t.Fatalf("status=%#v err=%v", status, err)
+	}
+}
+
+func TestChannelValidationRejectsNames(t *testing.T) {
+	a := &Adapter{}
+	for _, channel := range []string{"#general", "general", "C1234567", "C1234567890123456789012345678901"} {
+		if _, _, err := a.Prepare("eff_1", Input{Channel: channel, Text: "Build passed"}); err == nil {
+			t.Fatalf("expected channel %q to be rejected", channel)
+		}
+	}
+	if _, _, err := a.Prepare("eff_1", Input{Channel: "C12345678", Text: "Build passed"}); err != nil {
+		t.Fatalf("valid channel rejected: %v", err)
+	}
+}

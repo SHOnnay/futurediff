@@ -144,3 +144,41 @@ func TestFreshnessAndInputValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestStatusIgnoresNonMatchingPullRequests(t *testing.T) {
+	// Pre-existing PRs with different head/base/title must not be treated as
+	// this effect's outcome; only an exact marker match counts.
+	f := &fakeTransport{refs: map[string]string{"feature/test": strings.Repeat("a", 40), "main": strings.Repeat("b", 40)}, token: "secret"}
+	f.pulls = []pullResponse{
+		{Number: 100, Title: "Unrelated PR", Draft: true, Head: struct {
+			Ref string `json:"ref"`
+			SHA string `json:"sha"`
+		}{Ref: "feature/other", SHA: strings.Repeat("d", 40)}, Base: struct {
+			Ref string `json:"ref"`
+			SHA string `json:"sha"`
+		}{Ref: "main", SHA: strings.Repeat("b", 40)}},
+		{Number: 101, Title: "FutureDiff change xyz", Draft: false, Head: struct {
+			Ref string `json:"ref"`
+			SHA string `json:"sha"`
+		}{Ref: "feature/test", SHA: strings.Repeat("a", 40)}, Base: struct {
+			Ref string `json:"ref"`
+			SHA string `json:"sha"`
+		}{Ref: "main", SHA: strings.Repeat("b", 40)}},
+	}
+	a := adapterForFake(f)
+	prepared, _, err := a.Prepare(context.Background(), "eff_123", Input{Owner: "acme", Repo: "app", Title: "Safe change", Body: "Prepared by FutureDiff", Head: "feature/test", Base: "main"}, []byte("secret"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, err := a.Status(context.Background(), prepared, []byte("secret"))
+	if err != nil || status.Status != StatusNotFound {
+		t.Fatalf("expected not_found despite unrelated PRs, got %#v err=%v", status, err)
+	}
+	receipt, err := a.Create(context.Background(), prepared, []byte("secret"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if receipt.PullNumber != 431 || f.postCalls != 1 {
+		t.Fatalf("create: %#v calls=%d", receipt, f.postCalls)
+	}
+}

@@ -403,10 +403,20 @@ func (s *Service) commitGitHubBranch(ctx context.Context, effect domain.External
 		return s.effectDefiniteFailure(attempt, "branch_conflict", fmt.Errorf("remote branch exists at %s", status.ObservedOID))
 	}
 	var receipt githubbranch.Receipt
-	err = s.withCredential(ctx, credentials.AccessRequest{TransactionID: effect.TransactionID, EffectID: effect.EffectID, AdapterID: githubbranch.AdapterID, CredentialID: effect.CredentialID, Operation: githubbranch.CommitOperation, Destination: effect.Destination}, func(token []byte) error { var e error; receipt, e = s.GitHubBranch.Publish(ctx, p, token); return e })
+	var publishAdapterErr error
+	err = s.withCredential(ctx, credentials.AccessRequest{TransactionID: effect.TransactionID, EffectID: effect.EffectID, AdapterID: githubbranch.AdapterID, CredentialID: effect.CredentialID, Operation: githubbranch.CommitOperation, Destination: effect.Destination}, func(token []byte) error {
+		receipt, publishAdapterErr = s.GitHubBranch.Publish(ctx, p, token)
+		return publishAdapterErr
+	})
 	if err != nil {
+		// The credential wrapper redacts and re-strings the adapter error, so
+		// classify from the raw adapter error to preserve ambiguity.
+		classified := err
+		if publishAdapterErr != nil {
+			classified = publishAdapterErr
+		}
 		var pe *githubbranch.ProviderError
-		if errors.As(err, &pe) && pe.Ambiguous {
+		if errors.As(classified, &pe) && pe.Ambiguous {
 			return s.effectUnknown(attempt, pe.Class, err)
 		}
 		return s.effectDefiniteFailure(attempt, "branch_publish_failed", err)
