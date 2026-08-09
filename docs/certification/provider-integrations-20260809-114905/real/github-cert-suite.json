@@ -1,0 +1,124 @@
+{
+  "format_version": "0.1",
+  "generated_at": "2026-08-09T05:49:55.575673Z",
+  "build": {
+    "version": "v0.1.0-alpha.3.0.20260809054857-b0e77fb34e4b",
+    "commit": "unknown",
+    "date": "unknown",
+    "dirty": "unknown",
+    "go_version": "go1.26.5",
+    "platform": "darwin/arm64",
+    "module": "github.com/SHOnnay/futurediff"
+  },
+  "host": {
+    "goos": "darwin",
+    "goarch": "arm64"
+  },
+  "targets": [
+    {
+      "target": "local",
+      "requested": false,
+      "certified": false,
+      "checks": [
+        {
+          "id": "not_requested",
+          "status": "skip",
+          "required": false,
+          "detail": "target was not requested"
+        }
+      ]
+    },
+    {
+      "target": "oci",
+      "requested": false,
+      "certified": false,
+      "checks": [
+        {
+          "id": "not_requested",
+          "status": "skip",
+          "required": false,
+          "detail": "target was not requested"
+        }
+      ]
+    },
+    {
+      "target": "github",
+      "requested": true,
+      "certified": true,
+      "checks": [
+        {
+          "id": "github_repository_read",
+          "status": "pass",
+          "required": true,
+          "detail": "repository identity=SHOnnay/futurediff-certification-20260809-114905"
+        },
+        {
+          "id": "github_push_permission",
+          "status": "pass",
+          "required": true,
+          "detail": "token reports push access to the dedicated test repository"
+        },
+        {
+          "id": "github_mutation_certification",
+          "status": "blocked",
+          "required": false,
+          "detail": "readiness passed; create-only branch and draft-PR mutation certification requires an explicit disposable test run"
+        }
+      ]
+    },
+    {
+      "target": "slack",
+      "requested": false,
+      "certified": false,
+      "checks": [
+        {
+          "id": "not_requested",
+          "status": "skip",
+          "required": false,
+          "detail": "target was not requested"
+        }
+      ]
+    },
+    {
+      "target": "opencode",
+      "requested": false,
+      "certified": false,
+      "checks": [
+        {
+          "id": "not_requested",
+          "status": "skip",
+          "required": false,
+          "detail": "target was not requested"
+        }
+      ]
+    },
+    {
+      "target": "hermes",
+      "requested": false,
+      "certified": false,
+      "checks": [
+        {
+          "id": "not_requested",
+          "status": "skip",
+          "required": false,
+          "detail": "target was not requested"
+        }
+      ]
+    },
+    {
+      "target": "attestation",
+      "requested": false,
+      "certified": false,
+      "checks": [
+        {
+          "id": "not_requested",
+          "status": "skip",
+          "required": false,
+          "detail": "target was not requested"
+        }
+      ]
+    }
+  ],
+  "certified": true,
+  "report_digest": "033518da52f3af9f74472eb64afeca23b3b6caec2cebd0186d82b4a88106563b"
+}

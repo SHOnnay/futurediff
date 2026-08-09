@@ -1,0 +1,177 @@
+{
+  "kind": "provider-integration-certification",
+  "generated_at": "20260809-115001",
+  "host": "Darwin-arm64",
+  "nonce": "20260809-114905",
+  "git_sha": "b0e77fb34e4b1596e5a347f7ccdb59ad54f82022",
+  "confirmation_phrase_accepted": true,
+  "provider_surfaces": [
+    {
+      "name": "github_branch_publish",
+      "adapter": "builtin.github.branch-publish",
+      "operations": [
+        "github.query_git_ref",
+        "github.publish_branch"
+      ],
+      "evidence_classes": [
+        "real_provider",
+        "deterministic_integration",
+        "historical_real_provider"
+      ],
+      "certified": true
+    },
+    {
+      "name": "github_draft_pr",
+      "adapter": "builtin.github.draft-pull-request",
+      "operations": [
+        "github.read_refs",
+        "github.query_pull_requests",
+        "github.create_draft_pull_request"
+      ],
+      "evidence_classes": [
+        "real_provider",
+        "deterministic_integration",
+        "historical_real_provider"
+      ],
+      "certified": true
+    },
+    {
+      "name": "slack_message_outbox",
+      "adapter": "builtin.slack.message-outbox",
+      "operations": [
+        "slack.query_channel_history",
+        "slack.post_message"
+      ],
+      "evidence_classes": [
+        "deterministic_integration",
+        "historical_real_provider"
+      ],
+      "certified": true,
+      "real_evidence": "blocked on dedicated Slack token/channel (recorded in blocked_evidence)"
+    }
+  ],
+  "deterministic": {
+    "failures": 0,
+    "evidence": [
+      {
+        "id": "deterministic_go_tests",
+        "classification": "deterministic_integration",
+        "target": "github_branch_publish,github_draft_pr,slack_message_outbox,credentials_broker,egress_policy",
+        "expected": "adapters, app engine, credential scope, and egress tests pass",
+        "observed_source": "deterministic/go-tests.txt",
+        "pass": true
+      },
+      {
+        "id": "drill_1_no_broker",
+        "classification": "deterministic_integration",
+        "target": "all_provider_surfaces",
+        "injected_failure": "daemon started without a credential configuration",
+        "expected": "provider preparation is denied before any provider contact",
+        "observed_source": "deterministic/drill-1-no-broker.json",
+        "pass": true,
+        "denied": true,
+        "notes": "exit=1"
+      },
+      {
+        "id": "drill_2_unknown_credential",
+        "classification": "deterministic_integration",
+        "target": "all_provider_surfaces",
+        "injected_failure": "credential id not present in the broker configuration",
+        "expected": "denied before any provider contact",
+        "observed_source": "deterministic/drill-2-unknown-credential.json",
+        "pass": true,
+        "denied": true,
+        "notes": "exit=1"
+      },
+      {
+        "id": "drill_3_destination_scope",
+        "classification": "deterministic_integration",
+        "target": "github_branch_publish",
+        "injected_failure": "prepared destination outside the credential allowed_destinations",
+        "expected": "denied before any provider contact",
+        "observed_source": "deterministic/drill-3-scope-denial.json",
+        "pass": true,
+        "denied": true,
+        "notes": "exit=1"
+      },
+      {
+        "id": "drill_4_secret_source",
+        "classification": "deterministic_integration",
+        "target": "all_provider_surfaces",
+        "injected_failure": "environment secret source variable is unset in the daemon process",
+        "expected": "denied before any provider contact",
+        "observed_source": "deterministic/drill-4-source-resolution.json",
+        "pass": true,
+        "denied": true,
+        "notes": "exit=1"
+      },
+      {
+        "id": "drill_5_egress_policy",
+        "classification": "deterministic_integration",
+        "target": "github_draft_pr,slack_message_outbox",
+        "injected_failure": "provider API base set to plain http://localhost:9",
+        "expected": "daemon startup fails closed on the egress policy",
+        "observed_source": "deterministic/drill-5-egress-refusal.json",
+        "pass": true,
+        "denied": true,
+        "notes": "exit=1"
+      }
+    ]
+  },
+  "historical": [
+    {
+      "id": "github_write_recovery_2026_08_02",
+      "classification": "historical_real_provider",
+      "target": "github_branch_publish,github_draft_pr",
+      "adapter_code_unchanged": true,
+      "evidence_location": "docs/certification/GITHUB_WRITE_RECOVERY_2026-08-02.md"
+    }
+  ],
+  "real_provider": {
+    "github": [
+      {
+        "id": "github_provider_cert",
+        "classification": "real_provider",
+        "target": "github_branch_publish,github_draft_pr",
+        "repository": "SHOnnay/futurediff-certification-20260809-114905 (disposable, deleted after verification)",
+        "token_derivation": "derived from gh auth token (repo scope verified)",
+        "certified": true,
+        "checks": [
+          "github_create_branch:pass",
+          "github_create_draft_pr:pass",
+          "github_close_pr:pass",
+          "github_delete_branch:pass"
+        ],
+        "observed_source": "real/github-provider-cert.json"
+      },
+      {
+        "id": "github_readiness_suite",
+        "classification": "real_provider",
+        "target": "github_branch_publish,github_draft_pr",
+        "repository": "SHOnnay/futurediff-certification-20260809-114905 (disposable)",
+        "certified": true,
+        "observed_source": "real/github-cert-suite.json"
+      },
+      {
+        "id": "github_independent_verification",
+        "classification": "real_provider",
+        "target": "github_branch_publish,github_draft_pr",
+        "cleanup_verified": true,
+        "default_branch_head_unchanged": true,
+        "observed_source": "real/github-independent-verify.json"
+      }
+    ],
+    "slack": []
+  },
+  "blocked": [
+    {
+      "id": "slack_real_run",
+      "classification": "blocked_in_this_run",
+      "target": "slack_message_outbox",
+      "status": "not_requested",
+      "prerequisite": "--slack flag plus FUTUREDIFF_SLACK_TOKEN and FUTUREDIFF_SLACK_CHANNEL (dedicated test channel)",
+      "notes": "deterministic Slack coverage is recorded; real Slack evidence remains blocked on the external prerequisite"
+    }
+  ],
+  "failures": 0
+}
