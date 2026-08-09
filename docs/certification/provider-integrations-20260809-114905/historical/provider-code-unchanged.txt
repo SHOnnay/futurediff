@@ -1,0 +1,1 @@
+provider adapter runtime source byte-identical since 13b313b (2026-08-02 evidence commit)

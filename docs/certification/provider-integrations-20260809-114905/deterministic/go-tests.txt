@@ -1,0 +1,228 @@
+# github.com/SHOnnay/futurediff/internal/credentials.test
+ld: warning: ignoring duplicate libraries: '-lsqlite3'
+=== RUN   TestCreateOnlyPublicationAndStatus
+--- PASS: TestCreateOnlyPublicationAndStatus (0.00s)
+=== RUN   TestPrepareRejectsExistingBranch
+--- PASS: TestPrepareRejectsExistingBranch (0.00s)
+=== RUN   TestStatusConflictIsClassified
+--- PASS: TestStatusConflictIsClassified (0.00s)
+=== RUN   TestLSRemoteFailureIsAmbiguousStatus
+--- PASS: TestLSRemoteFailureIsAmbiguousStatus (0.00s)
+=== RUN   TestPostPushMismatchIsAmbiguous
+--- PASS: TestPostPushMismatchIsAmbiguous (0.00s)
+=== RUN   TestPublishRequiresAbsentRefLease
+--- PASS: TestPublishRequiresAbsentRefLease (0.00s)
+=== RUN   TestVerifyFreshReportsStaleWhenBranchAppears
+--- PASS: TestVerifyFreshReportsStaleWhenBranchAppears (0.00s)
+=== RUN   TestSanitizeRedactsToken
+--- PASS: TestSanitizeRedactsToken (0.00s)
+PASS
+ok  	github.com/SHOnnay/futurediff/internal/adapters/githubbranch	0.374s
+# github.com/SHOnnay/futurediff/internal/app.test
+ld: warning: ignoring duplicate libraries: '-lsqlite3'
+=== RUN   TestPrepareCreateAndStatus
+--- PASS: TestPrepareCreateAndStatus (0.00s)
+=== RUN   TestAmbiguousCreateCanBeRecoveredWithoutSecondPost
+--- PASS: TestAmbiguousCreateCanBeRecoveredWithoutSecondPost (0.00s)
+=== RUN   TestFreshnessAndInputValidation
+--- PASS: TestFreshnessAndInputValidation (0.00s)
+=== RUN   TestStatusIgnoresNonMatchingPullRequests
+--- PASS: TestStatusIgnoresNonMatchingPullRequests (0.00s)
+PASS
+ok  	github.com/SHOnnay/futurediff/internal/adapters/githubdraft	0.568s
+=== RUN   TestPreparePostAndRecoverByMetadata
+--- PASS: TestPreparePostAndRecoverByMetadata (0.00s)
+=== RUN   TestAmbiguousPostIsClassified
+--- PASS: TestAmbiguousPostIsClassified (0.00s)
+=== RUN   TestProviderRejectionIsDefinite
+--- PASS: TestProviderRejectionIsDefinite (0.00s)
+=== RUN   TestIncompleteReceiptIsAmbiguous
+--- PASS: TestIncompleteReceiptIsAmbiguous (0.00s)
+=== RUN   TestClientMsgIDIsStableAcrossPrepares
+--- PASS: TestClientMsgIDIsStableAcrossPrepares (0.00s)
+=== RUN   TestStatusRecoversByMetadataWhenClientMsgIDDiffers
+--- PASS: TestStatusRecoversByMetadataWhenClientMsgIDDiffers (0.00s)
+=== RUN   TestChannelValidationRejectsNames
+--- PASS: TestChannelValidationRejectsNames (0.00s)
+PASS
+ok  	github.com/SHOnnay/futurediff/internal/adapters/slackoutbox	0.846s
+=== RUN   TestBranchPublishCommitsExactlyOnce
+--- PASS: TestBranchPublishCommitsExactlyOnce (0.50s)
+=== RUN   TestBranchAlreadyPresentRecognizedWithoutPush
+--- PASS: TestBranchAlreadyPresentRecognizedWithoutPush (0.48s)
+=== RUN   TestBranchForeignCommitAtPreflightIsStale
+--- PASS: TestBranchForeignCommitAtPreflightIsStale (0.33s)
+=== RUN   TestBranchConflictDuringRecoveryIsManualIntervention
+--- PASS: TestBranchConflictDuringRecoveryIsManualIntervention (0.51s)
+=== RUN   TestBranchAmbiguousPushRearmsOnlyWhenProvedAbsent
+--- PASS: TestBranchAmbiguousPushRearmsOnlyWhenProvedAbsent (0.56s)
+=== RUN   TestBranchReceiptFaultAfterPushReconcilesWithoutRepush
+--- PASS: TestBranchReceiptFaultAfterPushReconcilesWithoutRepush (0.53s)
+=== RUN   TestBranchStatusUnknownRequiresReconciliation
+--- PASS: TestBranchStatusUnknownRequiresReconciliation (0.44s)
+=== RUN   TestBranchAuthenticationFailureIsDenied
+--- PASS: TestBranchAuthenticationFailureIsDenied (0.31s)
+=== RUN   TestBranchApproveThenChangedMaterialRequiresNewApproval
+--- PASS: TestBranchApproveThenChangedMaterialRequiresNewApproval (0.35s)
+=== RUN   TestBranchPublicationPrecedesBoundDraftPR
+--- PASS: TestBranchPublicationPrecedesBoundDraftPR (0.49s)
+=== RUN   TestEnforcedTransactionExecutesInOCIAndPersistsEvidence
+--- PASS: TestEnforcedTransactionExecutesInOCIAndPersistsEvidence (0.81s)
+=== RUN   TestEnforcedModeRejectedWithoutRuntime
+--- PASS: TestEnforcedModeRejectedWithoutRuntime (0.06s)
+=== RUN   TestPersistRuntimeEvidenceEncrypted
+--- PASS: TestPersistRuntimeEvidenceEncrypted (0.00s)
+=== RUN   TestGitHubDraftPRTransactionCommitsOnce
+--- PASS: TestGitHubDraftPRTransactionCommitsOnce (0.48s)
+=== RUN   TestAmbiguousGitHubCreateRecoversWithoutDuplicate
+--- PASS: TestAmbiguousGitHubCreateRecoversWithoutDuplicate (0.48s)
+=== RUN   TestGitHubRefChangeInvalidatesApprovalBeforeRelease
+--- PASS: TestGitHubRefChangeInvalidatesApprovalBeforeRelease (0.33s)
+=== RUN   TestDefiniteProviderRejectionCanRearm
+--- PASS: TestDefiniteProviderRejectionCanRearm (0.53s)
+=== RUN   TestPreparedEffectIsBoundIntoApprovalAndAbortIsDurable
+--- PASS: TestPreparedEffectIsBoundIntoApprovalAndAbortIsDurable (0.24s)
+=== RUN   TestEffectRefreshChangesApprovalDigest
+--- PASS: TestEffectRefreshChangesApprovalDigest (0.30s)
+=== RUN   TestLocalMaterializationSucceedsExactlyOnce
+--- PASS: TestLocalMaterializationSucceedsExactlyOnce (0.53s)
+=== RUN   TestLocalMaterializationFaultsFailClosed
+=== RUN   TestLocalMaterializationFaultsFailClosed/commit_tree
+=== RUN   TestLocalMaterializationFaultsFailClosed/apply_index
+=== RUN   TestLocalMaterializationFaultsFailClosed/write_tree
+=== RUN   TestLocalMaterializationFaultsFailClosed/update_ref
+=== RUN   TestLocalMaterializationFaultsFailClosed/worktree_add
+--- PASS: TestLocalMaterializationFaultsFailClosed (3.21s)
+    --- PASS: TestLocalMaterializationFaultsFailClosed/commit_tree (0.58s)
+    --- PASS: TestLocalMaterializationFaultsFailClosed/apply_index (0.65s)
+    --- PASS: TestLocalMaterializationFaultsFailClosed/write_tree (0.67s)
+    --- PASS: TestLocalMaterializationFaultsFailClosed/update_ref (0.68s)
+    --- PASS: TestLocalMaterializationFaultsFailClosed/worktree_add (0.62s)
+=== RUN   TestMaterializedRefPersistenceFaultEntersRecovery
+--- PASS: TestMaterializedRefPersistenceFaultEntersRecovery (0.53s)
+=== RUN   TestKnownPresentRefRecognizedIdempotently
+--- PASS: TestKnownPresentRefRecognizedIdempotently (0.41s)
+=== RUN   TestChangedMaterialRequiresNewApproval
+--- PASS: TestChangedMaterialRequiresNewApproval (0.50s)
+=== RUN   TestMaterializationFaultClassificationThroughCommit
+=== RUN   TestMaterializationFaultClassificationThroughCommit/enospc
+=== RUN   TestMaterializationFaultClassificationThroughCommit/edquot
+=== RUN   TestMaterializationFaultClassificationThroughCommit/erofs
+=== RUN   TestMaterializationFaultClassificationThroughCommit/eio
+--- PASS: TestMaterializationFaultClassificationThroughCommit (1.35s)
+    --- PASS: TestMaterializationFaultClassificationThroughCommit/enospc (0.30s)
+    --- PASS: TestMaterializationFaultClassificationThroughCommit/edquot (0.35s)
+    --- PASS: TestMaterializationFaultClassificationThroughCommit/erofs (0.35s)
+    --- PASS: TestMaterializationFaultClassificationThroughCommit/eio (0.34s)
+=== RUN   TestApprovalQuorumRequiredAndRecorded
+--- PASS: TestApprovalQuorumRequiredAndRecorded (0.27s)
+=== RUN   TestOpenTransactionQuota
+--- PASS: TestOpenTransactionQuota (0.21s)
+=== RUN   TestPatchQuotaRejectsBeforeSeal
+--- PASS: TestPatchQuotaRejectsBeforeSeal (0.30s)
+=== RUN   TestReceiptFaultBeforeEffectPreventsProviderCall
+=== RUN   TestReceiptFaultBeforeEffectPreventsProviderCall/create
+=== RUN   TestReceiptFaultBeforeEffectPreventsProviderCall/write
+--- PASS: TestReceiptFaultBeforeEffectPreventsProviderCall (1.11s)
+    --- PASS: TestReceiptFaultBeforeEffectPreventsProviderCall/create (0.58s)
+    --- PASS: TestReceiptFaultBeforeEffectPreventsProviderCall/write (0.53s)
+=== RUN   TestPostEffectReceiptFaultRequiresReconciliation
+=== RUN   TestPostEffectReceiptFaultRequiresReconciliation/short_write
+=== RUN   TestPostEffectReceiptFaultRequiresReconciliation/file_sync
+=== RUN   TestPostEffectReceiptFaultRequiresReconciliation/rename
+=== RUN   TestPostEffectReceiptFaultRequiresReconciliation/directory_sync
+--- PASS: TestPostEffectReceiptFaultRequiresReconciliation (2.00s)
+    --- PASS: TestPostEffectReceiptFaultRequiresReconciliation/short_write (0.51s)
+    --- PASS: TestPostEffectReceiptFaultRequiresReconciliation/file_sync (0.49s)
+    --- PASS: TestPostEffectReceiptFaultRequiresReconciliation/rename (0.48s)
+    --- PASS: TestPostEffectReceiptFaultRequiresReconciliation/directory_sync (0.52s)
+=== RUN   TestReceiptFaultClassificationThroughCommit
+=== RUN   TestReceiptFaultClassificationThroughCommit/enospc
+=== RUN   TestReceiptFaultClassificationThroughCommit/edquot
+=== RUN   TestReceiptFaultClassificationThroughCommit/erofs
+=== RUN   TestReceiptFaultClassificationThroughCommit/eio
+--- PASS: TestReceiptFaultClassificationThroughCommit (1.88s)
+    --- PASS: TestReceiptFaultClassificationThroughCommit/enospc (0.48s)
+    --- PASS: TestReceiptFaultClassificationThroughCommit/edquot (0.47s)
+    --- PASS: TestReceiptFaultClassificationThroughCommit/erofs (0.49s)
+    --- PASS: TestReceiptFaultClassificationThroughCommit/eio (0.45s)
+=== RUN   TestAlreadyPresentOutcomeRecognizedWithoutDuplication
+--- PASS: TestAlreadyPresentOutcomeRecognizedWithoutDuplication (0.46s)
+=== RUN   TestAmbiguousOutcomeRefusesBlindRetry
+--- PASS: TestAmbiguousOutcomeRefusesBlindRetry (0.52s)
+=== RUN   TestRepeatedRecoveryDoesNotDuplicateEffects
+--- PASS: TestRepeatedRecoveryDoesNotDuplicateEffects (0.47s)
+=== RUN   TestRecoveryFinalizesPublishedRef
+--- PASS: TestRecoveryFinalizesPublishedRef (0.50s)
+=== RUN   TestCreateUsesStableRepositoryAdmissionWhenPolicyOmitted
+--- PASS: TestCreateUsesStableRepositoryAdmissionWhenPolicyOmitted (0.24s)
+=== RUN   TestCreateStableDefaultRejectsReplacementRefs
+--- PASS: TestCreateStableDefaultRejectsReplacementRefs (0.31s)
+=== RUN   TestSignedApprovalRequiredAndRecorded
+--- PASS: TestSignedApprovalRequiredAndRecorded (0.28s)
+=== RUN   TestSlackOutboxAmbiguousRecoveryPostsOnce
+--- PASS: TestSlackOutboxAmbiguousRecoveryPostsOnce (0.48s)
+=== RUN   TestSlackKnownPresentCommitsWithoutPost
+--- PASS: TestSlackKnownPresentCommitsWithoutPost (0.50s)
+=== RUN   TestSlackReceiptFaultAfterPostReconcilesWithoutRepost
+--- PASS: TestSlackReceiptFaultAfterPostReconcilesWithoutRepost (0.48s)
+=== RUN   TestSlackProviderRejectionRedactsToken
+--- PASS: TestSlackProviderRejectionRedactsToken (0.46s)
+PASS
+ok  	github.com/SHOnnay/futurediff/internal/app	25.849s
+=== RUN   TestBrokerGrantsScopedTrustedAccessAndRedactsSecret
+--- PASS: TestBrokerGrantsScopedTrustedAccessAndRedactsSecret (0.00s)
+=== RUN   TestBrokerDeniesUntrustedAdapterWrongOperationAndDestination
+--- PASS: TestBrokerDeniesUntrustedAdapterWrongOperationAndDestination (0.00s)
+=== RUN   TestBrokerDeniesExpiredBindingAndFailsClosedOnAuditError
+--- PASS: TestBrokerDeniesExpiredBindingAndFailsClosedOnAuditError (0.00s)
+=== RUN   TestEnvironmentSourceDoesNotEchoSecretOrVariableNameInErrors
+--- PASS: TestEnvironmentSourceDoesNotEchoSecretOrVariableNameInErrors (0.00s)
+=== RUN   TestDestinationRuleNormalizationAndBoundary
+--- PASS: TestDestinationRuleNormalizationAndBoundary (0.00s)
+=== RUN   TestBrokerDeniesVerifiedAdapterUntilProcessIsolationExists
+--- PASS: TestBrokerDeniesVerifiedAdapterUntilProcessIsolationExists (0.00s)
+=== RUN   TestBrokerRedactsSecretFromTrustedAdapterErrors
+--- PASS: TestBrokerRedactsSecretFromTrustedAdapterErrors (0.00s)
+=== RUN   TestLoadConfigRequiresPrivatePermissionsAndRejectsUnknownFields
+--- PASS: TestLoadConfigRequiresPrivatePermissionsAndRejectsUnknownFields (0.00s)
+=== RUN   TestEnvironmentCredentialUseIsDurablyAudited
+--- PASS: TestEnvironmentCredentialUseIsDurablyAudited (0.02s)
+=== RUN   FuzzDestinationRuleExactBoundary
+=== RUN   FuzzDestinationRuleExactBoundary/seed#0
+=== RUN   FuzzDestinationRuleExactBoundary/seed#1
+=== RUN   FuzzDestinationRuleExactBoundary/seed#2
+=== RUN   FuzzDestinationRuleExactBoundary/seed#3
+=== RUN   FuzzDestinationRuleExactBoundary/seed#4
+--- PASS: FuzzDestinationRuleExactBoundary (0.00s)
+    --- PASS: FuzzDestinationRuleExactBoundary/seed#0 (0.00s)
+    --- PASS: FuzzDestinationRuleExactBoundary/seed#1 (0.00s)
+    --- PASS: FuzzDestinationRuleExactBoundary/seed#2 (0.00s)
+    --- PASS: FuzzDestinationRuleExactBoundary/seed#3 (0.00s)
+    --- PASS: FuzzDestinationRuleExactBoundary/seed#4 (0.00s)
+PASS
+ok  	github.com/SHOnnay/futurediff/internal/credentials	1.442s
+=== RUN   TestValidateRequestExactHostMethodAndPath
+--- PASS: TestValidateRequestExactHostMethodAndPath (0.00s)
+=== RUN   TestDNSAnswersRejectPrivateAndDocumentationRanges
+--- PASS: TestDNSAnswersRejectPrivateAndDocumentationRanges (0.00s)
+=== RUN   TestRuleFromBaseRejectsUnsafeBase
+--- PASS: TestRuleFromBaseRejectsUnsafeBase (0.00s)
+=== RUN   FuzzValidateRequestNeverPermitsLookalikeHostOrPath
+=== RUN   FuzzValidateRequestNeverPermitsLookalikeHostOrPath/seed#0
+=== RUN   FuzzValidateRequestNeverPermitsLookalikeHostOrPath/seed#1
+=== RUN   FuzzValidateRequestNeverPermitsLookalikeHostOrPath/seed#2
+=== RUN   FuzzValidateRequestNeverPermitsLookalikeHostOrPath/seed#3
+=== RUN   FuzzValidateRequestNeverPermitsLookalikeHostOrPath/seed#4
+=== RUN   FuzzValidateRequestNeverPermitsLookalikeHostOrPath/seed#5
+=== RUN   FuzzValidateRequestNeverPermitsLookalikeHostOrPath/seed#6
+--- PASS: FuzzValidateRequestNeverPermitsLookalikeHostOrPath (0.00s)
+    --- PASS: FuzzValidateRequestNeverPermitsLookalikeHostOrPath/seed#0 (0.00s)
+    --- PASS: FuzzValidateRequestNeverPermitsLookalikeHostOrPath/seed#1 (0.00s)
+    --- PASS: FuzzValidateRequestNeverPermitsLookalikeHostOrPath/seed#2 (0.00s)
+    --- PASS: FuzzValidateRequestNeverPermitsLookalikeHostOrPath/seed#3 (0.00s)
+    --- PASS: FuzzValidateRequestNeverPermitsLookalikeHostOrPath/seed#4 (0.00s)
+    --- PASS: FuzzValidateRequestNeverPermitsLookalikeHostOrPath/seed#5 (0.00s)
+    --- PASS: FuzzValidateRequestNeverPermitsLookalikeHostOrPath/seed#6 (0.00s)
+PASS
+ok  	github.com/SHOnnay/futurediff/internal/egress	0.835s

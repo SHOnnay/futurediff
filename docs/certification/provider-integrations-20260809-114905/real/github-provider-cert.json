@@ -1,0 +1,54 @@
+{
+  "format_version": "0.1",
+  "generated_at": "2026-08-09T05:49:49.123951Z",
+  "nonce": "20260809-114905",
+  "targets": [
+    {
+      "name": "github",
+      "checks": [
+        {
+          "id": "github_create_branch",
+          "status": "pass",
+          "detail": "create-only certification branch created",
+          "evidence": {
+            "branch": "futurediff-cert/20260809-114905",
+            "commit_sha": "df81cd0a3685db4e2d86f9975e50e17757c60a87"
+          }
+        },
+        {
+          "id": "github_create_draft_pr",
+          "status": "pass",
+          "detail": "draft pull request created",
+          "evidence": {
+            "draft": true,
+            "number": 1,
+            "url": "https://github.com/SHOnnay/futurediff-certification-20260809-114905/pull/1"
+          }
+        },
+        {
+          "id": "github_close_pr",
+          "status": "pass",
+          "detail": "draft pull request closed"
+        },
+        {
+          "id": "github_delete_branch",
+          "status": "pass",
+          "detail": "certification branch deleted"
+        }
+      ],
+      "certified": true
+    },
+    {
+      "name": "slack",
+      "checks": [
+        {
+          "id": "not_requested",
+          "status": "skip",
+          "detail": "target not requested"
+        }
+      ],
+      "certified": false
+    }
+  ],
+  "certified": true
+}

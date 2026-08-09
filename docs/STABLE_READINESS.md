@@ -122,11 +122,22 @@ Evidence lives in `docs/certification/corruption-lock-20260803-132704/` (`SUMMAR
 
 **New certification evidence**: `docs/certification/corruption-lock-disk-pressure-20260806-164815/` (77/77 checks, 9/9 scenarios, 0 failures; 33 evidence rows: 29 `real_local`, 4 `deterministic_injection`).
 
+### Provider-integration certification
+
+Completed 2026-08-09 with `scripts/certify-provider-integrations.sh` (evidence in `docs/certification/provider-integrations-20260809-114905/`):
+
+- every **supported** provider surface is certified: GitHub branch publish (`builtin.github.branch-publish`) and GitHub draft pull request (`builtin.github.draft-pull-request`); the Slack message outbox is **experimental, not a supported beta provider surface**, and is not claimed as certified for beta (see below);
+- real GitHub mutation certification against a disposable private repository created and deleted by the run: create-only certification branch, draft pull request, close and delete cleanup, read-only readiness suite, and independent GitHub-CLI verification that no certification branch or open certification PR remained and the default-branch head was unchanged (`real_provider` evidence);
+- deterministic integration evidence that always runs: focused provider/adapter/app/credential/egress tests plus binary-level scope-denial drills proving provider preparation without a configured broker, with an unknown credential, with a destination outside the credential scope, and with an unset secret source is denied before any provider contact, and that the daemon refuses a non-HTTPS provider API base (fail-closed egress) (`deterministic_integration` evidence);
+- historical reuse: the 2026-08-02 real GitHub write/recovery certification remains valid because the provider adapter runtime source is byte-identical to the evidence commit `13b313b` (`historical_real_provider` evidence);
+- **Slack message outbox is experimental**: the README supported-scope table lists Slack effects as Experimental and LIMITATIONS excludes guaranteed Slack delivery from the supported scope. Deterministic Slack coverage (post, status, metadata recovery, exactly-once reconciliation, token redaction) is recorded, but Slack real-mutation certification remains blocked on dedicated test credentials (`FUTUREDIFF_SLACK_TOKEN` plus a dedicated channel via `--slack`) and Slack is **not certified** for beta. Documented separately as remaining work before production in `WHAT_REMAINS_BEFORE_PRODUCTION.md`;
+- evidence is credential-free: the run's secret scan reports zero leaks.
 ## Required before beta
 
 - guided recovery for stale selections, deleted workspaces, and interrupted top-level flows — **completed 2026-08-02** (see the guided-recovery certification above);
 - **corruption, stale-lock, and disk-pressure drills with operator guidance — completed 2026-08-06** (full 9-scenario certification: live-lock refusal, stale/corrupt cleanup with audit evidence, corrupt-ledger diagnosis, stale-backup restore refusal and override, fail-closed restore over corrupt ledger, storage classification, ambiguous ownership, audit corruption, ENOSPC-before-mutation, durability failure — see `docs/certification/corruption-lock-disk-pressure-20260806-164815/`);
-- concrete provider-integration evidence for every supported provider surface.
+- concrete provider-integration evidence for every supported provider surface — **completed 2026-08-09** for the declared beta scope: GitHub branch publish and GitHub draft pull request are fully certified (real + deterministic + historical evidence; see the provider-integration certification above). The Slack message outbox is **experimental and outside the supported beta contract**; its deterministic coverage is recorded, and its real-mutation certification remains blocked on dedicated Slack credentials.
+
 ## Required before stable
 
 - signed release artifacts;
