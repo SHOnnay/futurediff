@@ -89,7 +89,7 @@ Any change to recovery (`internal/guidedcli/recover*.go`, `internal/app/recovery
 ## Documentation and manifest regeneration
 
 - Update relevant docs when changing user-facing behavior (CLI flags, JSON fields, reason codes, new commands).
-- Regenerate `MANIFEST.sha256` after adding/removing tracked files: `shasum -a 256 $(git ls-files) > MANIFEST.sha256`.
+- Regenerate `MANIFEST.sha256` after adding/removing tracked files (the manifest excludes itself): `git ls-files -z -- ':(exclude)MANIFEST.sha256' | xargs -0 shasum -a 256 > MANIFEST.sha256`.
 - ADR updates go in `docs/adr/` with the next sequential number.
 
 ## Full validation before PR readiness
