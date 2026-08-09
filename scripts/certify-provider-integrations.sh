@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # certify-provider-integrations.sh
 #
-# Provider-integration certification for every supported FutureDiff provider
-# surface:
+# Provider-integration certification for every FutureDiff provider surface:
 #
-#   1. GitHub branch publish        (builtin.github.branch-publish)
-#   2. GitHub draft pull request    (builtin.github.draft-pull-request)
-#   3. Slack message outbox         (builtin.slack.message-outbox)
+#   1. GitHub branch publish        (builtin.github.branch-publish)  - supported beta surface
+#   2. GitHub draft pull request    (builtin.github.draft-pull-request) - supported beta surface
+#   3. Slack message outbox         (builtin.slack.message-outbox) - experimental, NOT part of
+#      the supported beta provider contract (README lists Slack effects as
+#      Experimental); recorded with deterministic coverage only, never certified
 #
 # Evidence classes (recorded per artifact in SUMMARY.json):
 #   real_provider           live external-provider mutations on a disposable,
@@ -482,6 +483,10 @@ det_evidence = [json.loads(line) for line in open(sys.argv[7]) if line.strip()]
 real_evidence = [json.loads(line) for line in open(sys.argv[8]) if line.strip()]
 blocked_evidence = [json.loads(line) for line in open(sys.argv[9]) if line.strip()]
 hist_class = ["historical_real_provider"] if historical_pass else []
+# The Slack message outbox is experimental (README supported-scope table) and
+# outside the supported beta provider contract: it is recorded with
+# deterministic coverage only, never marked certified, and never carries the
+# GitHub-specific historical class.
 surfaces = [
     {"name": "github_branch_publish", "adapter": "builtin.github.branch-publish",
      "operations": ["github.query_git_ref", "github.publish_branch"],
@@ -493,8 +498,9 @@ surfaces = [
      "certified": True},
     {"name": "slack_message_outbox", "adapter": "builtin.slack.message-outbox",
      "operations": ["slack.query_channel_history", "slack.post_message"],
-     "evidence_classes": ["deterministic_integration"] + hist_class,
-     "certified": True,
+     "evidence_classes": ["deterministic_integration"],
+     "beta_scope": "experimental: not part of the supported beta provider contract (README lists Slack effects as Experimental)",
+     "certified": False,
      "real_evidence": "blocked on dedicated Slack token/channel (recorded in blocked_evidence)"},
 ]
 summary = {
@@ -524,13 +530,20 @@ cat > "$evidence_dir/CERTIFICATION_REPORT.md" <<EOF
 - **Nonce**: $nonce
 - **Confirmation phrase accepted**: yes
 
-## Provider surfaces certified
+## Provider surfaces
+
+Supported beta provider surfaces (certified):
 
 | Surface | Adapter | Evidence classes | Status |
 |---|---|---|---|
 | GitHub branch publish | \`builtin.github.branch-publish\` | real_provider, deterministic_integration, historical_real_provider | Certified |
 | GitHub draft pull request | \`builtin.github.draft-pull-request\` | real_provider, deterministic_integration, historical_real_provider | Certified |
-| Slack message outbox | \`builtin.slack.message-outbox\` | deterministic_integration | Certified deterministically; real evidence blocked on dedicated Slack token/channel |
+
+Experimental surface (not part of the supported beta provider contract):
+
+| Surface | Adapter | Evidence classes | Status |
+|---|---|---|---|
+| Slack message outbox | \`builtin.slack.message-outbox\` | deterministic_integration | Experimental — deterministic coverage recorded; real-mutation certification blocked on dedicated Slack token/channel; not certified for beta |
 
 ## Deterministic integration certification (always runs)
 

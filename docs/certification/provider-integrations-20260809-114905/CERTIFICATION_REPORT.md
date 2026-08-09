@@ -6,13 +6,20 @@
 - **Nonce**: 20260809-114905
 - **Confirmation phrase accepted**: yes
 
-## Provider surfaces certified
+## Provider surfaces
+
+Supported beta provider surfaces (certified):
 
 | Surface | Adapter | Evidence classes | Status |
 |---|---|---|---|
 | GitHub branch publish | `builtin.github.branch-publish` | real_provider, deterministic_integration, historical_real_provider | Certified |
 | GitHub draft pull request | `builtin.github.draft-pull-request` | real_provider, deterministic_integration, historical_real_provider | Certified |
-| Slack message outbox | `builtin.slack.message-outbox` | deterministic_integration | Certified deterministically; real evidence blocked on dedicated Slack token/channel |
+
+Experimental surface (not part of the supported beta provider contract):
+
+| Surface | Adapter | Evidence classes | Status |
+|---|---|---|---|
+| Slack message outbox | `builtin.slack.message-outbox` | deterministic_integration | Experimental — deterministic coverage recorded; real-mutation certification blocked on dedicated Slack token/channel; not certified for beta |
 
 ## Deterministic integration certification (always runs)
 

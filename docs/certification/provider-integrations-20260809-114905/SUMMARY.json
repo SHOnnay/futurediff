@@ -43,11 +43,11 @@
         "slack.post_message"
       ],
       "evidence_classes": [
-        "deterministic_integration",
-        "historical_real_provider"
+        "deterministic_integration"
       ],
-      "certified": true,
-      "real_evidence": "blocked on dedicated Slack token/channel (recorded in blocked_evidence)"
+      "certified": false,
+      "real_evidence": "blocked on dedicated Slack token/channel (recorded in blocked_evidence)",
+      "beta_scope": "experimental: not part of the supported beta provider contract (README lists Slack effects as Experimental)"
     }
   ],
   "deterministic": {
