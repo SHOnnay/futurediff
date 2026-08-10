@@ -1,0 +1,99 @@
+name: lifecycle-certification
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reproducible-packaging:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-amd64
+            runner: ubuntu-latest
+          - target: linux-arm64
+            runner: ubuntu-24.04-arm
+          - target: darwin-arm64
+            runner: macos-14
+          - target: darwin-amd64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.23.x'
+          cache: false
+      - name: Install SQLite development library
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ matrix.target }}" in
+            linux-*)
+              sudo apt-get update
+              sudo apt-get install -y libsqlite3-dev pkg-config
+              ;;
+            darwin-*)
+              brew install sqlite
+              echo "PKG_CONFIG_PATH=$(brew --prefix sqlite)/lib/pkgconfig" >> "$GITHUB_ENV"
+              echo "CGO_CFLAGS=-I$(brew --prefix sqlite)/include" >> "$GITHUB_ENV"
+              echo "CGO_LDFLAGS=-L$(brew --prefix sqlite)/lib" >> "$GITHUB_ENV"
+              ;;
+          esac
+      - name: Verify native target
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual=$(./scripts/build-public-release.sh --print-target)
+          [[ "$actual" == "${{ matrix.target }}" ]] || {
+            echo "runner target mismatch: expected ${{ matrix.target }}, got $actual" >&2
+            exit 1
+          }
+      - name: Certify reproducible packaging (native target)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/certify-reproducible-packaging.sh \
+            --confirm I_UNDERSTAND_FUTUREDIFF_WILL_CREATE_DISPOSABLE_EVIDENCE_ONLY \
+            --phase reproducibility-only \
+            --evidence-dir "$RUNNER_TEMP/reproducible-evidence-${{ matrix.target }}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: reproducible-evidence-${{ matrix.target }}
+          path: ${{ runner.temp }}/reproducible-evidence-${{ matrix.target }}/*
+          if-no-files-found: error
+
+  linux-lifecycle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.23.x'
+          cache: false
+      - name: Install SQLite development library
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y libsqlite3-dev pkg-config
+      - name: Build candidate from PR commit
+        shell: bash
+        run: ./scripts/build-public-release.sh "$(cat VERSION)" "$RUNNER_TEMP/candidate"
+      - name: Run native Linux clean-machine lifecycle drill
+        env:
+          CANDIDATE_ARCHIVE: ${{ runner.temp }}/candidate/futurediff-v0.1.0-alpha.3-linux-amd64.tar.gz
+          COMMIT_EXPECTED: ${{ github.sha }}
+          BASELINE_VERSION: v0.1.0-alpha.3
+          OUTPUT: ${{ runner.temp }}/lifecycle-evidence.json
+        shell: bash
+        run: bash scripts/certify-linux-lifecycle.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: lifecycle-evidence
+          path: ${{ runner.temp }}/lifecycle-evidence.json
+          if-no-files-found: error
