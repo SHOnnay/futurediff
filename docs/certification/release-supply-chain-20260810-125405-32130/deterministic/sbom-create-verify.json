@@ -1,0 +1,12 @@
+{
+  "schema_ok": true,
+  "verified": true,
+  "mutation_rejected": true,
+  "component_count": 1211,
+  "spec_version": "1.5",
+  "serial_number": "urn:uuid:855cde55-8c4e-fb6f-3699-17acce2613f1",
+  "changed_on_mutation": [
+    "README.md"
+  ],
+  "pass": true
+}

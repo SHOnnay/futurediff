@@ -1,0 +1,11 @@
+{
+  "sign_rc": 0,
+  "verify_rc": 0,
+  "tamper_rc": 2,
+  "roundtrip_verified": true,
+  "tamper_rejected": true,
+  "pass": true,
+  "file_sha256": "1b3bdb276b3731beb96819bc11d82579d5088beb9e58d9134632eafca7857415",
+  "signature_sha256": "fdcb9f7dc84648f3405aa54813528e2628e5a0bc0de73714041e4dcb15a26862",
+  "public_key": "deterministic/release-public-key.pem"
+}

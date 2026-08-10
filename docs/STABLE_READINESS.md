@@ -138,14 +138,27 @@ Completed 2026-08-09 with `scripts/certify-provider-integrations.sh` (evidence i
 - **corruption, stale-lock, and disk-pressure drills with operator guidance — completed 2026-08-06** (full 9-scenario certification: live-lock refusal, stale/corrupt cleanup with audit evidence, corrupt-ledger diagnosis, stale-backup restore refusal and override, fail-closed restore over corrupt ledger, storage classification, ambiguous ownership, audit corruption, ENOSPC-before-mutation, durability failure — see `docs/certification/corruption-lock-disk-pressure-20260806-164815/`);
 - concrete provider-integration evidence for every supported provider surface — **completed 2026-08-09** for the declared beta scope: GitHub branch publish and GitHub draft pull request are fully certified (real + deterministic + historical evidence; see the provider-integration certification above). The Slack message outbox is **experimental and outside the supported beta contract**; its deterministic coverage is recorded, and its real-mutation certification remains blocked on dedicated Slack credentials.
 
+### Release supply-chain integrity certification
+
+Completed 2026-08-10 with `scripts/certify-release-supply-chain.sh` from the clean committed tree `251a173` (the release supply-chain implementation itself); current/final evidence in `docs/certification/release-supply-chain-20260810-140949-24564/` (`SUMMARY.json` `git_sha: 251a173…`, `failures: 0`, secret scan 0 findings). The earlier run bound to the pre-implementation base `82d5428` is preserved as historical evidence under `docs/certification/release-supply-chain-20260810-125405-32130/`:
+
+- **signed release artifacts**: deterministic sign→verify roundtrip with an ephemeral in-script RSA-3072 keypair incl. tamper rejection, real packaged darwin-arm64 tarball + source zip signed and verified with the same keypair, independent recomputation (recorded public key + `.sig` re-verified); the private key never left the disposable run directory. Release-hosted signed assets and stable release-signing-key custody remain **blocked** (hosting requires a new release, which is forbidden for this milestone; custody is an operator decision);
+- **published SBOM assets**: CycloneDX 1.5 SBOM create/verify/schema against the pristine HEAD worktree (1245 components) with a mutation negative test; real SBOM bound to HEAD. Publishing SBOM assets on a release remains **blocked** (release creation forbidden);
+- **reproducibility evidence for packaged releases**: deterministic source zip built twice from the pristine worktree (identical sha256 + manifest digest, each `release-verify` clean); packaged build-twice from the same pristine worktree with a PATH-shimmed fixed `date` — payload file bytes are byte-identical (`payload_identical: true`), while the archives differ only in packaging metadata (tar entry mtimes and the gzip header written by BSD libarchive `tar -czf`), honestly classified `packaged_content_differs` with `byte_identical_packaged_archives` recorded **blocked** (SOURCE_DATE_EPOCH-style packaging normalization required; `gzip -n` re-packaging was never used as a pass basis);
+- **clean-machine install, upgrade, and uninstall evidence**: deterministic drill (`deterministic_integration`, network dependency `github_release_download`) against the published `v0.1.0-alpha.1` → `v0.1.0-alpha.3` assets in a temp prefix + temp `FDIF_HOME`: install, upgrade, and uninstall exactly per the new compatibility/deprecation policy contract (remove `$prefix/bin/{fdif,futurediff,futurediffd}` + `$FDIF_HOME`); real drill re-installed the digest-verified published alpha.3 asset via the documented installer. Linux and Windows native clean-machine evidence remains **blocked** (no native hosts);
+- **GitHub artifact attestations**: live read-only `gh attestation verify` **passed** against the digest-matched alpha.3 darwin-arm64 asset (`passed: true`, subject sha256 recorded) — real attestation evidence exists for the published alpha.3 asset;
+- **compatibility and deprecation policy**: `docs/COMPATIBILITY_AND_DEPRECATION_POLICY.md` (new) defines versioning semantics, supported surfaces, the deprecation process, and the uninstall contract;
+- **external security review** remains **blocked** (independent human/org; cannot be self-certified).
+
+## Required before beta
 ## Required before stable
 
-- signed release artifacts;
-- published SBOM assets;
-- reproducibility evidence for packaged releases;
-- clean-machine install, upgrade, and uninstall evidence on supported platforms;
-- compatibility and deprecation policy;
-- external security review or authoritative external validation.
+- signed release artifacts — **completed 2026-08-10** locally with an ephemeral keypair (deterministic roundtrip + real packaged sign/verify + independent recomputation; see the release supply-chain certification above); release-hosted signed assets and release-signing-key custody remain **blocked**;
+- published SBOM assets — **completed 2026-08-10** locally (CycloneDX 1.5 create/verify/schema + mutation negative; real SBOM bound to HEAD); publishing SBOM assets on a release remains **blocked**;
+- reproducibility evidence for packaged releases — **completed 2026-08-10** (deterministic source zip byte-identical; packaged build-twice with PATH-shimmed date: payload file bytes byte-identical, archive metadata differs and is recorded **blocked** with its exact prerequisite);
+- clean-machine install, upgrade, and uninstall evidence on supported platforms — **completed 2026-08-10** for macOS arm64 (published alpha.1 → alpha.3 drill + real drill; see the certification above); Linux and Windows native hosts remain **blocked**;
+- compatibility and deprecation policy — **completed 2026-08-10** (`docs/COMPATIBILITY_AND_DEPRECATION_POLICY.md`, including the uninstall contract the drill executes);
+- external security review or authoritative external validation — **blocked** (independent human/org; cannot be self-certified).
 
 ## Permanent safeguards
 
@@ -165,11 +178,11 @@ These should remain product safeguards even in stable releases:
 ### High
 
 1. **corruption, stale-lock, and disk-pressure drills — completed 2026-08-06** (full 9-scenario certification; see `docs/certification/corruption-lock-disk-pressure-20260806-164815/` and `docs/adr/ADR-099-corruption-lock-disk-pressure-resilience.md`).
-2. stable release evidence set: signatures, SBOMs, reproducibility, install/upgrade/uninstall evidence;
+2. stable release evidence set: signatures, SBOMs, reproducibility, install/upgrade/uninstall evidence — **completed 2026-08-10** (see the release supply-chain integrity certification above; hosted/published/external items remain blocked with exact prerequisites);
 3. real hosted GitHub write/recovery certification — **completed 2026-08-02** (see `docs/certification/GITHUB_WRITE_RECOVERY_2026-08-02.md`).
 ### Medium
 
-1. supported-platform compatibility and uninstall contract;
+1. supported-platform compatibility and uninstall contract — **completed 2026-08-10** (`docs/COMPATIBILITY_AND_DEPRECATION_POLICY.md`; the uninstall contract is exercised by the release supply-chain drill);
 2. decide whether enforced OCI graduates from experimental status.
 
 ### Deferred

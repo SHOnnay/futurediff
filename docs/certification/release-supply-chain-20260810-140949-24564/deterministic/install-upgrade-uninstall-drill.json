@@ -1,0 +1,11 @@
+{
+  "classification": "deterministic_integration",
+  "network_dependency": "github_release_download",
+  "install_v0.1.0-alpha.1": "fdif version contains v0.1.0-alpha.1 + fdif doctor smoke",
+  "upgrade_v0.1.0-alpha.3": "fdif version contains v0.1.0-alpha.3 in the same prefix",
+  "uninstall_contract": "remove $prefix/bin/{fdif,futurediff,futurediffd} + $FDIF_HOME; no package-manager hooks",
+  "uninstall_verified": "command -v empty within the prefixed PATH; FDIF_HOME removed",
+  "pass": true,
+  "network_failure": false,
+  "detail": ""
+}

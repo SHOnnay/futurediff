@@ -1,0 +1,10 @@
+{
+  "version": "v0.1.0-alpha.3",
+  "tarball_verified": true,
+  "source_zip_verified": true,
+  "checksum_verified": true,
+  "public_key": "deterministic/release-public-key.pem",
+  "signature_tarball": "real/release-darwin-arm64.tar.gz.sig",
+  "signature_source_zip": "real/release-source.zip.sig",
+  "pass": true
+}

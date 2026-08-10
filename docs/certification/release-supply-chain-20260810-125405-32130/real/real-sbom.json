@@ -1,0 +1,9 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:855cde55-8c4e-fb6f-3699-17acce2613f1",
+  "component_count": 1211,
+  "verified": true,
+  "manifest_digest_property": "855cde558c4efb6f369917acce2613f1819df1261b39cfcd1d3d2ad2f35ef96d",
+  "pass": true
+}

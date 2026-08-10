@@ -1,0 +1,12 @@
+{
+  "archive_sha256_1": "cf7872b1305f1e80139975b76ec81ff3e3729c4460f7111eac649bf06e9c82b4",
+  "archive_sha256_2": "cf7872b1305f1e80139975b76ec81ff3e3729c4460f7111eac649bf06e9c82b4",
+  "archive_identical": true,
+  "manifest_digest_1": "855cde558c4efb6f369917acce2613f1819df1261b39cfcd1d3d2ad2f35ef96d",
+  "manifest_digest_2": "855cde558c4efb6f369917acce2613f1819df1261b39cfcd1d3d2ad2f35ef96d",
+  "manifest_digest_identical": true,
+  "release_verify_1": true,
+  "release_verify_2": true,
+  "file_count": 1211,
+  "pass": true
+}
