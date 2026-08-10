@@ -1,0 +1,8 @@
+{
+  "version": "v0.1.0-alpha.3",
+  "installer": "scripts/install-release.sh (checksum-sidecar-verified download from the published GitHub release)",
+  "install_verified": "fdif version contains the version; fdif doctor smoke exits 0",
+  "uninstall_contract": "remove $prefix/bin/{fdif,futurediff,futurediffd} + $FDIF_HOME",
+  "pass": true,
+  "detail": ""
+}

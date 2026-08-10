@@ -77,9 +77,9 @@ done
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/futurediff-install.XXXXXX")
 trap 'rm -rf "$tmp"' EXIT
 
-curl --fail --location --proto '=https' --tlsv1.2 \
+curl --fail --location --proto '=https' --tlsv1.2 --max-time 1200 --retry 3 --retry-delay 5 \
   --output "$tmp/$asset" "$base/$asset"
-curl --fail --location --proto '=https' --tlsv1.2 \
+curl --fail --location --proto '=https' --tlsv1.2 --max-time 120 --retry 3 --retry-delay 5 \
   --output "$tmp/$asset.sha256" "$base/$asset.sha256"
 
 (

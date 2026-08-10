@@ -1,0 +1,199 @@
+{
+  "kind": "release-supply-chain-certification",
+  "generated_at": "20260810-125444",
+  "host": "Darwin-arm64",
+  "nonce": "20260810-125405-32130",
+  "git_sha": "82d54286ccebcf5364598d9c08ce2701991b9a9f",
+  "confirmation_phrase_accepted": true,
+  "deterministic": {
+    "failures": 0,
+    "evidence": [
+      {
+        "classification": "deterministic",
+        "expected": "roundtrip verified + tamper rejected",
+        "id": "sign_verify_roundtrip",
+        "observed_source": "deterministic/sign-verify-roundtrip.json",
+        "pass": true,
+        "target": "signed_release_artifacts"
+      },
+      {
+        "classification": "deterministic",
+        "expected": "cyclonedx 1.5 schema + verify + mutation negative",
+        "id": "sbom_create_verify_schema",
+        "observed_source": "deterministic/sbom-create-verify.json",
+        "pass": true,
+        "target": "sbom_assets"
+      },
+      {
+        "classification": "deterministic",
+        "expected": "SLSA v1 create + verify + digest match",
+        "id": "provenance_create_verify",
+        "observed_source": "deterministic/provenance-create-verify.json",
+        "pass": true,
+        "target": "in_toto_provenance"
+      },
+      {
+        "classification": "deterministic",
+        "expected": "source zip byte-identical + release-verify",
+        "id": "release_build_twice",
+        "observed_source": "deterministic/release-build-twice.json",
+        "pass": true,
+        "target": "reproducible_builds"
+      },
+      {
+        "classification": "deterministic",
+        "expected": "packaged build-twice honest classification",
+        "id": "packaged_build_twice",
+        "observed_source": "deterministic/packaged-build-twice.json",
+        "pass": true,
+        "target": "reproducible_builds"
+      },
+      {
+        "classification": "deterministic",
+        "expected": "published .sha256 sidecar verifies the archive",
+        "id": "checksum_verify",
+        "observed_source": "deterministic/checksum-verify.txt",
+        "pass": true,
+        "target": "release_checksums"
+      },
+      {
+        "classification": "deterministic_integration",
+        "expected": "install alpha.1 -> upgrade alpha.3 -> uninstall per policy contract",
+        "id": "install_upgrade_uninstall_drill",
+        "observed_source": "deterministic/install-upgrade-uninstall-drill.json",
+        "pass": true,
+        "target": "clean_machine_install"
+      },
+      {
+        "classification": "deterministic",
+        "expected": "re-run verify-signature with the recorded key and .sig",
+        "id": "recompute_signature_verify",
+        "observed_source": "real/recompute-signature-verify.json",
+        "pass": true,
+        "target": "independent_recomputation"
+      },
+      {
+        "classification": "deterministic",
+        "expected": "re-run release-verify on the recorded source zip",
+        "id": "recompute_release_verify",
+        "observed_source": "real/recompute-release-verify.json",
+        "pass": true,
+        "target": "independent_recomputation"
+      },
+      {
+        "classification": "deterministic",
+        "expected": "no credential material in evidence",
+        "id": "secret_scan_evidence",
+        "observed_source": "secrets-scan.txt",
+        "pass": true,
+        "target": "credential_scan"
+      }
+    ]
+  },
+  "real": {
+    "failures": 0,
+    "evidence": [
+      {
+        "classification": "real",
+        "expected": "real darwin-arm64 tarball + source zip signed and verified",
+        "id": "real_packaged_sign_verify",
+        "observed_source": "real/real-packaged-sign-verify.json",
+        "pass": true,
+        "target": "signed_release_artifacts"
+      },
+      {
+        "classification": "real",
+        "expected": "real CycloneDX SBOM bound to HEAD, verified",
+        "id": "real_sbom",
+        "observed_source": "real/real-sbom.json",
+        "pass": true,
+        "target": "sbom_assets"
+      },
+      {
+        "classification": "real",
+        "expected": "real in-toto provenance bound to HEAD, verified",
+        "id": "real_provenance",
+        "observed_source": "real/real-provenance.json",
+        "pass": true,
+        "target": "in_toto_provenance"
+      },
+      {
+        "classification": "real",
+        "expected": "gh attestation verify on the digest-matched alpha.3 asset",
+        "id": "real_attestation",
+        "observed_source": "real/attestation.json",
+        "pass": true,
+        "target": "github_artifact_attestation"
+      },
+      {
+        "classification": "real",
+        "expected": "clean-machine install of published alpha.3 via the documented installer + uninstall",
+        "id": "real_install_upgrade_uninstall",
+        "observed_source": "real/real-install-upgrade-uninstall.json",
+        "pass": true,
+        "target": "clean_machine_install"
+      }
+    ]
+  },
+  "blocked": [
+    {
+      "classification": "blocked",
+      "expected": "byte-identical packaged archives",
+      "id": "byte_identical_packaged_archives",
+      "observed_source": "deterministic/packaged-build-twice.json",
+      "pass": false,
+      "prerequisite": "payload file bytes are byte-identical; the archive diff is only packaging metadata (tar entry mtimes and the gzip header written by BSD libarchive tar -czf) \u2014 normalize packaging metadata (SOURCE_DATE_EPOCH-style) for byte-identical archives; recorded diff: archive_sha256_1/2 + content_sha256_1/2 + payload_sha256_1/2 in deterministic/packaged-build-twice.json",
+      "target": "reproducible_builds"
+    },
+    {
+      "classification": "blocked",
+      "expected": "independent external security review or authoritative external validation",
+      "id": "external_security_review",
+      "pass": false,
+      "prerequisite": "commission an independent security review or obtain authoritative external validation (external human/org; cannot be self-certified)",
+      "target": "external_security_review"
+    },
+    {
+      "classification": "blocked",
+      "expected": "clean-machine install/upgrade/uninstall evidence on native Linux",
+      "id": "linux_native_clean_machine",
+      "pass": false,
+      "prerequisite": "provision a Linux clean machine (host) and run the certification drill there",
+      "target": "clean_machine_install"
+    },
+    {
+      "classification": "blocked",
+      "expected": "clean-machine install/upgrade/uninstall evidence on native Windows",
+      "id": "windows_native_clean_machine",
+      "pass": false,
+      "prerequisite": "provision a Windows clean machine (host) and run the certification drill there (Windows runtime/installer support is deferred in STABLE_READINESS.md)",
+      "target": "clean_machine_install"
+    },
+    {
+      "classification": "blocked",
+      "expected": "release-hosted signed artifacts",
+      "id": "hosted_signed_assets",
+      "pass": false,
+      "prerequisite": "requires creating a new GitHub release with signed assets (release creation is forbidden for this milestone; release.yml signs on v[1-9]* tags)",
+      "target": "signed_release_artifacts"
+    },
+    {
+      "classification": "blocked",
+      "expected": "published SBOM assets on a release",
+      "id": "published_sbom_assets",
+      "pass": false,
+      "prerequisite": "requires creating a new GitHub release publishing SBOM.cdx.json assets (release creation is forbidden for this milestone)",
+      "target": "sbom_assets"
+    },
+    {
+      "classification": "blocked",
+      "expected": "stable release-signing-key custody",
+      "id": "release_signing_key_custody",
+      "pass": false,
+      "prerequisite": "operator decision on a committed release public key with an offline-held private key (ephemeral in-run keypair is not a stable identity)",
+      "target": "signed_release_artifacts"
+    }
+  ],
+  "failures": 0,
+  "assertion_problems": []
+}
