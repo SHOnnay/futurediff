@@ -49,7 +49,13 @@ if [[ ! $version =~ ^v0\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
 fi
 
 commit=$(git -C "$root" rev-parse HEAD 2>/dev/null || printf unknown)
-date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+# Deterministic release timestamp derived from source control
+# (SOURCE_DATE_EPOCH semantics): the exact commit timestamp in epoch
+# seconds, never the wall clock. buildinfo.Date and every archive mtime
+# derive from it, so the same committed tree produces the same archive.
+sde=$(git -C "$root" log -1 --format=%ct HEAD 2>/dev/null || printf 0)
+export SOURCE_DATE_EPOCH="$sde"
+date="$(TZ=UTC date -u -r "$sde" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || TZ=UTC date -u -d "@$sde" +%Y-%m-%dT%H:%M:%SZ)"
 dirty=false
 if ! git -C "$root" diff --quiet --ignore-submodules -- 2>/dev/null || \
    ! git -C "$root" diff --cached --quiet --ignore-submodules -- 2>/dev/null; then
@@ -122,11 +128,12 @@ if [[ -n $symlink_path ]]; then
   exit 1
 fi
 
-(
-  cd "$out"
-  COPYFILE_DISABLE=1 tar -czf \
-    "$(basename "$archive")" "$(basename "$stage")"
-)
+command -v python3 >/dev/null 2>&1 || {
+  echo "python3 is required for deterministic release archives" >&2
+  exit 1
+}
+python3 "$root/scripts/reproducible-archive.py" \
+  --root "$stage" --name "$name" --output "$archive" --mtime "$sde"
 
 actual_entries=$(mktemp "${TMPDIR:-/tmp}/futurediff-archive-actual.XXXXXX")
 expected_entries=$(mktemp "${TMPDIR:-/tmp}/futurediff-archive-expected.XXXXXX")
