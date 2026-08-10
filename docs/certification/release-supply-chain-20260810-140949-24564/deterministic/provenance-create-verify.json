@@ -1,0 +1,11 @@
+{
+  "verified": true,
+  "subject_match": true,
+  "byproduct_match": true,
+  "types_ok": true,
+  "manifest_digest": "ebc1ea4ae7182914cc3d87cab39b5bc6d3e3c8461b13e54cf37eee392502b9be",
+  "source_digest_recorded": "251a1735a8c82fd600298eac72c05b4b6f4d214c",
+  "statement_type": "https://in-toto.io/Statement/v1",
+  "predicate_type": "https://slsa.dev/provenance/v1",
+  "pass": true
+}

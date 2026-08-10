@@ -1,0 +1,15 @@
+{
+  "version": "v0.1.0-alpha.3",
+  "archive_sha256_1": "2428ff97565496f85ec0f40754cffe5ea24010a5754fe633b4ceb164c4c38bfd",
+  "archive_sha256_2": "a0eaebd61a6be1acbd487c2cc867410e91198535febf1e783935e6ce858d6e81",
+  "archive_identical": false,
+  "content_sha256_1": "fc9c724aa9cbdabd51a43e191a88b0283973ea3972ddbe392d657f322c980bd4",
+  "content_sha256_2": "9671d1c4788c4dd08da4fb8b915c12957cc1fca77df6f48ab23d53982d3f3ae8",
+  "content_identical": false,
+  "payload_sha256_1": "64d70ca2780c9356acfe058ab02a1406c195bd192a255ec0d1a5bec73e2956b0",
+  "payload_sha256_2": "64d70ca2780c9356acfe058ab02a1406c195bd192a255ec0d1a5bec73e2956b0",
+  "payload_identical": true,
+  "classification": "packaged_content_differs",
+  "pass": true,
+  "note": "both builds ran build-public-release.sh from the same pristine detached worktree with a PATH-shimmed date returning one fixed timestamp and identical toolchain/host; only the two original outputs were compared (never re-packaged); payload_sha256 hashes the extracted file bytes only, so payload_identical isolates archive-level metadata differences (tar entry mtimes and gzip header) from binary-level differences"
+}
