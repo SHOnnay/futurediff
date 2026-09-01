@@ -102,8 +102,9 @@ fail() {
 
 record() {
   # record STEP:passed
+  local key="${1%:}"
   results="$results
-  \"$1\": $2"
+  \"$key\": $2"
 }
 
 # --- 1. clean-machine precondition ------------------------------------------
@@ -302,6 +303,8 @@ doc = {
 }
 json.dump(doc, open(out, "w"), indent=2)
 if not all_pass:
+    failed = sorted(key for key, passed in steps.items() if not passed)
+    print(json.dumps({"pass": False, "failed_steps": failed}), file=sys.stderr)
     raise SystemExit(1)
 print(json.dumps({"pass": all_pass, "steps": len(steps)}))
 PY
