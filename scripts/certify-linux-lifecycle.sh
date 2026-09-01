@@ -121,25 +121,32 @@ record "1_absent_precondition": true
 record "2_install_baseline": true
 
 # --- 3. version/health verification ------------------------------------------
+# Alpha.1 predates FDIF_HOME but supports FUTUREDIFF_ROOT. Export both to the
+# same fresh location so predecessor state is upgraded in place by the
+# candidate instead of touching the runner's real home directory.
+rm -rf "$fdif_home"
+mkdir -p "$fdif_home"
+chmod 700 "$fdif_home"
+export FDIF_HOME="$fdif_home"
+export FUTUREDIFF_ROOT="$fdif_home"
+export PATH="$prefix/bin:$PATH"
+
 v_ok=0
 if "$prefix/bin/fdif" version 2>&1 | grep -Fq "$baseline_version"; then
   v_ok=1
 fi
 "$prefix/bin/futurediffd" --version > "$work_dir/d-version.log" 2>&1 || v_ok=0
-FDIF_HOME="$fdif_home" "$prefix/bin/fdif" doctor > "$work_dir/doctor-baseline.log" 2>&1 || true
+"$prefix/bin/fdif" daemon start > "$work_dir/daemon-start-baseline.log" 2>&1 \
+  || fail "baseline daemon failed to start"
+"$prefix/bin/fdif" doctor > "$work_dir/doctor-baseline.log" 2>&1 || v_ok=0
 [[ $v_ok -eq 1 ]] || fail "baseline version/health verification failed"
 record "3_version_health": true
 
 # --- 4. fresh isolated FDIF_HOME --------------------------------------------
-rm -rf "$fdif_home"
-mkdir -p "$fdif_home"
-chmod 700 "$fdif_home"
+[[ -d "$fdif_home" && ! -L "$fdif_home" ]] || fail "isolated FDIF_HOME is not a real directory"
 record "4_fresh_fdif_home": true
 
 # --- guided flow helpers ----------------------------------------------------
-export FDIF_HOME="$fdif_home"
-export PATH="$prefix/bin:$PATH"
-
 run_workflow() {
   # run_workflow LABEL -> writes transaction id to stdout; fails on error
   local label="$1"
@@ -154,7 +161,7 @@ run_workflow() {
   local start_json
   start_json="$(cd "$repo_dir" && fdif --json start .)"
   local tx
-  tx="$(python3 -c "import json,sys; print(json.loads(sys.argv[1])['transaction']['transaction_id'])" "$start_json")"
+  tx="$(python3 -c "import json,sys; d=json.loads(sys.argv[1]); print((d.get('transaction') or {}).get('transaction_id') or d.get('transaction_id') or '')" "$start_json")"
   [[ -n "$tx" ]] || fail "$label: no transaction id"
   printf 'lifecycle %s change\n' "$label" >> "$fdif_home/runtime/transactions/$tx/workspace/README.md"
   fdif --json --yes finish "$tx" > "$work_dir/finish-$label.json" 2>&1 \
@@ -186,6 +193,8 @@ for b in fdif futurediff futurediffd; do
   [[ -x "$root_dir/bin/$b" ]] || fail "candidate archive missing executable $b"
   install -m 0755 "$root_dir/bin/$b" "$prefix/bin/$b"
 done
+fdif daemon restart > "$work_dir/daemon-restart-candidate.log" 2>&1 \
+  || fail "candidate daemon failed to restart against predecessor state"
 record "6_upgrade_candidate": true
 
 # --- 7. candidate version/commit verification --------------------------------
@@ -210,6 +219,16 @@ tx2="$(run_workflow post)" || exit 1
 record "9_postupgrade_workflow": true
 
 # --- 10. uninstall per the documented contract --------------------------------
+fdif daemon stop > "$work_dir/daemon-stop.log" 2>&1 || fail "candidate daemon failed to stop"
+daemon_stopped=0
+for ((attempt = 0; attempt < 50; attempt++)); do
+  if fdif --json daemon status 2>/dev/null | python3 -c "import json,sys; sys.exit(0 if json.load(sys.stdin).get('running') is False else 1)"; then
+    daemon_stopped=1
+    break
+  fi
+  sleep 0.1
+done
+[[ $daemon_stopped -eq 1 ]] || fail "candidate daemon remained running during uninstall"
 rm -f "$prefix/bin/fdif" "$prefix/bin/futurediff" "$prefix/bin/futurediffd"
 rm -rf "$fdif_home"
 record "10_uninstall": true
