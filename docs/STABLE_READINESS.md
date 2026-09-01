@@ -155,7 +155,7 @@ Completed 2026-08-10 with `scripts/certify-release-supply-chain.sh` from the cle
 
 - signed release artifacts — **completed 2026-08-10** locally with an ephemeral keypair (deterministic roundtrip + real packaged sign/verify + independent recomputation; see the release supply-chain certification above); release-hosted signed assets and release-signing-key custody remain **blocked**;
 - published SBOM assets — **completed 2026-08-10** locally (CycloneDX 1.5 create/verify/schema + mutation negative; real SBOM bound to HEAD); publishing SBOM assets on a release remains **blocked**;
-- reproducibility evidence for packaged releases — **completed 2026-08-10** (deterministic source zip byte-identical; packaged build-twice with PATH-shimmed date: payload file bytes byte-identical, archive metadata differs and is recorded **blocked** with its exact prerequisite);
+- reproducibility evidence for packaged releases — **in progress** (darwin-arm64: payload_identical=true, archive_identical=true; linux targets and per-target reproducibility evidence pending GitHub-hosted runner execution);
 - clean-machine install, upgrade, and uninstall evidence on supported platforms — **completed 2026-08-10** for macOS arm64 (published alpha.1 → alpha.3 drill + real drill; see the certification above); Linux and Windows native hosts remain **blocked**;
 - compatibility and deprecation policy — **completed 2026-08-10** (`docs/COMPATIBILITY_AND_DEPRECATION_POLICY.md`, including the uninstall contract the drill executes);
 - external security review or authoritative external validation — **blocked** (independent human/org; cannot be self-certified).

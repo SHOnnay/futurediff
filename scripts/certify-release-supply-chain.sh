@@ -158,13 +158,10 @@ openssl genrsa -out "$cert_root/keys/release.key" 3072 2>/dev/null
 openssl rsa -in "$cert_root/keys/release.key" -pubout -out "$cert_root/keys/release.pub" 2>/dev/null
 cp "$cert_root/keys/release.pub" "$evidence_dir/deterministic/release-public-key.pem"
 
-# Fixed-timestamp date shim for the reproducibility double-build (evidence-only).
-mkdir -p "$cert_root/shim"
-cat > "$cert_root/shim/date" <<'SHIM'
-#!/bin/sh
-printf '%s\n' '2026-01-01T00:00:00Z'
-SHIM
-chmod +x "$cert_root/shim/date"
+# The packaged double-build no longer needs a fixed date shim:
+# build-public-release.sh derives SOURCE_DATE_EPOCH from the committed
+# source tree (the commit timestamp), so both builds are byte-identical
+# without any environment interception.
 
 echo ">> pristine worktree: $pristine ($pristine_sha)"
 
@@ -322,12 +319,10 @@ d4_json="$evidence_dir/deterministic/release-build-twice.json"
 python3 -c "import json,sys; d=json.load(open('$d4_json')); sys.exit(0 if d['pass'] else 1)" || det_failures=$((det_failures + 1))
 emit_det release_build_twice deterministic reproducible_builds "source zip byte-identical + release-verify" deterministic/release-build-twice.json "$(python3 -c "import json;print(json.load(open('$d4_json'))['pass'])")"
 
-# --- 1e. packaged build-twice (PATH-shimmed date; honest classification)
+# --- 1e. packaged build-twice (SOURCE_DATE_EPOCH; byte-identical archives)
 if [[ "$skip_build" == "0" && "$is_darwin" == "1" ]]; then
-  export PATH="$cert_root/shim:$PATH"
   ( cd "$pristine" && bash scripts/build-public-release.sh "$version" "$cert_root/pkg1" ) > "$cert_root/pkg1.log" 2>&1
   ( cd "$pristine" && bash scripts/build-public-release.sh "$version" "$cert_root/pkg2" ) > "$cert_root/pkg2.log" 2>&1
-  export PATH="$original_path"
   a1="$cert_root/pkg1/futurediff-$version-darwin-arm64.tar.gz"
   a2="$cert_root/pkg2/futurediff-$version-darwin-arm64.tar.gz"
   sha1="$(shasum -a 256 "$a1" | awk '{print $1}')"
@@ -368,7 +363,7 @@ doc = {
     "payload_identical": p1 == p2,
     "classification": classification,
     "pass": True,
-    "note": "both builds ran build-public-release.sh from the same pristine detached worktree with a PATH-shimmed date returning one fixed timestamp and identical toolchain/host; only the two original outputs were compared (never re-packaged); payload_sha256 hashes the extracted file bytes only, so payload_identical isolates archive-level metadata differences (tar entry mtimes and gzip header) from binary-level differences",
+    "note": "both builds ran build-public-release.sh from the same pristine detached worktree; SOURCE_DATE_EPOCH is derived from the committed source tree (git commit timestamp), so buildinfo.Date and every tar/gzip mtime are fixed without any environment interception; only the two original outputs were compared (never re-packaged); payload_sha256 hashes the extracted file bytes only",
 }
 json.dump(doc, open(out, "w"), indent=2)
 print(json.dumps({"classification": classification, "archive_identical": archive_identical, "content_identical": content_identical, "payload_identical": p1 == p2, "blocked_needed": blocked_needed, "blocked_prerequisite": blocked_prerequisite}))

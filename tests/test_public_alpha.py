@@ -148,7 +148,19 @@ class PublicAlphaTests(unittest.TestCase):
 
     def test_public_archive_rejects_platform_metadata(self):
         script = read_utf8(ROOT / "scripts/build-public-release.sh")
-        self.assertIn("COPYFILE_DISABLE=1 tar -czf", script)
+        archiver = read_utf8(ROOT / "scripts/reproducible-archive.py")
+        self.assertIn("scripts/reproducible-archive.py", script)
+        self.assertIn("SOURCE_DATE_EPOCH", script)
+        self.assertIn('git -C "$root" log -1 --format=%ct HEAD', script)
+        self.assertIn('--mtime "$sde"', script)
+        # The archiver must normalize every nondeterministic archive field.
+        self.assertIn("sorted path order", archiver)
+        self.assertIn("uid/gid are forced to 0", archiver)
+        self.assertIn("uname/gname to root/root", archiver)
+        self.assertIn("mtime is forced to SOURCE_DATE_EPOCH", archiver)
+        self.assertIn("no atime/ctime", archiver)
+        self.assertIn("mtime = SOURCE_DATE_EPOCH and no original", archiver)
+        self.assertIn("tarfile.GNU_FORMAT", archiver)
         self.assertIn("-name '._*'", script)
         self.assertIn("-name '.DS_Store'", script)
         self.assertIn("unexpected symlink in public staging tree", script)
