@@ -244,11 +244,10 @@ clean_path="$(printf '%s' "$PATH" | tr ':' '\n' | grep -v "^$prefix/bin$" | past
 if [[ -n "$bin_residue" ]]; then
   fail "uninstall left binaries:$bin_residue"
 fi
-if command -v fdif >/dev/null 2>&1; then
-  # a system-wide fdif (outside the drill prefix) must not exist either
-  system_fdif="$(command -v fdif || true)"
-  [[ -z "$system_fdif" ]] || fail "system-wide fdif still present: $system_fdif"
-fi
+# A system-wide fdif (outside the drill prefix) must not exist either. Search
+# the already-computed prefix-free PATH, not the PATH used during the drill.
+system_fdif="$(PATH="$clean_path" command -v fdif 2>/dev/null || true)"
+[[ -z "$system_fdif" ]] || fail "system-wide fdif still present: $system_fdif"
 record "11_binaries_absent": true
 
 # --- 12. FDIF_HOME handling follows the documented policy ----------------------
