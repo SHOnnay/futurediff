@@ -56,6 +56,7 @@ fi
 scratch="${RUNNER_TEMP:-/tmp}"
 prefix="${PREFIX:-$scratch/fdif-prefix}"
 fdif_home="${FDIF_HOME:-$scratch/fdif-home}"
+fdif_socket="$fdif_home/futurediff.sock"
 work_dir="${WORK_DIR:-$scratch/fdif-work}"
 output="${OUTPUT:-lifecycle-evidence.json}"
 
@@ -129,6 +130,7 @@ mkdir -p "$fdif_home"
 chmod 700 "$fdif_home"
 export FDIF_HOME="$fdif_home"
 export FUTUREDIFF_ROOT="$fdif_home"
+export FUTUREDIFF_SOCKET="$fdif_socket"
 export PATH="$prefix/bin:$PATH"
 
 v_ok=0
