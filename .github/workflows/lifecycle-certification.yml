@@ -7,6 +7,9 @@ on:
 permissions:
   contents: read
 
+env:
+  CERTIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
 jobs:
   reproducible-packaging:
     strategy:
@@ -24,6 +27,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.CERTIFICATION_SHA }}
       - uses: actions/setup-go@v7
         with:
           go-version: '1.23.x'
@@ -71,6 +76,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.CERTIFICATION_SHA }}
       - uses: actions/setup-go@v7
         with:
           go-version: '1.23.x'
@@ -87,8 +94,8 @@ jobs:
       - name: Run native Linux clean-machine lifecycle drill
         env:
           CANDIDATE_ARCHIVE: ${{ runner.temp }}/candidate/futurediff-v0.1.0-alpha.3-linux-amd64.tar.gz
-          COMMIT_EXPECTED: ${{ github.sha }}
-          BASELINE_VERSION: v0.1.0-alpha.3
+          COMMIT_EXPECTED: ${{ env.CERTIFICATION_SHA }}
+          BASELINE_VERSION: v0.1.0-alpha.2
           OUTPUT: ${{ runner.temp }}/lifecycle-evidence.json
         shell: bash
         run: bash scripts/certify-linux-lifecycle.sh

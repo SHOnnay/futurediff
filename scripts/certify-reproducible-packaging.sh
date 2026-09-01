@@ -213,11 +213,22 @@ tar -tvf "$a2" > "$evidence_dir/deterministic_local/archive-B.tar-tvf.txt" 2>&1
 tar -tzf "$a1" | LC_ALL=C sort > "$evidence_dir/deterministic_local/archive-A.entries.txt"
 tar -tzf "$a2" | LC_ALL=C sort > "$evidence_dir/deterministic_local/archive-B.entries.txt"
 
-# metadata: uid/gid/uname/gname normalized to 0/root, mtime == SDE
-tvf_owner_ok=1
-if grep -Evq "^[d-][rwx-]{9} +0 (root|wheel) +(root|wheel) " "$evidence_dir/deterministic_local/archive-A.tar-tvf.txt"; then
-  tvf_owner_ok=0
-fi
+# metadata: uid/gid/uname/gname normalized to 0/root, mtime == SDE.
+# Inspect the archive fields directly: GNU and BSD tar format `tar -tvf`
+# ownership differently, so display parsing would reject valid Linux archives.
+tvf_owner_ok="$(python3 - "$a1" <<'PY'
+import sys, tarfile
+
+with tarfile.open(sys.argv[1], "r:gz") as archive:
+    print(int(all(
+        member.uid == 0
+        and member.gid == 0
+        and member.uname == "root"
+        and member.gname == "root"
+        for member in archive
+    )))
+PY
+)"
 gzip_mtime="$(python3 -c "
 import struct
 h=open('$a1','rb').read(8)
@@ -369,13 +380,27 @@ sbom_pass="$(python3 -c "import json;print(json.load(open('$evidence_dir/determi
 emit_det sbom_valid deterministic_local sbom_assets "CycloneDX SBOM create/verify bound to the committed tree" deterministic_local/sbom-verify.json "$sbom_pass"
 [[ "$sbom_pass" == "True" ]] || det_failures=$((det_failures + 1))
 
-$assurance provenance-create --root "$pristine" --name futurediff --version "$version" \
-  --source-digest "$git_sha" \
+$assurance manifest-create --root "$pristine" \
+  --output "$cert_root/source-manifest.json" > "$cert_root/manifest-create.log" 2>&1
+$assurance provenance-create --root "$pristine" --manifest "$cert_root/source-manifest.json" \
+  --name futurediff --version "$version" --builder-id "$builder_id" \
+  --source-uri "$source_uri" --source-digest "$git_sha" \
   --output "$evidence_dir/deterministic_local/provenance.intoto.json" > "$cert_root/prov-create.log" 2>&1
-$assurance provenance-verify --provenance "$evidence_dir/deterministic_local/provenance.intoto.json" \
-  --source-digest "$git_sha" \
+$assurance provenance-verify --manifest "$cert_root/source-manifest.json" \
+  --provenance "$evidence_dir/deterministic_local/provenance.intoto.json" \
   --output "$evidence_dir/deterministic_local/provenance-verify.json" > "$cert_root/prov-verify.log" 2>&1
-prov_pass="$(python3 -c "import json;d=json.load(open('$evidence_dir/deterministic_local/provenance-verify.json'));print(d.get('verified') is True and d.get('subject_match') is True)")"
+prov_pass="$(python3 - "$evidence_dir/deterministic_local/provenance-verify.json" \
+  "$evidence_dir/deterministic_local/provenance.intoto.json" "$git_sha" <<'PY'
+import json, sys
+
+verification = json.load(open(sys.argv[1]))
+provenance = json.load(open(sys.argv[2]))
+source_digest = sys.argv[3]
+dependencies = provenance.get("predicate", {}).get("buildDefinition", {}).get("resolvedDependencies", [])
+source_bound = any(dependency.get("digest", {}).get("sha1") == source_digest for dependency in dependencies)
+print(verification.get("verified") is True and verification.get("subject_match") is True and source_bound)
+PY
+)"
 emit_det provenance_bound deterministic_local in_toto_provenance "in-toto provenance bound to the committed tree ($git_sha)" deterministic_local/provenance-verify.json "$prov_pass"
 [[ "$prov_pass" == "True" ]] || det_failures=$((det_failures + 1))
 
@@ -429,21 +454,23 @@ print('%s %s run=%s' % (r.get('runner_name',''), r.get('runner_arch',''), r.get(
     fi
 
     target_shas=()
-    for f in "${rep_files[@]}"; do
-      tgt="$(basename "$f" .json | sed 's/^reproducible-evidence-//')"
-      cp "$f" "$evidence_dir/hosted_native_linux/reproducible-evidence-$tgt.json"
-      f_commit="$(python3 -c "import json;print(json.load(open('$evidence_dir/hosted_native_linux/reproducible-evidence-$tgt.json'))['commit_tested'])")"
-      f_pass="$(python3 -c "import json;print(json.load(open('$evidence_dir/hosted_native_linux/reproducible-evidence-$tgt.json'))['pass'])")"
-      f_sha="$(python3 -c "import json;print(json.load(open('$evidence_dir/hosted_native_linux/reproducible-evidence-$tgt.json'))['archive_sha256_A'])")"
-      if [[ "$f_commit" != "$git_sha" ]]; then
-        hosted_ok=0; hosted_detail="$hosted_detail ${tgt}:commit mismatch"
-      fi
-      if [[ "$f_pass" != "True" ]]; then
-        hosted_ok=0; hosted_detail="$hosted_detail ${tgt}:pass != True"
-      fi
-      target_shas+=("$tgt:$f_sha")
-      emit_hosted hosted_reproducible_${tgt//-/_} hosted_native_linux reproducible_builds "byte-identical packaged archive for $tgt on its native runner" "hosted_native_linux/reproducible-evidence-$tgt.json" "$f_pass"
-    done
+    if [[ ${#rep_files[@]} -gt 0 ]]; then
+      for f in "${rep_files[@]}"; do
+        tgt="$(basename "$f" .json | sed 's/^reproducible-evidence-//')"
+        cp "$f" "$evidence_dir/hosted_native_linux/reproducible-evidence-$tgt.json"
+        f_commit="$(python3 -c "import json;print(json.load(open('$evidence_dir/hosted_native_linux/reproducible-evidence-$tgt.json'))['commit_tested'])")"
+        f_pass="$(python3 -c "import json;print(json.load(open('$evidence_dir/hosted_native_linux/reproducible-evidence-$tgt.json'))['pass'])")"
+        f_sha="$(python3 -c "import json;print(json.load(open('$evidence_dir/hosted_native_linux/reproducible-evidence-$tgt.json'))['archive_sha256_A'])")"
+        if [[ "$f_commit" != "$git_sha" ]]; then
+          hosted_ok=0; hosted_detail="$hosted_detail ${tgt}:commit mismatch"
+        fi
+        if [[ "$f_pass" != "True" ]]; then
+          hosted_ok=0; hosted_detail="$hosted_detail ${tgt}:pass != True"
+        fi
+        target_shas+=("$tgt:$f_sha")
+        emit_hosted hosted_reproducible_${tgt//-/_} hosted_native_linux reproducible_builds "byte-identical packaged archive for $tgt on its native runner" "hosted_native_linux/reproducible-evidence-$tgt.json" "$f_pass"
+      done
+    fi
 
     # cross-target identity: every target archive must be distinct
     distinct=$(python3 - "$evidence_dir/hosted_native_linux" <<'PY'
@@ -553,10 +580,10 @@ if [[ "$phase" == "full" ]]; then
   emit_det secret_scan_evidence deterministic_local credential_scan "no credential material in evidence" secrets-scan.txt True
 fi
 
-printf '%s\n' "${det_evidence[@]}" > "$cert_root/det.jsonl"
-printf '%s\n' "${hosted_evidence[@]}" > "$cert_root/hosted.jsonl"
-printf '%s\n' "${blocked_evidence[@]}" > "$cert_root/blocked.jsonl"
-printf '%s\n' "${na_evidence[@]}" > "$cert_root/na.jsonl"
+printf "%s\n" "${det_evidence[@]+"${det_evidence[@]}"}" > "$cert_root/det.jsonl"
+printf "%s\n" "${hosted_evidence[@]+"${hosted_evidence[@]}"}" > "$cert_root/hosted.jsonl"
+printf "%s\n" "${blocked_evidence[@]+"${blocked_evidence[@]}"}" > "$cert_root/blocked.jsonl"
+printf "%s\n" "${na_evidence[@]+"${na_evidence[@]}"}" > "$cert_root/na.jsonl"
 
 python3 - "$summary_file" "$evidence_dir" "$nonce" "$host" "$git_sha" "$det_failures" "$phase" \
   "$cert_root/det.jsonl" "$cert_root/hosted.jsonl" "$cert_root/blocked.jsonl" "$cert_root/na.jsonl" \

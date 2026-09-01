@@ -29,7 +29,7 @@
 #                       exact commit under certification (required)
 #   COMMIT_EXPECTED     full SHA of the commit under certification (required)
 #   BASELINE_VERSION    published baseline release to install first
-#                       (default: v0.1.0-alpha.3)
+#                       (default: v0.1.0-alpha.2)
 #   PREFIX              fresh install prefix (default: $RUNNER_TEMP/fdif-prefix)
 #   FDIF_HOME           fresh FutureDiff home (default: $RUNNER_TEMP/fdif-home)
 #   WORK_DIR            fresh scratch directory (default: $RUNNER_TEMP/fdif-work)
@@ -41,7 +41,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 version="$(cat "$repo_root/VERSION")"
-baseline_version="${BASELINE_VERSION:-$version}"
+baseline_version="${BASELINE_VERSION:-v0.1.0-alpha.2}"
 candidate_archive="${CANDIDATE_ARCHIVE:-}"
 commit_expected="${COMMIT_EXPECTED:-}"
 if [[ -z "$candidate_archive" || ! -f "$candidate_archive" ]]; then
@@ -142,7 +142,8 @@ export PATH="$prefix/bin:$PATH"
 
 run_workflow() {
   # run_workflow LABEL -> writes transaction id to stdout; fails on error
-  local label=$1 repo_dir="$work_dir/repo-$label"
+  local label="$1"
+  local repo_dir="$work_dir/repo-$label"
   rm -rf "$repo_dir"
   git init -q -b main "$repo_dir"
   git -C "$repo_dir" config user.email "lifecycle@example.invalid"

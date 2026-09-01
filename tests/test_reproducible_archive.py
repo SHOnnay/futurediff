@@ -12,6 +12,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ARCHIVER = os.path.join(ROOT, "scripts", "reproducible-archive.py")
 
 
+@unittest.skipIf(
+    os.name == "nt",
+    "reproducible release archives are supported on Linux and macOS",
+)
 class ReproducibleArchiveTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="futurediff-repro-archive-test.")
