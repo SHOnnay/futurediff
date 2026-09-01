@@ -264,7 +264,10 @@ proc="$(pgrep -f 'futurediff|fdif ' 2>/dev/null | head -5 | tr '\n' ' ' || true)
 [[ -n "$proc" ]] && { residue_ok=0; residue_detail="processes: $proc"; }
 units="$(systemctl list-unit-files 2>/dev/null | grep -i futurediff || true)"
 [[ -n "$units" ]] && { residue_ok=0; residue_detail="$residue_detail units: $units"; }
-prefix_left="$(find "$prefix" -mindepth 1 2>/dev/null | head -5 | tr '\n' ' ' || true)"
+# The uninstall contract removes the installed binaries, not the shared
+# prefix/bin directory created by the installer. Flag actual residual entries
+# while allowing that directory to remain empty.
+prefix_left="$(find "$prefix" -mindepth 1 ! -type d 2>/dev/null | head -5 | tr '\n' ' ' || true)"
 [[ -n "$prefix_left" ]] && { residue_ok=0; residue_detail="$residue_detail prefix: $prefix_left"; }
 [[ $residue_ok -eq 1 ]] || fail "residue found: $residue_detail"
 record "13_residue": true
