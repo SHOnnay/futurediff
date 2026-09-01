@@ -37,7 +37,8 @@
 #                       (default: ./lifecycle-evidence.json)
 #
 # Exit non-zero if any step fails (fail-closed).
-set -euo pipefail
+set -Eeuo pipefail
+trap 'rc=$?; echo "FAIL: unexpected command failure at line $LINENO (exit $rc): $BASH_COMMAND" >&2' ERR
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 version="$(cat "$repo_root/VERSION")"
