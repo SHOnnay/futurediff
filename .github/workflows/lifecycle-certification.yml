@@ -95,7 +95,7 @@ jobs:
         env:
           CANDIDATE_ARCHIVE: ${{ runner.temp }}/candidate/futurediff-v0.1.0-alpha.3-linux-amd64.tar.gz
           COMMIT_EXPECTED: ${{ env.CERTIFICATION_SHA }}
-          BASELINE_VERSION: v0.1.0-alpha.2
+          BASELINE_VERSION: v0.1.0-alpha.1
           OUTPUT: ${{ runner.temp }}/lifecycle-evidence.json
         shell: bash
         run: bash scripts/certify-linux-lifecycle.sh
